@@ -68,7 +68,7 @@ spec:
               items:
                 type: string
               default:
-                - "http://localhost:3000"
+                - "http://localhost:13000"
             allowMethods:
               type: array
               items:
@@ -153,10 +153,31 @@ spec:
                 - name: main
                   image: ${workload.container.image}
                   imagePullPolicy: ${environmentConfigs.imagePullPolicy}
-                  command: |
-                    ${has(workload.container.command) ? workload.container.command : oc_omit()}
-                  args: |
-                    ${has(workload.container.args) ? workload.container.args : oc_omit()}
+                  command:
+                    - /bin/sh
+                    - -lc
+                  args:
+                    - |
+                      cat >/tmp/amp_chat_hotfix.py <<'PY'
+                      from pathlib import Path
+
+                      p = Path('/workspace/main.py')
+                      text = p.read_text()
+                      old = """# Pydantic model for handling chat input\nclass Question(BaseModel):\n    prompt: str\n"""
+                      new = """# Pydantic model for handling chat input\nclass Question(BaseModel):\n    prompt: str | None = None\n    message: str | None = None\n    session_id: str | None = None\n    context: dict | None = None\n"""
+                      if old in text:
+                          text = text.replace(old, new, 1)
+
+                      old2 = """# Route to chat with OpenAI\n@app.post(\"/chat/\")\ndef ask_openai(question: Question):\n    try:\n        response = client.chat.completions.create(\n            model=\"gpt-4o\",\n            messages=[{\"role\": \"user\", \"content\": question.prompt}]\n        )\n        result = response.choices[0].message.content\n\n        # Store chat history in database\n        db = SessionLocal()\n        db.add(QueryHistory(question=question.prompt, response=result))\n        db.commit()\n\n        return {\"response\": result}\n    except Exception as e:\n        raise HTTPException(status_code=500, detail=str(e))\n"""
+                      new2 = """# Route to chat with OpenAI\n@app.post(\"/chat/\")\ndef ask_openai(question: Question):\n    try:\n        user_prompt = question.message or question.prompt\n        if not user_prompt:\n            raise HTTPException(status_code=422, detail=\"message or prompt is required\")\n\n        response = client.chat.completions.create(\n            model=\"gpt-4o\",\n            messages=[{\"role\": \"user\", \"content\": user_prompt}]\n        )\n        result = response.choices[0].message.content\n\n        # Store chat history in database\n        db = SessionLocal()\n        db.add(QueryHistory(question=user_prompt, response=result))\n        db.commit()\n\n        return {\"response\": result}\n    except HTTPException:\n        raise\n    except Exception as e:\n        raise HTTPException(status_code=500, detail=str(e))\n"""
+                      if old2 in text:
+                          text = text.replace(old2, new2, 1)
+
+                      p.write_text(text)
+                      print("startup hotfix applied")
+                      PY
+                      /layers/google.python.runtime/python/bin/python3 /tmp/amp_chat_hotfix.py
+                      exec /cnb/process/web
                   resources:
                     requests:
                       cpu: ${environmentConfigs.resources.requests.cpu}
