@@ -6,6 +6,14 @@
 
 An open control plane designed for enterprises to deploy, manage, and govern AI agents at scale.
 
+## Note About External Repository Import Testing
+
+To validate agent import and deployment from an external source repository, we used the following public repository as a compatible agent example:
+
+- https://github.com/kooljo/poc-agent-sdk (branch: main, commit: 8de1694693c4dea1220dbb1397b00a227fd23e98)
+
+This repository was used to verify integration and automatic deployment of internally hosted agents from source code stored on GitHub.
+
 ## Overview
 
 WSO2 Agent Manager provides a comprehensive platform for enterprise AI agent management. It enables organizations to deploy AI agents (both internally hosted and externally deployed), monitor their behavior through full-stack observability, and enforce governance policies at scale.
