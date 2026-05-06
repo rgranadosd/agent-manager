@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../../charlas/48HSK"
+		}
+	],
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"kubectl logs": true
+		}
+	}
+}

@@ -218,7 +218,7 @@ console:
   image:
     repository: ghcr.io/wso2/amp-console
     tag: "0.0.0-dev"
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   service:
     type: LoadBalancer
@@ -262,7 +262,7 @@ console:
     # Backend API URLs (will be auto-configured if empty)
     apiBaseUrl: "http://localhost:9000"
     # Gateway control plane URL for gateway setup commands (default: http://localhost:9243)
-    gatewayControlPlaneUrl: "host.docker.internal:9243"
+    gatewayControlPlaneUrl: "localhost:9243"
     # Gateway version for setup commands (default: v0.9.0)
     gatewayVersion: "v0.9.0"
     instrumentationUrl: "https://localhost:22894/otel"

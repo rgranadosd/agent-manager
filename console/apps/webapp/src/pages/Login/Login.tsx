@@ -18,7 +18,7 @@
 
 import { useAuthHooks } from "@agent-management-platform/auth";
 import { FullPageLoader } from "@agent-management-platform/views";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
 export function Login() {
@@ -33,10 +33,7 @@ export function Login() {
   const { state } = useLocation();
   const from = state?.from?.pathname || "/";
 
-  const isOAuthCallback = useMemo(
-    () => new URLSearchParams(window.location.search).has("code"),
-    [],
-  );
+  const hasInitiatedLogin = useRef(false);
 
   const safeRedirectPath = useMemo(() => {
     if (!from || typeof from !== "string") {
@@ -67,15 +64,17 @@ export function Login() {
       return;
     }
 
-    if (!isOAuthCallback) {
-      login();
+    if (hasInitiatedLogin.current) {
+      return;
     }
+
+    hasInitiatedLogin.current = true;
+    void login();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isAuthenticated,
     isLoadingIsAuthenticated,
     isLoadingUserInfo,
-    isOAuthCallback,
     safeRedirectPath,
     userInfo,
     // login, comment out to avoid infinite re-render

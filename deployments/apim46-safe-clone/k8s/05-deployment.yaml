@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apim46-lab
+  namespace: apim46-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: apim46-lab
+  template:
+    metadata:
+      labels:
+        app: apim46-lab
+    spec:
+      securityContext:
+        fsGroup: 10001
+      initContainers:
+        - name: verify-db-clone
+          image: busybox:1.36.1
+          command:
+            - sh
+            - -c
+            - >-
+              test -f /database/WSO2AM_DB.mv.db &&
+              test -f /database/WSO2SHARED_DB.mv.db &&
+              test -f /database/WSO2CARBON_DB.mv.db
+          volumeMounts:
+            - name: database
+              mountPath: /database
+      containers:
+        - name: apim46-lab
+          image: localhost/apim46-lab:4.6.0-local-jdk21
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WSO2_SERVER_HOME
+              value: /home/wso2carbon/wso2am-4.6.0
+            - name: APIM_PUBLIC_HOSTNAME
+              value: localhost
+            - name: APIM_INTERNAL_MGMT_DNS
+              value: apim46-lab-mgmt.apim46-lab.svc.cluster.local
+            # Upstream wso2/wso2am:4.6.0 ships JDK 21. The api-manager.sh start
+            # script appends -XX:MaxPermSize=256m (removed in JDK 17+) when
+            # JVM_MEM_OPTS is unset, causing the JVM to abort. Set explicit
+            # JVM_MEM_OPTS so that branch is bypassed.
+            - name: JVM_MEM_OPTS
+              value: -Xms1024m -Xmx2048m
+          envFrom:
+            - secretRef:
+                name: apim46-lab-env
+          ports:
+            - name: https-mgmt
+              containerPort: 9453
+            - name: https-gateway
+              containerPort: 8253
+            - name: http-gateway
+              containerPort: 8290
+          startupProbe:
+            tcpSocket:
+              port: 9453
+            periodSeconds: 10
+            failureThreshold: 180
+          readinessProbe:
+            tcpSocket:
+              port: 8253
+            periodSeconds: 15
+            failureThreshold: 20
+          livenessProbe:
+            tcpSocket:
+              port: 9453
+            periodSeconds: 30
+            failureThreshold: 10
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          volumeMounts:
+            - name: apim-config
+              mountPath: /opt/wso2/bootstrap/deployment.toml.tpl
+              subPath: deployment.toml.tpl
+              readOnly: true
+            - name: apim-config
+              mountPath: /opt/wso2/bootstrap/sequences/InputSanitizationPolicy.xml
+              subPath: InputSanitizationPolicy.xml
+              readOnly: true
+            - name: apim-config
+              mountPath: /opt/wso2/bootstrap/sequences/WSO2AM--Ext--In.xml
+              subPath: WSO2AM--Ext--In.xml
+              readOnly: true
+            - name: keystores
+              mountPath: /opt/wso2/bootstrap/security
+              readOnly: true
+            - name: database
+              mountPath: /home/wso2carbon/wso2am-4.6.0/repository/database
+          terminationMessagePolicy: FallbackToLogsOnError
+      terminationGracePeriodSeconds: 120
+      volumes:
+        - name: apim-config
+          configMap:
+            name: apim46-lab-config
+        - name: keystores
+          secret:
+            secretName: apim46-lab-keystores
+        - name: database
+          persistentVolumeClaim:
+            claimName: apim46-lab-db

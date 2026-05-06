@@ -9,10 +9,6 @@ kubeAPI:
   hostPort: "6550"
 # Single cluster mode exposes all plane port ranges for consistency with multi-cluster setup
 ports:
-  # AMP Console UI (NodePort service on port 3000)
-  - port: 3000:3000
-    nodeFilters:
-      - loadbalancer
   # AMP API (LoadBalancer service on port 9000)
   - port: 9000:9000
     nodeFilters:

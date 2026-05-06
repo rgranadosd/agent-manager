@@ -1,0 +1,47 @@
+# Thin overlay over the official WSO2 APIM 4.6 image.
+# Adds only the truly custom artifacts required by this lab:
+#   - Custom InputSanitizationMediator JAR
+#   - Local synapse sequences and file-system APIs
+#   - Bootstrap entrypoint that templates deployment.toml + materializes secrets
+# Keeps the upstream base intact (Java, layout, ports, user 10001).
+FROM docker.io/wso2/wso2am:4.6.0
+
+USER root
+
+ARG WSO2_SERVER_HOME=/home/wso2carbon/wso2am-4.6.0
+
+RUN mkdir -p /opt/wso2/bootstrap/sequences /opt/wso2/bootstrap/security
+
+# Custom mediator JAR (truly custom; not present in upstream image).
+# IMPORTANT: only copy the custom JAR. Copying the legacy infra jars from the
+# local install (aspectjweaver_1.8.7, andes_client, securevault, etc.) crashes
+# the upstream image because it ships JDK 21 and those jars require JDK 11.
+COPY deployments/apim46-safe-clone/staging/product-home/wso2am-4.6.0/repository/components/dropins/InputSanitizationMediator.jar \
+     ${WSO2_SERVER_HOME}/repository/components/dropins/InputSanitizationMediator.jar
+
+# Local synapse sequences (overwrite upstream defaults so customizations take effect)
+COPY deployments/apim46-safe-clone/staging/product-home/wso2am-4.6.0/repository/deployment/server/synapse-configs/default/sequences/ \
+     ${WSO2_SERVER_HOME}/repository/deployment/server/synapse-configs/default/sequences/
+
+# File-system deployed APIs (registry-deployed APIs come in via H2 PVC)
+COPY deployments/apim46-safe-clone/staging/product-home/wso2am-4.6.0/repository/deployment/server/synapse-configs/default/api/ \
+     ${WSO2_SERVER_HOME}/repository/deployment/server/synapse-configs/default/api/
+
+# Reuse the existing bootstrap entrypoint (templating + secrets + sequence merge)
+COPY deployments/apim46-safe-clone/container/apim-entrypoint.sh /usr/local/bin/apim-entrypoint.sh
+
+RUN chmod 0555 /usr/local/bin/apim-entrypoint.sh && \
+    chown -R 10001:10001 \
+        /opt/wso2 \
+        /usr/local/bin/apim-entrypoint.sh \
+        ${WSO2_SERVER_HOME}/repository/components/dropins \
+        ${WSO2_SERVER_HOME}/repository/deployment
+
+USER 10001
+
+ENV WSO2_SERVER_HOME=${WSO2_SERVER_HOME}
+WORKDIR ${WSO2_SERVER_HOME}
+
+EXPOSE 9453 8253 8290
+
+ENTRYPOINT ["/usr/local/bin/apim-entrypoint.sh"]

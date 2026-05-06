@@ -1,0 +1,92 @@
+services:
+
+  db-agent-manager:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: agent_manager
+      POSTGRES_USER: wso2
+      POSTGRES_PASSWORD: wso2123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wso2 -d agent_manager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openbao:
+    image: openbao/openbao:latest
+    cap_add:
+      - IPC_LOCK
+    environment:
+      - BAO_DEV_ROOT_TOKEN_ID=dev-root-token
+    ports:
+      - "8200:8200"
+    command: server -dev -dev-root-token-id=dev-root-token -dev-listen-address=0.0.0.0:8200
+    healthcheck:
+      test: ["CMD", "bao", "status", "-address=http://0.0.0.0:8200"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  agent-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9653:8080"   # Main API server (SERVER_PORT)
+      - "9243:9243"   # Internal HTTPS server (INTERNAL_SERVER_PORT)
+    environment:
+      - DB_HOST=db-agent-manager
+      - DB_PORT=5432
+      - DB_USER=wso2
+      - DB_PASSWORD=wso2123
+      - DB_NAME=agent_manager
+      - OPEN_CHOREO_BASE_URL=https://choreo.cloud.wso2.com
+      - JWT_SIGNING_PRIVATE_KEY_PATH=/app/keys/private.pem
+      - JWT_SIGNING_ACTIVE_KEY_ID=key-1
+      - JWT_SIGNING_PUBLIC_KEYS_CONFIG=/app/keys/public-keys-config.json
+      # OpenBao (data plane secrets)
+      - SECRET_MANAGER_PROVIDER=openbao
+      - OPENBAO_URL=http://openbao:8200
+      - OPENBAO_TOKEN=dev-root-token
+      - OPENBAO_PATH=secret
+      # OpenBao (workflow plane / git secrets)
+      - WORKFLOW_PLANE_OPENBAO_URL=http://openbao:8200
+      - WORKFLOW_PLANE_OPENBAO_TOKEN=dev-root-token
+      - WORKFLOW_PLANE_OPENBAO_PATH=secret
+      # Encryption key (AES-256, 32 bytes base64)
+      - ENCRYPTION_KEY=00b5dac5eb11b1ead377bf4477e0c4af16abf330391e73e5cbcdbd662ba2a53e
+    depends_on:
+      db-agent-manager:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+      start_period: 30s
+
+  console:
+    build:
+      context: ./console
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - API_BASE_URL=http://localhost:9653
+      - GATEWAY_CONTROL_PLANE_URL=http://localhost:9243
+      - GATEWAY_VERSION=v0.9.0
+      - INSTRUMENTATION_URL=
+      - GUARDRAILS_CATALOG_URL=
+      - GUARDRAILS_DEFINITION_BASE_URL=
+    depends_on:
+      agent-manager:
+        condition: service_started
+
+volumes:
+  pgdata:

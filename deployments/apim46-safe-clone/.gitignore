@@ -1,0 +1,4 @@
+build-overlay/dropins/*.jar
+build-overlay/lib/*.jar
+staging/
+*.tar

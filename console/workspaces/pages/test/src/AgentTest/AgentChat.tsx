@@ -73,7 +73,7 @@ export function AgentChat() {
 
   useEffect(() => {
     if (endpointOptions.length > 0) {
-      setEndpoint(endpointOptions[0].value + "/chat");
+      setEndpoint(endpointOptions[0].value.replace(/\/$/, "") + "/chat/");
     }
   }, [endpointOptions]);
 
@@ -81,8 +81,15 @@ export function AgentChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const canSendMessage = Boolean(message.trim()) && Boolean(endpoint) && !isLoading;
+
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) return;
+
+    if (!endpoint) {
+      setError("Agent endpoint is still loading. Wait a moment and try again.");
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -108,7 +115,6 @@ export function AgentChat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
-        referrerPolicy: "",
       });
 
       let responseData: any;
@@ -220,7 +226,7 @@ export function AgentChat() {
                 variant="contained"
                 color="primary"
                 onClick={handleSendMessage}
-                disabled={isLoading || !message.trim()}
+                disabled={!canSendMessage}
                 startIcon={
                   isLoading ? (
                     <CircularProgress size={16} />

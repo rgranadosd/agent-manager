@@ -14,6 +14,9 @@ VERSION="${VERSION:-0.0.0-dev}"
 # Helm chart registry and versions
 HELM_CHART_REGISTRY="${HELM_CHART_REGISTRY:-ghcr.io/wso2}"
 
+# Local charts directory (used when VERSION=0.0.0-dev to avoid fetching from remote registry)
+LOCAL_CHARTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../helm-charts" && pwd)"
+
 # Chart names
 AMP_CHART_NAME="wso2-agent-manager"
 BUILD_CI_CHART_NAME="wso2-amp-build-extension"
@@ -80,6 +83,16 @@ if ! declare -f log_warning >/dev/null 2>&1; then
         echo "WARNING: $1" >&2
     }
 fi
+
+# Resolve chart reference: use local path for dev, OCI registry for releases
+resolve_chart_ref() {
+    local chart_name="$1"
+    if [[ "${VERSION}" == "0.0.0-dev" && -d "${LOCAL_CHARTS_DIR}/${chart_name}" ]]; then
+        echo "${LOCAL_CHARTS_DIR}/${chart_name}"
+    else
+        echo "oci://${HELM_CHART_REGISTRY}/${chart_name}"
+    fi
+}
 
 # Check if helm release exists
 helm_release_exists() {
@@ -150,7 +163,8 @@ install_amp_helm_chart() {
 
 # Install Agent Management Platform
 install_agent_management_platform() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${AMP_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${AMP_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp"
     local helm_log="/tmp/helm-amp-install.log"
@@ -159,7 +173,7 @@ install_agent_management_platform() {
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${AMP_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
         --set console.config.instrumentationUrl="http://localhost:22893/otel" \
-        "${AMP_HELM_ARGS[@]}" >"${helm_log}" 2>&1; then
+        ${AMP_HELM_ARGS[@]+"${AMP_HELM_ARGS[@]}"} >"${helm_log}" 2>&1; then
         echo "Helm installation log (last 50 lines):"
         tail -50 "${helm_log}" 2>/dev/null || cat "${helm_log}" 2>/dev/null || echo "Log file not available"
         echo ""
@@ -218,14 +232,15 @@ install_agent_management_platform() {
 
 # Install Observability Extension
 install_observability_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${OBSERVABILITY_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${OBSERVABILITY_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-observability-traces"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${OBSERVABILITY_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${OBSERVABILITY_HELM_ARGS[@]}"; then
+        ${OBSERVABILITY_HELM_ARGS[@]+"${OBSERVABILITY_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -245,14 +260,15 @@ install_observability_extension() {
 
 # Install AMP Thunder Extension
 install_amp_thunder_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${THUNDER_EXTENSION_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${THUNDER_EXTENSION_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-thunder-extension"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${THUNDER_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${THUNDER_HELM_ARGS[@]}"; then
+        ${THUNDER_HELM_ARGS[@]+"${THUNDER_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -261,14 +277,15 @@ install_amp_thunder_extension() {
 
 # Install Build Extension
 install_build_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${BUILD_CI_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${BUILD_CI_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="build-workflow-extensions"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${BUILD_CI_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${BUILD_CI_HELM_ARGS[@]}"; then
+        ${BUILD_CI_HELM_ARGS[@]+"${BUILD_CI_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -277,14 +294,15 @@ install_build_extension() {
 
 # Install Evaluation Extension
 install_evaluation_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${EVALUATION_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${EVALUATION_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-evaluation-extension"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${EVALUATION_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${EVALUATION_HELM_ARGS[@]}"; then
+        ${EVALUATION_HELM_ARGS[@]+"${EVALUATION_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -293,14 +311,15 @@ install_evaluation_extension() {
 
 # Install Platform Resources Extension
 install_platform_resources_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${PLATFORM_RESOURCES_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${PLATFORM_RESOURCES_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-platform-resources"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${DEFAULT_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${PLATFORM_RESOURCES_HELM_ARGS[@]}"; then
+        ${PLATFORM_RESOURCES_HELM_ARGS[@]+"${PLATFORM_RESOURCES_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -309,14 +328,15 @@ install_platform_resources_extension() {
 
 # Install Secrets Extension (OpenBao for secret management)
 install_secrets_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${SECRETS_EXTENSION_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${SECRETS_EXTENSION_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-secrets"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${SECRETS_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${SECRETS_HELM_ARGS[@]}"; then
+        ${SECRETS_HELM_ARGS[@]+"${SECRETS_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -374,14 +394,15 @@ verify_amp_prerequisites() {
 #   1. Runs a bootstrap Job to register the AI gateway in Agent Manager and generate a token
 #   2. Deploys an APIGateway CR consumed by the gateway-operator to spin up the full stack
 install_gateway_extension() {
-    local chart_ref="oci://${HELM_CHART_REGISTRY}/${GATEWAY_EXTENSION_CHART_NAME}"
+    local chart_ref
+    chart_ref=$(resolve_chart_ref "${GATEWAY_EXTENSION_CHART_NAME}")
     local chart_version="${VERSION}"
     local release_name="amp-ai-gateway"
 
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${DATA_PLANE_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${GATEWAY_HELM_ARGS[@]}"; then
+        ${GATEWAY_HELM_ARGS[@]+"${GATEWAY_HELM_ARGS[@]}"}; then
         return 1
     fi
 

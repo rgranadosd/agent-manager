@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: apim46-lab-ingress
+  namespace: apim46-lab
+spec:
+  podSelector:
+    matchLabels:
+      app: apim46-lab
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apim46-lab
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: wso2-amp
+      ports:
+        - protocol: TCP
+          port: 9453
+        - protocol: TCP
+          port: 8253
+        - protocol: TCP
+          port: 8290

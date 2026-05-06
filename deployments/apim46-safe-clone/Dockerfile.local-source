@@ -1,0 +1,26 @@
+FROM docker.io/library/eclipse-temurin:21-jre-jammy
+
+ARG WSO2_SERVER_HOME=/home/wso2carbon/wso2am-4.6.0
+
+USER root
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends bash ca-certificates findutils procps && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --gid 10001 wso2 && \
+    useradd --uid 10001 --gid 10001 --create-home --home-dir /home/wso2carbon --shell /bin/bash wso2carbon && \
+    mkdir -p /opt/wso2/bootstrap/sequences /opt/wso2/bootstrap/security ${WSO2_SERVER_HOME}/repository/database
+
+COPY deployments/apim46-safe-clone/staging/product-home/wso2am-4.6.0/ ${WSO2_SERVER_HOME}/
+COPY deployments/apim46-safe-clone/container/apim-entrypoint.sh /usr/local/bin/apim-entrypoint.sh
+
+RUN chmod 0555 /usr/local/bin/apim-entrypoint.sh && \
+    chown -R 10001:10001 /home/wso2carbon /opt/wso2 /usr/local/bin/apim-entrypoint.sh
+
+USER 10001
+
+WORKDIR ${WSO2_SERVER_HOME}
+
+EXPOSE 9453 8253 8290
+
+ENTRYPOINT ["/usr/local/bin/apim-entrypoint.sh"]

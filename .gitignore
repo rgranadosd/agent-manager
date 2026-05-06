@@ -65,6 +65,7 @@ agent-manager-service/agent-manager-service
 charts/
 
 .env
+.amp-local.env
 
 # Local development configurations
 deployments/values/api-platform-operator-local-config.yaml

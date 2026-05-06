@@ -68,9 +68,9 @@ export const useAuthHooks = () => {
     },
   });
 
-  const customLogin = () => {
-    signIn();
-    refetchIsAuthenticated();
+  const customLogin = async () => {
+    await signIn();
+    await refetchIsAuthenticated();
   };
 
   const handleLogout = async () => {

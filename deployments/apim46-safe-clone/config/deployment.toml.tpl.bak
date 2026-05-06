@@ -1,0 +1,59 @@
+[server]
+hostname = "__APIM_PUBLIC_HOSTNAME__"
+offset = 10
+base_path = "https://__APIM_PUBLIC_HOSTNAME__:9453"
+server_role = "default"
+
+[super_admin]
+username = "__SUPER_ADMIN_USERNAME__"
+password = "__SUPER_ADMIN_PASSWORD__"
+create_admin_account = true
+
+[user_store]
+type = "database_unique_id"
+
+[database.apim_db]
+type = "h2"
+url = "jdbc:h2:./repository/database/WSO2AM_DB;DB_CLOSE_ON_EXIT=FALSE"
+username = "wso2carbon"
+password = "wso2carbon"
+
+[database.shared_db]
+type = "h2"
+url = "jdbc:h2:./repository/database/WSO2SHARED_DB;DB_CLOSE_ON_EXIT=FALSE"
+username = "wso2carbon"
+password = "wso2carbon"
+
+[database.local]
+url = "jdbc:h2:./repository/database/WSO2CARBON_DB;DB_CLOSE_ON_EXIT=FALSE"
+
+[keystore.tls]
+file_name = "wso2carbon-new.jks"
+type = "JKS"
+password = "__TLS_KEYSTORE_PASSWORD__"
+alias = "__TLS_KEY_ALIAS__"
+key_password = "__TLS_KEY_PASSWORD__"
+
+[keystore.listener_profile]
+bind_address = "0.0.0.0"
+
+[apim]
+gateway_type = "Regular,APK,AWS,Azure,Kong,Envoy"
+
+[[apim.gateway.environment]]
+name = "Default"
+type = "hybrid"
+gateway_type = "Regular"
+provider = "wso2"
+display_in_api_console = true
+description = "Lab-safe cloned gateway environment."
+show_as_token_endpoint_url = true
+service_url = "https://__APIM_INTERNAL_MGMT_DNS__:9453/services/"
+username = "${admin.username}"
+password = "${admin.password}"
+ws_endpoint = "ws://__APIM_PUBLIC_HOSTNAME__:9099"
+wss_endpoint = "wss://__APIM_PUBLIC_HOSTNAME__:8099"
+http_endpoint = "http://__APIM_PUBLIC_HOSTNAME__:8290"
+https_endpoint = "https://__APIM_PUBLIC_HOSTNAME__:8253"
+websub_event_receiver_http_endpoint = "http://__APIM_PUBLIC_HOSTNAME__:9021"
+websub_event_receiver_https_endpoint = "https://__APIM_PUBLIC_HOSTNAME__:8021"

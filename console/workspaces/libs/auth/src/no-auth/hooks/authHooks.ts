@@ -18,6 +18,52 @@
 
 
 import { UserInfo } from '../../types';
+import { globalConfig } from '@agent-management-platform/types';
+
+let cachedLocalToken: string | null = null;
+
+function getLocalTokenEndpoint(): string {
+  const configuredBaseUrl = globalConfig.authConfig?.baseUrl || 'http://localhost:8082';
+
+  try {
+    const url = new URL(configuredBaseUrl);
+    return `${url.origin}/oauth2/token`;
+  } catch {
+    return 'http://localhost:8082/oauth2/token';
+  }
+}
+
+async function getLocalDevToken(): Promise<string> {
+  if (cachedLocalToken) {
+    return cachedLocalToken;
+  }
+
+  const response = await fetch(getLocalTokenEndpoint(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: 'amp-api-client',
+      client_secret: 'amp-api-client-secret',
+      scope: 'openid system',
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to obtain local dev token: ${response.status}`);
+  }
+
+  const data = await response.json() as { access_token?: string };
+
+  if (!data.access_token) {
+    throw new Error('Thunder token response did not include access_token');
+  }
+
+  cachedLocalToken = data.access_token;
+  return data.access_token;
+}
 
 const demoUserInfo : UserInfo = {
   username: 'john.doe',
@@ -31,6 +77,7 @@ const demoUserInfo : UserInfo = {
 };
 
 export const refreshToken = async () => {
+  cachedLocalToken = null;
   return Promise.resolve();
 }
 export const useAuthHooks = () => {
@@ -42,6 +89,6 @@ export const useAuthHooks = () => {
     login: () => Promise.resolve(),
     logout: () => Promise.resolve(),
     trySignInSilently: () => Promise.resolve(),
-    getToken: () => Promise.resolve('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJBZ2VudCBNYW5hZ2VtZW50IFBsYXRmb3JtIExvY2FsIiwiaWF0IjoxNzYxNzI3NDY5LCJleHAiOjE3OTMyNjM0NjksImF1ZCI6ImxvY2FsaG9zdCIsInN1YiI6IjhmMzA3MzUxLTI1YzUtNGZjNi04NWUwLWY1MWMyZDQ1OGYwNiJ9.etSp2_pwhdaWnFlK8IYWCptWV1MiZd32Ou6Ri6rBIvE'),
+    getToken: () => getLocalDevToken(),
   };
 };

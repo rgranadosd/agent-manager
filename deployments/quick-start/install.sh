@@ -94,7 +94,6 @@ check_port_available() {
 # Check all required ports are available
 check_required_ports() {
     # Required ports for k3d cluster (host:container mapping)
-    # 3000  - AMP Console UI
     # 8080  - kgateway HTTP (Thunder auth + OpenChoreo API routing)
     # 8443  - kgateway HTTPS
     # 8084  - AI Gateway HTTP
@@ -111,7 +110,7 @@ check_required_ports() {
     # 21893 - OTel Collector
     # 22893 - Observability Gateway HTTP
     # 22894 - Observability Gateway HTTPS
-    local required_ports=(3000 8080 8443 8084 8243 9000 9098 9243 10082 11080 11082 11085 19080 19443 21893 22893 22894)
+    local required_ports=(8080 8443 8084 8243 9000 9098 9243 10082 11080 11082 11085 19080 19443 21893 22893 22894)
     local ports_in_use=()
 
     for port in "${required_ports[@]}"; do
@@ -454,29 +453,24 @@ log_step "OpenChoreo Development Environment Setup"
 
 # Check and fix Docker permissions
 check_docker_permissions() {
-    local docker_sock="/var/run/docker.sock"
-    
-    if [ ! -S "${docker_sock}" ]; then
-        log_error "Docker socket not found at ${docker_sock}"
-        log_info "Make sure Docker is running and the socket is mounted"
-        return 1
-    fi
-    
-    # Check if we can access Docker
-    if docker ps &>/dev/null; then
-        log_success "Docker access verified"
-        return 0
-    fi
-    
-    # Try to fix permissions
-    log_warning "Docker socket permissions issue detected. Attempting to fix..."
-    if sudo chmod 666 "${docker_sock}" 2>/dev/null; then
-        log_success "Docker socket permissions fixed"
-        return 0
+    # Check if we can access the container runtime (podman or docker)
+    local runtime
+    if command -v podman &>/dev/null; then
+        runtime="podman"
+    elif command -v docker &>/dev/null; then
+        runtime="docker"
     else
-        log_error "Cannot fix Docker socket permissions. Please run: sudo chmod 666 ${docker_sock}"
+        log_error "Neither podman nor docker found in PATH"
         return 1
     fi
+
+    if ${runtime} ps &>/dev/null; then
+        log_success "Container runtime (${runtime}) access verified"
+        return 0
+    fi
+
+    log_error "Cannot access container runtime ${runtime}. Make sure Podman/Docker is running."
+    return 1
 }
 
 # Check prerequisites
@@ -652,7 +646,8 @@ if [[ -z "$NODES" ]]; then
 else
     for NODE in $NODES; do
         log_info "Generating machine ID for ${NODE}..."
-        if docker exec ${NODE} sh -c "cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id" 2>/dev/null; then
+        _rt=$(command -v podman || command -v docker)
+        if ${_rt} exec ${NODE} sh -c "cat /proc/sys/kernel/random/uuid | tr -d '-' > /etc/machine-id" 2>/dev/null; then
             log_success "Machine ID generated for ${NODE}"
         else
             log_warning "Could not generate Machine ID for ${NODE} (it may not be running)"
@@ -755,7 +750,7 @@ if helm upgrade --install openbao oci://ghcr.io/openbao/charts/openbao \
     --namespace openbao \
     --create-namespace \
     --version 0.25.6 \
-    --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-openbao.yaml" \
+    --values "${SCRIPT_DIR}/../single-cluster/values-openbao.yaml" \
     --timeout 180s &>/dev/null; then
     log_success "OpenBao installed successfully"
 else
@@ -816,7 +811,7 @@ helm_install_idempotent \
     "openchoreo-control-plane" \
     "${TIMEOUT_CONTROL_PLANE}" \
     --version "${OPENCHOREO_VERSION}" \
-    --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-cp.yaml"
+    --values "${SCRIPT_DIR}/../single-cluster/values-cp.yaml"
 
 wait_for_pods "openchoreo-control-plane" "${TIMEOUT_CONTROL_PLANE}"
 
@@ -834,7 +829,7 @@ helm_install_idempotent \
     "${DATA_PLANE_NS}" \
     "${TIMEOUT_DATA_PLANE}" \
     --version "${OPENCHOREO_VERSION}" \
-    --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-dp.yaml"
+    --values "${SCRIPT_DIR}/../single-cluster/values-dp.yaml"
 
 # Register Data Plane with Control Plane
 log_info "Registering Data Plane with Control Plane..."
@@ -1019,7 +1014,7 @@ fi
 
 # Apply OpenTelemetry Collector ConfigMap (idempotent)
 log_info "Applying Custom OpenTelemetry Collector configuration..."
-CONFIGMAP_FILE="https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/values/oc-collector-configmap.yaml"
+CONFIGMAP_FILE="${SCRIPT_DIR}/../values/oc-collector-configmap.yaml"
 
 if kubectl apply -f "${CONFIGMAP_FILE}" -n "${OBSERVABILITY_NS}" &>/dev/null; then
     log_success "OpenTelemetry Collector configuration applied successfully"
@@ -1042,7 +1037,7 @@ helm_install_idempotent \
     "${TIMEOUT_OBSERVABILITY_PLANE}" \
     --version "${OPENCHOREO_VERSION}" \
     --set observer.extraEnv.AUTH_SERVER_BASE_URL=http://thunder-service.openchoreo-control-plane.svc.cluster.local:8090 \
-    --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-op.yaml"
+    --values "${SCRIPT_DIR}/../single-cluster/values-op.yaml"
 
 # Install Observability Modules
 log_info "Installing Observability Modules..."
@@ -1251,7 +1246,7 @@ log_success "Gateway Operator installed"
 
 # Apply Gateway Operator Configuration
 log_info "Applying Gateway Operator Configuration..."
-GATEWAY_CONFIG_FILE="https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/values/api-platform-operator-full-config.yaml"
+GATEWAY_CONFIG_FILE="${SCRIPT_DIR}/../values/api-platform-operator-full-config.yaml"
 
 if kubectl apply -f "${GATEWAY_CONFIG_FILE}" &>/dev/null; then
     log_success "Gateway Operator configuration applied successfully"
@@ -1303,7 +1298,7 @@ fi
 log_info "Applying Gateway and API Resources..."
 
 # Apply Gateway
-GATEWAY_FILE="https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/values/obs-gateway.yaml"
+GATEWAY_FILE="${SCRIPT_DIR}/../values/obs-gateway.yaml"
 if kubectl apply -f "${GATEWAY_FILE}" &>/dev/null; then
     log_success "Gateway resource applied"
 else
@@ -1319,7 +1314,7 @@ else
 fi
 
 # Apply RestApi
-RESTAPI_FILE="https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/values/otel-collector-rest-api.yaml"
+RESTAPI_FILE="${SCRIPT_DIR}/../values/otel-collector-rest-api.yaml"
 if kubectl apply -f "${RESTAPI_FILE}" &>/dev/null; then
     log_success "RestApi resource applied"
 else
