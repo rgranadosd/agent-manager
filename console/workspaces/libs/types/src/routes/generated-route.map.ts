@@ -91,7 +91,8 @@ export const generatedRouteMap =  {
                 }
               }
             }
-          },
+          }
+        },
         "evaluators": {
           "path": "/org/:orgId/evaluators",
           "wildPath": "/org/:orgId/evaluators/*",
