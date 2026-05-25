@@ -196,14 +196,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
   }
   if (!currentDiployment) {
     return (
-      <Card
-        variant="outlined"
-        sx={{
-          "&.MuiCard-root": {
-            backgroundColor: "background.paper",
-          },
-        }}
-      >
+      <Card variant="outlined">
         <CardContent>
           <Box
             display="flex"
@@ -235,25 +228,27 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
             </Box>
             <Box display="flex" flexDirection="row" gap={1} alignItems="center">
               {actions}
-              <Button
-                startIcon={<Workflow size={16} />}
-                variant="text"
-                component={Link}
-                to={generatePath(
-                  absoluteRouteMap.children.org.children.projects.children
-                    .agents.children.environment.children.observability.children.traces.path,
-                  {
-                    orgId,
-                    projectId,
-                    agentId,
-                    envId: environment?.name ?? "",
-                  }
-                )}
-                color="primary"
-                size="small"
-              >
-                View Traces
-              </Button>
+              {!external && (
+                <Button
+                  startIcon={<Workflow size={16} />}
+                  variant="text"
+                  component={Link}
+                  to={generatePath(
+                    absoluteRouteMap.children.org.children.projects.children
+                      .agents.children.environment.children.observability.children.traces.path,
+                    {
+                      orgId,
+                      projectId,
+                      agentId,
+                      envId: environment?.name ?? "",
+                    }
+                  )}
+                  color="primary"
+                  size="small"
+                >
+                  View Traces
+                </Button>
+              )}
             </Box>
           </Box>
           {bottomContent}

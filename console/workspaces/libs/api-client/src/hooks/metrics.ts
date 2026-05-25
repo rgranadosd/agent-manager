@@ -46,7 +46,9 @@ export function useGetAgentMetrics(
       const { startTime, endTime } = hasPreset
         ? getTimeRange(options!.timeRange!)
         : { startTime: body.startTime, endTime: body.endTime };
-      return getAgentMetrics(params, { environmentName: body.environmentName, startTime, endTime }, getToken);
+      return getAgentMetrics(
+        params, { environmentName: body.environmentName, startTime, endTime }, getToken,
+      );
     },
     refetchInterval: options?.enableAutoRefresh ? SLOW_POLL_INTERVAL : undefined,
     enabled:

@@ -40,7 +40,9 @@ interface KindInfoCardProps {
     model?: string;
 }
 
-export const KindInfoCard: React.FC<KindInfoCardProps> = ({ orgId, kindName, framework, model }) => {
+export const KindInfoCard: React.FC<KindInfoCardProps> = ({
+    orgId, kindName, framework, model,
+}) => {
     const { data: kind, isLoading } = useGetAgentKind({ orgName: orgId, kindName });
 
     const kindHref = generatePath(
@@ -122,7 +124,9 @@ export const KindInfoCard: React.FC<KindInfoCardProps> = ({ orgId, kindName, fra
                                     </Typography>
                                 </Box>
                                 <Typography variant="body2" color="text.secondary" noWrap flex={1}>
-                                    {formatDistanceToNow(new Date(latestVersionData.createdAt), { addSuffix: true })}
+                                    {formatDistanceToNow(
+                                        new Date(latestVersionData.createdAt), { addSuffix: true },
+                                    )}
                                 </Typography>
                                 {(framework || model) && (
                                     <Typography variant="caption" color="text.secondary" noWrap sx={{ flexShrink: 0 }}>

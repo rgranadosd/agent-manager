@@ -50,6 +50,8 @@ interface EnvObservabilitySectionProps {
     projectId: string;
     agentId: string;
     envId: string;
+    hideMetrics?: boolean;
+    external?: boolean;
 }
 
 const formatCpu = (cores: number): string => {
@@ -120,19 +122,24 @@ const MetricCard: React.FC<MetricCardProps> = ({ label, value, points, color = "
 );
 
 export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = ({
-    orgId, projectId, agentId, envId,
+    orgId, projectId, agentId, envId, hideMetrics = false, external = false,
 }) => {
     const theme = useTheme();
     const navigate = useNavigate();
     const { data: deployments } = useListAgentDeployments(
         { orgName: orgId, projName: projectId, agentName: agentId },
+        { enabled: !external },
     );
-    const isSuspended = deployments?.[envId]?.status === "suspended";
+    const isSuspended = !external && deployments?.[envId]?.status === "suspended";
 
     const { data: metrics, isLoading: isMetricsLoading } = useGetAgentMetrics(
         { agentName: agentId, orgName: orgId, projName: projectId },
         { environmentName: envId },
-        { enabled: !isSuspended, enableAutoRefresh: true, timeRange: TraceListTimeRange.ONE_HOUR },
+        {
+            enabled: !hideMetrics && !isSuspended,
+            enableAutoRefresh: true,
+            timeRange: TraceListTimeRange.ONE_HOUR,
+        },
     );
 
     const { traceList, isLoading: isTracesLoading } = useTraceList(
@@ -162,7 +169,7 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
 
     return (
         <>
-            {isSuspended ? (
+            {!hideMetrics && (isSuspended ? (
                 <NoDataFound
                     iconElement={PauseCircle}
                     message="Environment Suspended"
@@ -205,7 +212,7 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
                         />
                     </Stack>
                 </>
-            )}
+            ))}
             <Divider sx={{ mt: 1.5, mb: 1 }} />
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600}
@@ -262,16 +269,18 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
                                         <ListingTable.Cell
                                             align="center"
                                             sx={{
-                                                color: (theme) => isError
-                                                    ? theme.vars?.palette?.error?.main
-                                                    : theme.vars?.palette?.success?.main,
+                                                color: (t) => isError
+                                                    ? t.vars?.palette?.error?.main
+                                                    : t.vars?.palette?.success?.main,
                                             }}
                                         >
                                             <Tooltip
                                                 title={isError ? `${errorCount} error${errorCount > 1 ? "s" : ""}` : "OK"}
                                                 disableHoverListener={!isError}
                                             >
-                                                {isError ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                                                {isError
+                                                    ? <XCircle size={16} />
+                                                    : <CheckCircle size={16} />}
                                             </Tooltip>
                                         </ListingTable.Cell>
                                         <ListingTable.Cell align="left">
@@ -314,8 +323,14 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
                                         <ListingTable.Cell align="right">
                                             {trace.score?.score != null ? (
                                                 <Tooltip title={`${trace.score.totalCount} evaluations, ${trace.score.skippedCount} skipped`}>
-                                                    <Typography variant="caption" component="span"
-                                                        sx={{ color: scoreColor(trace.score.score), fontWeight: 600 }}>
+                                                    <Typography
+                                                        variant="caption"
+                                                        component="span"
+                                                        sx={{
+                                                            color: scoreColor(trace.score.score),
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
                                                         {(trace.score.score * 100).toFixed(1)}%
                                                     </Typography>
                                                 </Tooltip>
