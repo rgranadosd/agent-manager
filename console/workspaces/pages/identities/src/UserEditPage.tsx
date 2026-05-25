@@ -67,6 +67,7 @@ export const UserEditPage: React.FC = () => {
   const [selectedGroups, setSelectedGroups] = useState<ThunderGroup[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const hasEdited = useRef(false);
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export const UserEditPage: React.FC = () => {
   const handleSave = async () => {
     if (!orgId || !userId) return;
     setSaveError(undefined);
+    setSaveSuccess(false);
     setIsSaving(true);
     try {
       const currentGroupIds = new Set(initialGroups.map((g) => g.id));
@@ -110,7 +112,8 @@ export const UserEditPage: React.FC = () => {
         });
       }
 
-      navigate(usersPath);
+      setSaveSuccess(true);
+      hasEdited.current = false;
     } catch {
       setSaveError("Failed to update group memberships. Please try again.");
     } finally {
@@ -138,9 +141,8 @@ export const UserEditPage: React.FC = () => {
       disableIcon
     >
       <Stack spacing={3} sx={{ maxWidth: 700 }}>
-        {saveError != null && (
-          <Alert severity="error">{saveError}</Alert>
-        )}
+        {saveError != null && <Alert severity="error">{saveError}</Alert>}
+        {saveSuccess && <Alert severity="success">User updated successfully.</Alert>}
 
         <Box>
           <Typography variant="subtitle1" fontWeight={600} mb={1}>

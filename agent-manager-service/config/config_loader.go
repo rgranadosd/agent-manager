@@ -228,7 +228,7 @@ func loadEnvs() {
 	}
 
 	config.RBACEnabled = r.readOptionalBool("RBAC_ENABLED", false)
-  
+
 	// Resource limits for agent resource configurations (operator-controlled ceilings)
 	config.PerAgentResourceLimits = ResourceLimitsConfig{
 		MaxReplicas: int(r.readOptionalInt64("RESOURCE_MAX_REPLICAS", 10)),

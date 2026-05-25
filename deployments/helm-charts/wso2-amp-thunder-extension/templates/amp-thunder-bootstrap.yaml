@@ -1488,3 +1488,39 @@ data:
       '["org:view","project:read","environment:create","environment:read","environment:update","environment:delete","gateway:create","gateway:read","gateway:update","gateway:delete","gateway:token:manage","data-plane:read","deployment-pipeline:read","llm-provider:read","llm-provider:configure-guardrail","mcp-server:read","mcp-server:configure-guardrail","agent:read","agent:build","agent:deploy:non-production","agent:deploy:production","agent:promote","agent:rollback","agent:suspend","monitor:read","monitor:score:read","observability:org-dashboard","observability:project-dashboard","observability:infra-metric","catalog:read"]'
 
     log_info "Default role provisioning complete (4 roles created/updated)."
+
+    # ===========================================================================
+    # Assign default users to roles
+    # ===========================================================================
+    assign_user_to_role() {
+      local username="$1" role_id="$2" role_name="$3"
+      local response http_code body user_id
+
+      response=$(thunder_api_call GET "/users")
+      http_code="${response: -3}"
+      body="${response%???}"
+      if [[ "$http_code" != "200" ]]; then
+        log_error "Failed to fetch users (HTTP $http_code)"
+        exit 1
+      fi
+
+      user_id=$(echo "$body" | sed 's/},{/}\n{/g' | grep "\"username\":\"${username}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+      if [[ -z "$user_id" ]]; then
+        log_warning "User '${username}' not found, skipping role assignment"
+        return 0
+      fi
+
+      local payload="{\"assignments\":[{\"id\":\"${user_id}\",\"type\":\"user\"}]}"
+      response=$(thunder_api_call POST "/roles/${role_id}/assignments/add" "$payload")
+      http_code="${response: -3}"
+      if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]] || [[ "$http_code" == "204" ]] || [[ "$http_code" == "409" ]]; then
+        log_success "Assigned user '${username}' to role '${role_name}'"
+      else
+        log_error "Failed to assign user '${username}' to role '${role_name}' (HTTP $http_code): ${response%???}"
+        exit 1
+      fi
+    }
+
+    assign_user_to_role "amp-admin@wso2.com" "$ADMIN_ID" "admin"
+
+    log_info "Default role assignments complete."

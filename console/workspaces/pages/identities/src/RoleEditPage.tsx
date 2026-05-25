@@ -21,6 +21,7 @@ import {
   Autocomplete,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Divider,
@@ -39,6 +40,7 @@ import { generatePath, useNavigate, useParams } from "react-router-dom";
 import {
   useAllUsers,
   useAllGroups,
+  useGetRole,
   useGetRoleAssignments,
   useAddRoleAssignees,
   useRemoveRoleAssignees,
@@ -80,7 +82,12 @@ export const RoleEditPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>("permissions");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | undefined>();
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const { data: roleData, isLoading: isLoadingRole } = useGetRole({
+    orgName: orgId,
+    roleId: roleId ?? "",
+  });
   const { data: assignmentsData, isLoading: isLoadingAssignments } = useGetRoleAssignments({
     orgName: orgId,
     roleId: roleId ?? "",
@@ -241,6 +248,7 @@ export const RoleEditPage: React.FC = () => {
   const handleSave = async () => {
     if (!orgId || !roleId) return;
     setSaveError(undefined);
+    setSaveSuccess(false);
     setIsSaving(true);
     try {
       const params = { orgName: orgId, roleId };
@@ -285,7 +293,12 @@ export const RoleEditPage: React.FC = () => {
         }
       }
 
-      navigate(rolesPath);
+      setSaveSuccess(true);
+      setPendingUserAdds([]);
+      setRemovedUserIds(new Set());
+      setPendingGroupAdds([]);
+      setRemovedGroupIds(new Set());
+      hasEditedPermissions.current = false;
     } catch {
       setSaveError("Failed to update role. Please try again.");
     } finally {
@@ -294,7 +307,9 @@ export const RoleEditPage: React.FC = () => {
   };
 
   const isLoading =
-    isLoadingAssignments || isLoadingUsers || isLoadingGroups || isLoadingCatalog;
+    isLoadingRole || isLoadingAssignments || isLoadingUsers || isLoadingGroups || isLoadingCatalog;
+
+  const pageTitle = roleData?.name ? `Edit Role: ${roleData.name}` : "Edit Role";
 
   if (isLoading) {
     return (
@@ -307,9 +322,10 @@ export const RoleEditPage: React.FC = () => {
   }
 
   return (
-    <PageLayout title="Edit Role" backHref={rolesPath} backLabel="Back to Roles" disableIcon>
+    <PageLayout title={pageTitle} backHref={rolesPath} backLabel="Back to Roles" disableIcon>
       <Stack spacing={3} sx={{ maxWidth: 800 }}>
         {saveError != null && <Alert severity="error">{saveError}</Alert>}
+        {saveSuccess && <Alert severity="success">Role updated successfully.</Alert>}
 
         <Tabs
           value={activeTab}
@@ -333,6 +349,7 @@ export const RoleEditPage: React.FC = () => {
 
             <Autocomplete
               multiple
+              disableCloseOnSelect
               options={catalogPermissions}
               value={selectedPermissions}
               onChange={handlePermissionsChange}
@@ -342,6 +359,66 @@ export const RoleEditPage: React.FC = () => {
                 (option as ThunderPermission).name === (value as ThunderPermission).name
               }
               renderTags={() => null}
+              renderGroup={(params) => {
+                const groupPerms = catalogPermissions.filter(
+                  (p) => permGroup(p) === params.group,
+                );
+                const allSelected = groupPerms.every((p) => selectedNames.has(p.name));
+                const someSelected = groupPerms.some((p) => selectedNames.has(p.name));
+                const handleGroupToggle = (e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  hasEditedPermissions.current = true;
+                  if (allSelected) {
+                    setSelectedPermissions((prev) =>
+                      prev.filter((p) => permGroup(p) !== params.group),
+                    );
+                  } else {
+                    const toAdd = groupPerms.filter((p) => !selectedNames.has(p.name));
+                    setSelectedPermissions((prev) => [...prev, ...toAdd]);
+                  }
+                };
+                return (
+                  <li key={params.key}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        px: 1,
+                        py: 0.25,
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { bgcolor: "action.hover" },
+                      }}
+                      onClick={handleGroupToggle}
+                    >
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={someSelected && !allSelected}
+                        size="small"
+                        sx={{ mr: 0.5, p: 0.5 }}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={
+                          handleGroupToggle as unknown as React.ChangeEventHandler<HTMLInputElement>
+                        }
+                      />
+                      <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}
+                      >
+                        {params.group}
+                      </Typography>
+                    </Box>
+                    <ul style={{ padding: 0 }}>{params.children}</ul>
+                  </li>
+                );
+              }}
+              renderOption={(props, option, { selected }) => (
+                <li {...props}>
+                  <Checkbox checked={selected} size="small" sx={{ mr: 1 }} />
+                  {permLabel(option as ThunderPermission)}
+                </li>
+              )}
               renderInput={(params) => (
                 <TextField
                   {...params}

@@ -85,7 +85,14 @@ export function useNavigationItems(): Array<
     if (globalConfig.disableAuth || !globalConfig.rbacEnabled) return showAll;
     const scopeStr = userInfo?.scope;
     if (!scopeStr) {
-      return { resources: false, evaluation: false, infrastructure: false, identityUsers: false, identityRoles: false, identityGroups: false };
+      return {
+        resources: false,
+        evaluation: false,
+        infrastructure: false,
+        identityUsers: false,
+        identityRoles: false,
+        identityGroups: false,
+      };
     }
     const s = new Set(scopeStr.split(" ").filter(Boolean));
     return {
@@ -637,6 +644,34 @@ export function useNavigationItems(): Array<
         href: generatePath(absoluteRouteMap.children.org.children.catalog.path, { orgId }),
         isActive: !!matchPath(absoluteRouteMap.children.org.children.catalog.wildPath, pathname),
       },
+      ...(() => {
+        const identityItems = [
+          ...(navVisibility.identityUsers ? [{
+            label: "Users",
+            type: "item" as const,
+            icon: <Users size={20} />,
+            href: generatePath(identitiesOrgRoute.children.users.path, { orgId }),
+            isActive: !!matchPath(identitiesOrgRoute.children.users.wildPath, pathname),
+          }] : []),
+          ...(navVisibility.identityRoles ? [{
+            label: "Roles",
+            type: "item" as const,
+            icon: <Shield size={20} />,
+            href: generatePath(identitiesOrgRoute.children.roles.path, { orgId }),
+            isActive: !!matchPath(identitiesOrgRoute.children.roles.wildPath, pathname),
+          }] : []),
+          ...(navVisibility.identityGroups ? [{
+            label: "Groups",
+            type: "item" as const,
+            icon: <Folder size={20} />,
+            href: generatePath(identitiesOrgRoute.children.groups.path, { orgId }),
+            isActive: !!matchPath(identitiesOrgRoute.children.groups.wildPath, pathname),
+          }] : []),
+        ];
+        return identityItems.length > 0
+          ? [{ title: identitiesMetadata.title, type: "section" as const, icon: <identitiesMetadata.icon size={20} />, items: identityItems }]
+          : [];
+      })(),
       ...(navVisibility.resources
         ? [
             {
@@ -691,34 +726,6 @@ export function useNavigationItems(): Array<
             },
           ]
         : []),
-      ...(() => {
-        const identityItems = [
-          ...(navVisibility.identityUsers ? [{
-            label: "Users",
-            type: "item" as const,
-            icon: <Users size={20} />,
-            href: generatePath(identitiesOrgRoute.children.users.path, { orgId }),
-            isActive: !!matchPath(identitiesOrgRoute.children.users.wildPath, pathname),
-          }] : []),
-          ...(navVisibility.identityRoles ? [{
-            label: "Roles",
-            type: "item" as const,
-            icon: <Shield size={20} />,
-            href: generatePath(identitiesOrgRoute.children.roles.path, { orgId }),
-            isActive: !!matchPath(identitiesOrgRoute.children.roles.wildPath, pathname),
-          }] : []),
-          ...(navVisibility.identityGroups ? [{
-            label: "Groups",
-            type: "item" as const,
-            icon: <Folder size={20} />,
-            href: generatePath(identitiesOrgRoute.children.groups.path, { orgId }),
-            isActive: !!matchPath(identitiesOrgRoute.children.groups.wildPath, pathname),
-          }] : []),
-        ];
-        return identityItems.length > 0
-          ? [{ title: identitiesMetadata.title, type: "section" as const, icon: <identitiesMetadata.icon size={20} />, items: identityItems }]
-          : [];
-      })(),
       ...externalNavItems.filter(item => item.level === "org").map(item => ({
         label: item.title,
         type: "item" as const,
