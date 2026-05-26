@@ -469,7 +469,8 @@ export function DeploymentConfig({
                   label="Enable CORS"
                 />
                 <Typography variant="body2" color="text.secondary">
-                  Control which origins, methods, and headers are allowed to access this agent endpoint.
+                  Control which origins, methods, and headers are allowed to access this agent
+                  endpoint.
                 </Typography>
                 <Collapse in={corsEnabled}>
                   <Accordion
