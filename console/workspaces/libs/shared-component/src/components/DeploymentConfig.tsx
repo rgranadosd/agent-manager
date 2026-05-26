@@ -215,6 +215,8 @@ export function DeploymentConfig({
 
   const isApiAgent = agent?.agentType?.type === "agent-api";
 
+  const hasWildcardOrigin = corsAllowAll || corsOrigins.includes("*");
+
   const lockedKeys = useMemo(
     () => new Set((configSchema ?? []).map((i) => i.name)),
     [configSchema],
@@ -321,10 +323,10 @@ export function DeploymentConfig({
             ...(isApiAgent && {
               corsConfig: {
                 enabled: corsEnabled,
-                allowOrigin: corsAllowAll ? ["*"] : corsOrigins,
+                allowOrigin: hasWildcardOrigin ? ["*"] : corsOrigins,
                 allowMethods: corsMethods,
                 allowHeaders: corsHeaders,
-                allowCredentials: corsAllowAll ? false : corsAllowCredentials,
+                allowCredentials: hasWildcardOrigin ? false : corsAllowCredentials,
               },
             }),
           },
@@ -478,7 +480,12 @@ export function DeploymentConfig({
                             checked={corsAllowAll}
                             onChange={(_, checked) => {
                               setCorsAllowAll(checked);
-                              if (checked) setCorsAllowCredentials(false);
+                              if (checked) {
+                                setCorsAllowCredentials(false);
+                                setCorsOrigins(["*"]);
+                              } else {
+                                setCorsOrigins((prev) => prev.filter((o) => o !== "*"));
+                              }
                             }}
                             disabled={isPending}
                           />
@@ -490,7 +497,7 @@ export function DeploymentConfig({
                           <Checkbox
                             checked={corsAllowCredentials}
                             onChange={(_, checked) => setCorsAllowCredentials(checked)}
-                            disabled={isPending || corsAllowAll}
+                            disabled={isPending || hasWildcardOrigin}
                           />
                         }
                         label="Allow credentials"
