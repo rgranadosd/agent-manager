@@ -58,6 +58,7 @@ export function useDeployAgent() {
     action: { verb: 'start', target: 'deployment' },
     mutationFn: ({ params, body }) => deployAgent(params, body, getToken),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent'] });
       queryClient.invalidateQueries({ queryKey: ['agent-configurations'] });
       queryClient.invalidateQueries({ queryKey: ['agent-deployments'] });
     },
