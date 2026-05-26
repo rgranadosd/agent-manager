@@ -472,47 +472,46 @@ export function DeploymentConfig({
                   Control which origins, methods, and headers are allowed to access this agent endpoint.
                 </Typography>
                 <Collapse in={corsEnabled}>
-                  <Form.Stack spacing={2} sx={{ mt: 1 }}>
-                    <Box display="flex" gap={2} alignItems="center">
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={corsAllowAll}
-                            onChange={(_, checked) => {
-                              setCorsAllowAll(checked);
-                              if (checked) {
-                                setCorsAllowCredentials(false);
-                                setCorsOrigins(["*"]);
-                              } else {
-                                setCorsOrigins((prev) => prev.filter((o) => o !== "*"));
-                              }
-                            }}
-                            disabled={isPending}
+                  <Accordion
+                    disableGutters
+                    elevation={0}
+                    sx={{ mt: 1, border: "1px solid", borderColor: "divider", borderRadius: 1, "&:before": { display: "none" } }}
+                  >
+                    <AccordionSummary expandIcon={<ChevronDown size={16} />}>
+                      <Typography variant="body2">Advanced</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Form.Stack spacing={2}>
+                        <Box display="flex" gap={2} alignItems="center">
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={corsAllowAll}
+                                onChange={(_, checked) => {
+                                  setCorsAllowAll(checked);
+                                  if (checked) {
+                                    setCorsAllowCredentials(false);
+                                    setCorsOrigins(["*"]);
+                                  } else {
+                                    setCorsOrigins((prev) => prev.filter((o) => o !== "*"));
+                                  }
+                                }}
+                                disabled={isPending}
+                              />
+                            }
+                            label="Allow all origins"
                           />
-                        }
-                        label="Allow all origins"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={corsAllowCredentials}
-                            onChange={(_, checked) => setCorsAllowCredentials(checked)}
-                            disabled={isPending || hasWildcardOrigin}
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={corsAllowCredentials}
+                                onChange={(_, checked) => setCorsAllowCredentials(checked)}
+                                disabled={isPending || hasWildcardOrigin}
+                              />
+                            }
+                            label="Allow credentials"
                           />
-                        }
-                        label="Allow credentials"
-                      />
-                    </Box>
-                    <Accordion
-                      disableGutters
-                      elevation={0}
-                      sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, "&:before": { display: "none" } }}
-                    >
-                      <AccordionSummary expandIcon={<ChevronDown size={16} />}>
-                        <Typography variant="body2">Advanced</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Form.Stack spacing={2}>
+                        </Box>
                           {!corsAllowAll && (
                             <FormControl fullWidth>
                               <FormLabel>Allowed origins</FormLabel>
@@ -584,10 +583,9 @@ export function DeploymentConfig({
                               )}
                             />
                           </FormControl>
-                        </Form.Stack>
-                      </AccordionDetails>
-                    </Accordion>
-                  </Form.Stack>
+                      </Form.Stack>
+                    </AccordionDetails>
+                  </Accordion>
                 </Collapse>
               </Form.Stack>
             </Form.Section>
