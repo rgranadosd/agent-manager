@@ -1,15 +1,54 @@
 # AMP Instrumentation Matrix
 
-Compatibility-matrix test suite. See
+Per-PR + nightly compatibility matrix for AMP instrumentation. See
 [`references/INSTRUMENTATION-MATRIX-DESIGN.md`](../../references/INSTRUMENTATION-MATRIX-DESIGN.md)
-for the architecture. Full operational docs in
-[`references/INSTRUMENTATION-MATRIX.md`](../../references/INSTRUMENTATION-MATRIX.md)
-(see Phase 9).
+for the architecture; this README is the operational quickstart.
 
-## Quickstart
+## Run locally
 
 ```bash
-nox -s emission                                 # full matrix
-nox -s emission -k langchain                    # filter
-nox -s emission -- --cell-id=<id>               # single cell
+# one cell
+nox -s emission -- --cell-id=traceloop-0.60.0-langchain-0.3.27-py3.11
+
+# filter
+nox -s emission -k langchain
+
+# full matrix
+nox -s emission
+
+# build PR-comment summary
+nox -s report
 ```
+
+## Re-record cassettes
+
+```bash
+OPENAI_API_KEY=sk-... ANTHROPIC_API_KEY=sk-ant-... \
+    python scripts/record_cassette.py <framework> <scenario>
+```
+
+## Adding a new framework or version
+
+1. Add the framework block (or extend an existing `versions:` list) in
+   `matrix.yaml`.
+2. Add a sample under `cells/<framework>_sample.py` if new.
+3. Record cassettes for any new scenarios.
+4. Open a PR; the
+   [Tier 1 workflow](../../.github/workflows/instrumentation-matrix-pr.yaml)
+   will run the new cells as advisory checks. `check-default-cell` is the
+   required status check; the rest of the matrix runs `continue-on-error`
+   and posts a sticky comment summarising each cell.
+
+## Triggering nightly + heavy tier on demand
+
+Use **Actions → Instrumentation matrix — manual** (Tier 3) with inputs for
+target versions / frameworks. See
+[`.github/workflows/instrumentation-matrix-manual.yaml`](../../.github/workflows/instrumentation-matrix-manual.yaml)
+(landing in Phase 8).
+
+## Findings log
+
+Upstream gaps and schema concessions discovered while building cells are
+tracked in [`FINDINGS.md`](FINDINGS.md). Each entry has an `F-NNN` id,
+the affected provider/framework combo, what we mitigated, and the
+upstream change that would let us tighten back.
