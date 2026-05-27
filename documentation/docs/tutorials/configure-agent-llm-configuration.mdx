@@ -4,8 +4,8 @@ sidebar_position: 7
 
 # Configure LLM Providers for an Agent
 
-Agents can be configured to use one or more LLM Service Providers registered at the organization level. The configuration process differs slightly between **Platform-hosted** and **External** agents, 
-but both follow the same pattern: attach an org-level provider to the agent with an optional name, description, and guardrails.
+Agents can be configured to use one or more LLM Service Providers registered at the organization level. The configuration process differs slightly between **Platform-hosted** and **External** agents,
+but both follow the same pattern: attach an org-level provider to the agent with optional guardrails.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ but both follow the same pattern: attach an org-level provider to the agent with
 | Type | Description |
 |---|---|
 | **Platform** | Agent code is built and deployed by the platform from a GitHub repository. The platform injects LLM credentials as environment variables. |
-| **External** | Agent is deployed and managed externally. The platform registers it and provides the invoke URL + API key for the LLM provider. |
+| **External** | Agent is deployed and managed externally. The platform registers it and provides the gateway endpoint URL + API key for the LLM provider. |
 
 ---
 
@@ -31,47 +31,49 @@ but both follow the same pattern: attach an org-level provider to the agent with
 2. Click on a **Platform**-tagged agent.
 3. In the left sidebar, click **Configure**.
 
-### Step 2: Add an LLM Provider
+### Step 2: Add an LLM Configuration
 
-The **Configure** page displays the **LLM Providers** section listing all LLM providers currently attached to this agent.
+The **Configure** page displays the **LLM Configurations** section listing all LLM configurations currently attached to this agent.
 
-1. Click **+ Add Provider**.
-2. Fill in the **Basic Details**:
-
-   | Field | Description | Example |
-   |---|---|---|
-   | **Name** | A logical name for this LLM binding within the agent | `OpenAI GPT5` |
-   | **Description** | Optional description | `Primary reasoning model` |
-
-3. Under **LLM Service Provider**, click **Select a Provider**.
+1. Click **+ Add LLM Configuration**.
+2. Under **Service Provider**, click **Select a Service Provider**.
    - A side panel opens listing all org-level LLM Service Providers with their template, rate limiting status, and guardrails.
-   - Select the desired provider and close the panel.
+   - Select the desired provider. The panel closes automatically.
+3. Optionally, under **Guardrails**, click **+ Add Guardrail** to attach guardrails specific to this agent's use of the provider.
+4. Click **Save**.
 
-4. Optionally, under **Guardrails**, click **+ Add Guardrail** to attach guardrails specific to this agent's use of the provider.
+> **Note**: The configuration name is auto-generated from the selected provider's template (e.g., `openai`, `anthropic`). If a name already exists, a numeric suffix is appended (e.g., `openai-2`).
 
-5. Click **Save**.
+> **Multiple environments**: If your organization has more than one environment, tabs appear at the top of the Service Provider section — one per environment. Select a provider for each environment tab before saving. Tabs with no provider selected are marked with a warning indicator.
 
-### Step 3: Use the Provider in Agent Code
+### Step 3: Set Environment Variable Names
 
-After saving, the platform generates **environment variables** that are automatically injected into the agent's deployment runtime. You can view these on the LLM provider detail page under **Environment Variables References**:
+After saving, the **Environment Variables & Integration Guide** panel opens automatically. It shows the two environment variables the platform will inject into the agent at runtime:
 
-| Variable Name | Description |
-|---|---|
-| `<NAME>_API_KEY` | API Key for authenticating with the LLM provider |
-| `<NAME>_BASE_URL` | Base URL of the LLM Provider API endpoint |
+| Variable Key | Default Name (example) | Description |
+|---|---|---|
+| `url` | `OPENAI_URL` | Base URL of the LLM provider endpoint |
+| `apikey` | `OPENAI_API_KEY` | API key for authenticating with the LLM provider |
 
-Where `<NAME>` is derived from the provider name (uppercased, e.g., `OPENAI_GPT5` for a provider named `OpenAI GPT5`).
+The names are auto-generated from the provider template (e.g., `OPENAI_URL`, `OPENAI_API_KEY` for an OpenAI provider). If your agent code already reads different variable names, edit them directly in the table and click **Save**.
 
-If your agent is already configured to read a different environment variable name, update the system provided variable name and click **Save**.
+> **Note**: Variable names are shared across all environments. The platform injects environment-specific values at runtime. If the agent is in a deployed state, the updated LLM configuration will be injected into the running pod automatically — no rebuild or redeploy is required.
 
-**Python code snippet** (shown in the UI):
+### Step 4: Use the Provider in Agent Code
+
+The panel provides two ready-to-use integration options (toggle between them):
+
+- **Python** — a code snippet using the correct SDK client for the provider template, pre-populated with the environment variable names.
+- **Copilot Prompt** — a prompt you can paste into an AI coding assistant (e.g., GitHub Copilot, Claude) to automatically update your code to use the injected environment variables.
+
+Example Python snippet (OpenAI template):
 
 ```python
 import os
 from openai import OpenAI
 
-apikey = os.environ.get('OPENAI_GPT5_API_KEY')
-url = os.environ.get('OPENAI_GPT5_URL')
+url = os.environ.get('OPENAI_URL')
+apikey = os.environ.get('OPENAI_API_KEY')
 
 client = OpenAI(
     base_url=url,
@@ -80,14 +82,7 @@ client = OpenAI(
 )
 ```
 
-> **Note**: The platform also provides an **AI Prompt** snippet — a ready-made prompt you can paste into an AI coding assistant to automatically update your code to use the injected environment variables.
-
-### Step 4: Build and Deploy
-
-1. After configuring the LLM provider, click **Build** in the sidebar.
-2. Click **Trigger a Build** to build the agent from its GitHub source.
-3. Once the build completes, click **Deploy** to deploy to the target environment.
-4. The deployed agent URL appears on the **Overview** page (e.g., `http://default-default.localhost:19080/agent-name`).
+You can reopen this panel at any time from the LLM configuration detail page by clicking **Environment Variables & Integration Guide** in the top-right corner.
 
 ---
 
@@ -166,31 +161,22 @@ You can reopen the Setup Agent panel at any time from the agent **Overview** pag
 
 ---
 
-### Step 3: Add an LLM Provider
+### Step 3: Add an LLM Configuration
 
 1. In the left sidebar, click **Configure**.
-2. The **Configure Agent** page shows the **LLM Providers** section (empty for a new agent).
-3. Click **+ Add Provider**.
-4. Fill in the **Basic Details**:
-
-   | Field | Description | Example |
-   |---|---|---|
-   | **Name** | A logical name for this LLM binding | `openai-provider` |
-   | **Description** | Optional description | `Main model for customer queries` |
-
-5. Under **LLM Service Provider**, click **Select a Provider**.
+2. The **Configure Agent** page shows the **LLM Configurations** section (empty for a new agent).
+3. Click **+ Add LLM Configuration**.
+4. Under **Service Provider**, click **Select a Service Provider**.
    - A side panel opens listing all org-level LLM Service Providers, showing the template (e.g., OpenAI), deployment time, rate limiting status, and guardrails.
    - Select the desired provider.
-
-6. Optionally, under **Guardrails**, click **+ Add Guardrail** to attach content safety policies.
-
-7. Click **Save**.
+5. Optionally, under **Guardrails**, click **+ Add Guardrail** to attach content safety policies.
+6. Click **Save**.
 
 ---
 
 ### Step 4: Connect Your Agent Code to the LLM
 
-Immediately after saving, the provider detail page is shown with a **Connect to your LLM Provider** section containing everything needed to call the LLM from your agent code:
+Immediately after saving, the **Connect to LLM Provider** panel opens automatically with everything needed to call the LLM from your agent code:
 
 | Field | Description |
 |---|---|
@@ -204,15 +190,12 @@ Example cURL:
 ```bash
 curl -X POST <endpoint-url> \
   --header "API-Key: <your-api-key>" \
-  -d '{"your": "data"}'
+  -d '{"model": "", "messages": [{"role": "user", "content": "Hi..."}]}'
 ```
 
 Configure your agent's LLM client using the Endpoint URL as the base URL and pass the API Key in the `API-Key` header on every request.
 
-Below the connection details, the page also shows:
-
-- **LLM Service Provider**: the linked org-level provider (name, template, rate limiting and guardrails status)
-- **Guardrails**: agent-level guardrails attached to this LLM binding
+You can reopen the connection details panel at any time from the LLM configuration detail page by clicking **Connect to LLM Provider** in the top-right corner. However, the API Key is only displayed once at creation time — if lost, delete the configuration and re-add it to generate a new key.
 
 ### Step 5: Run the Agent
 
@@ -226,24 +209,27 @@ amp-instrument python main.py
 
 ---
 
-## Managing Attached LLM Providers
+## Managing LLM Configurations
 
-From the **Configure Agent** page, the LLM Providers table shows all attached providers with:
+From the **Configure Agent** page, the LLM Configurations table shows all attached configurations with:
 
-- **Name**: The logical name given to this LLM binding.
-- **Description**: Optional description.
+- **Name**: The auto-generated name for this LLM binding (derived from the provider template, e.g., `openai`). Click a row to open the configuration detail page.
 - **Created**: When the binding was created.
-- **Actions**: Delete icon to remove the provider from the agent.
+- **Actions**: Delete icon to remove the configuration from the agent.
 
-Multiple providers can be attached to a single agent, allowing the agent code to use different LLMs for different tasks by referencing their respective environment variable names (platform agents) or endpoint URLs and API keys (external agents).
+Multiple configurations can be attached to a single agent, allowing the agent code to use different LLMs for different tasks by referencing their respective environment variable names (platform agents) or endpoint URLs and API keys (external agents).
+
+### Changing the Provider
+
+From the LLM configuration detail page, click the **pencil icon** on the provider card to swap the linked org-level provider. This opens the provider selection drawer. Select a new provider and click **Save** to apply the change.
 
 ---
 
 ## Notes
 
-- LLM provider credentials are **never exposed** to agent code directly — only the injected environment variables are available at runtime.
-- For platform agents, environment variables are re-injected on each deployment; no manual secret management is required.
+- LLM provider credentials are **never exposed** to agent code directly — only the injected environment variables (platform agents) or the gateway endpoint + API key (external agents) are available at runtime.
+- For platform agents, if the agent is in a deployed state, the updated LLM configuration is injected into the running pod automatically — no rebuild or redeploy is required.
 - For external agents, the Endpoint URL routes traffic through the AI Gateway, enabling centralized rate limiting, access control, and guardrails configured at the org level.
-- The external agent API Key shown after saving is a **one-time display** — it cannot be retrieved again. If lost, delete the LLM provider binding and re-add it to generate a new key.
+- The external agent API Key shown after saving is a **one-time display** — it cannot be retrieved again. If lost, delete the LLM configuration and re-add it to generate a new key.
 - The **Setup Agent** instrumentation step is for observability (traces) only and is independent of LLM configuration.
 - Guardrails added at the agent-LLM binding level are applied **in addition to** any guardrails configured on the provider itself.
