@@ -1,10 +1,18 @@
-"""Aggregate per-cell reports into the PR-comment Markdown summary."""
+"""Aggregate per-cell reports into the PR-comment Markdown summary +
+machine-readable metrics for the nightly Chat alert."""
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 from pathlib import Path
+from typing import Any
 
 EMOJI = {"pass": "✅", "fail": "❌", "skipped": "⚠️"}
+
+# Pulls the provider_version segment out of a cell id like
+# `traceloop-0.60.0-langchain-0.3.27-py3.11`.
+_PROVIDER_VERSION_RE = re.compile(r"^[^-]+-([0-9][^-]*)-")
 
 
 def build_summary(
@@ -45,6 +53,97 @@ def build_summary(
         f"{counts['skipped']} skipped",
     ]
     return "\n".join(body)
+
+
+def collect_metrics(reports_dir: Path) -> dict[str, Any]:
+    """Walk per-cell reports and return counts, category histogram, and a
+    likely-cause string for the nightly Chat alert.
+
+    Heuristic (design §12.2): if every failure shares a `(provider, version)`
+    and the failures span more than one framework, that's almost always a
+    provider-version regression. If every failure shares the same violation
+    `path`, that's a schema/observer regression. Otherwise None.
+    """
+    files = sorted(Path(reports_dir).glob("*.json"))
+    counts: dict[str, int] = {"pass": 0, "fail": 0, "skipped": 0}
+    categories: Counter[str] = Counter()
+    failed: list[dict] = []
+    for f in files:
+        r = json.loads(f.read_text())
+        result = r["result"]
+        if result in counts:
+            counts[result] += 1
+        else:
+            counts[result] = 1
+        if result == "fail":
+            failed.append(r)
+            if r.get("category"):
+                categories[r["category"]] += 1
+
+    return {
+        "counts": counts,
+        "categories": dict(categories),
+        "likely_cause": _likely_cause(failed),
+    }
+
+
+def _likely_cause(failed: list[dict]) -> str | None:
+    if len(failed) < 2:
+        return None
+
+    # 1) Same provider_version across all failures, multiple frameworks → provider regression.
+    pvs = {_extract_provider_version(r["cellId"]) for r in failed}
+    pvs.discard(None)
+    if len(pvs) == 1:
+        frameworks = {_extract_framework(r["cellId"]) for r in failed}
+        frameworks.discard(None)
+        pv = next(iter(pvs))
+        if len(frameworks) > 1:
+            return f"Provider regression: every failing cell is on version {pv}."
+
+    # 2) Same violation path across all failures → schema/observer regression.
+    paths = []
+    for r in failed:
+        v = r.get("violations") or []
+        if not v:
+            paths.append(None)
+            continue
+        paths.append(v[0].get("path"))
+    path_set = set(paths)
+    path_set.discard(None)
+    if path_set and len(path_set) == 1 and len([p for p in paths if p]) == len(failed):
+        path = next(iter(path_set))
+        return f"Schema/observer regression: every failure violates `{path}`."
+
+    return None
+
+
+def _extract_provider_version(cell_id: str) -> str | None:
+    m = _PROVIDER_VERSION_RE.match(cell_id)
+    return m.group(1) if m else None
+
+
+def _extract_framework(cell_id: str) -> str | None:
+    # cellId = "<provider>-<provider_version>-<framework>-<framework_version>-py<py>"
+    # `<provider_version>` can contain dots; `<framework>` is the next segment
+    # after the version. Split on '-py' to drop the python suffix, then take
+    # everything between the version and the framework_version. Best-effort.
+    body = cell_id.rsplit("-py", 1)[0]
+    parts = body.split("-")
+    # parts: [<provider>, <pver_segments...>, <framework>, <fver_segments...>]
+    # The provider is always 1 segment; the framework_version starts at the
+    # first segment that looks like a version (begins with digit + dot/letter).
+    # Simpler heuristic: the framework name is the 3rd segment from the end
+    # of parts when the framework_version has 3 dot-segments, but versions
+    # vary — use re-parsing instead.
+    # Find the framework name by looking for the segment after the provider
+    # version. The provider version matches `_PROVIDER_VERSION_RE`; everything
+    # between that and the next version-shaped run is the framework name.
+    m = re.match(
+        r"^[^-]+-[0-9][^-]*-([a-z][a-z0-9_-]*?)-[0-9]",
+        cell_id,
+    )
+    return m.group(1) if m else None
 
 
 def _detail(r: dict) -> str:
