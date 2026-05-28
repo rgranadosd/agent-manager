@@ -13,7 +13,6 @@ on:
 permissions:
   contents: read
   issues: write
-  actions: read              # required for `gh run download` cross-workflow
 
 concurrency:
   group: instrumentation-matrix-nightly
@@ -51,45 +50,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: full-emission-matrix
     timeout-minutes: 90
-    # Heavy bodies in heavy/amp_client.py and heavy/observer.py are
-    # scaffold-only (NotImplementedError); this job is expected to fail at
-    # the deploy step until Phase 8+ fills them. `continue-on-error: true`
-    # keeps the rest of the nightly running. Once bodies land, drop this
-    # flag and surface heavy failures the same way emission does.
+    # The deploy/poll bodies are implemented but unvalidated against a live
+    # stack, and the build-from-source bring-up itself is first-run-tunable —
+    # so keep continue-on-error until a real run is green, then drop it.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Install k3d
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          k3d version
-      - name: Install helm + kubectl
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
-          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
-      # The snapshot lives in another workflow's artifacts. `gh run download`
-      # has no --workflow flag, so resolve the latest successful snapshot
-      # run id first, then download by id.
-      - name: Restore AMP snapshot
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p /tmp/amp-snapshot
-          run_id=$(gh run list \
-            --repo "${{ github.repository }}" \
-            --workflow heavy-tier-snapshot.yaml \
-            --status success -L 1 \
-            --json databaseId --jq '.[0].databaseId // empty')
-          if [ -n "$run_id" ] && gh run download "$run_id" \
-              --repo "${{ github.repository }}" \
-              --name amp-heavy-snapshot \
-              --dir /tmp/amp-snapshot; then
-            echo "snapshot restored from run $run_id"
-            ls -lh /tmp/amp-snapshot/
-          else
-            echo "::warning::no heavy-tier snapshot artifact available; heavy tier will fail at deploy"
-          fi
+      # Build the AMP component images from this branch and stand up the full
+      # stack on k3d (NOT the released quick-start images — the matrix must
+      # exercise the PR's observer + instrumentation changes).
+      - uses: ./.github/actions/amp-dev-stack
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -98,15 +68,10 @@ jobs:
       - run: pip install nox pyyaml requests
       - name: Run heavy tier
         working-directory: test/instrumentation-matrix
-        # Required env vars are set in the matching org/repo secrets once the
-        # heavy bodies land (Phase 8+). Until then, the driver fails fast at
-        # the env precheck with a clear pointer to HEAVY-TIER-DEPLOY.md.
+        # Service URLs + IDP creds default to the dev bring-up's values
+        # (see heavy/driver.py); only the LLM keys are real secrets, and
+        # they're forwarded into each deployed agent so it can make calls.
         env:
-          AMP_API_BASE_URL: ${{ secrets.AMP_API_BASE_URL }}
-          TRACES_OBSERVER_BASE_URL: ${{ secrets.TRACES_OBSERVER_BASE_URL }}
-          IDP_TOKEN_URL: ${{ secrets.IDP_TOKEN_URL }}
-          IDP_CLIENT_ID: ${{ secrets.IDP_CLIENT_ID }}
-          IDP_CLIENT_SECRET: ${{ secrets.IDP_CLIENT_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: nox -s heavy

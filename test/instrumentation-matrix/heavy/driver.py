@@ -6,12 +6,18 @@ traces-observer-service for the resulting spans, validates against the
 contract, and writes a per-cell report. Failures fall into the same
 taxonomy the emission tier uses (categorize.FailureCategory).
 
-The deploy/invoke/poll bodies (heavy.amp_client, heavy.observer, and
-_invoke_agent below) are implemented against the Go e2e reference but have
-not yet run against a live AMP stack — no heavy-tier snapshot exists. The
-heavy job stays `continue-on-error: true` in CI until a real run validates
-this end to end; expect timing constants and the observer namespace/
-component mapping to need a tune on first run.
+The heavy CI job brings up AMP from the working tree via the dev
+`make setup` chain (build-from-source — so the PR's observer +
+instrumentation changes are actually exercised, unlike e2e's released
+quick-start), then runs this driver. Service URLs + Thunder IDP creds
+default to the values that bring-up exposes; only the LLM keys are real
+secrets, forwarded into each deployed agent.
+
+The deploy/invoke/poll bodies are implemented against the Go e2e reference
+but have not yet run against a live stack. The heavy job stays
+`continue-on-error: true` until a real run validates this end to end;
+expect timing constants and the observer `/spans` param mapping to need a
+tune on first run.
 """
 from __future__ import annotations
 
@@ -32,58 +38,57 @@ from providers import PROVIDERS
 
 HERE = Path(__file__).resolve().parent.parent
 
-REQUIRED_ENV = (
-    "AMP_API_BASE_URL",
-    "TRACES_OBSERVER_BASE_URL",
-    "IDP_TOKEN_URL",
-    "IDP_CLIENT_ID",
-    "IDP_CLIENT_SECRET",
-)
+# AMP service URLs + Thunder IDP credentials default to the values the dev
+# `make setup` bring-up exposes (same defaults the e2e suite's config uses).
+# They're env-overridable but never required as secrets — the only real
+# secrets are the LLM keys, which are forwarded into the deployed agent.
+_DEFAULTS = {
+    "AMP_API_BASE_URL": "http://localhost:9000",
+    "TRACES_OBSERVER_BASE_URL": "http://localhost:9098",
+    "IDP_TOKEN_URL": "http://thunder.amp.localhost:8080/oauth2/token",
+    "IDP_CLIENT_ID": "amp-api-client",
+    "IDP_CLIENT_SECRET": "amp-api-client-secret",
+}
+
+# LLM keys the deployed agent needs to make real calls. Forwarded as
+# sensitive env vars into each agent at create time; absent keys are simply
+# not forwarded (a cell whose framework needs one will then fail its call,
+# which the matrix surfaces).
+_LLM_ENV_KEYS = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY")
 
 
-def _require_env() -> None:
-    """Fail fast on missing AMP / IDP env vars, before any cluster wait.
-
-    A KeyError 25 minutes into `k3d.wait_ready()` is a terrible UX; this
-    precheck surfaces the missing var in under a second with a pointer at
-    the contract doc.
-    """
-    missing = [k for k in REQUIRED_ENV if k not in os.environ]
-    if missing:
-        raise SystemExit(
-            "heavy tier missing required env vars: "
-            f"{', '.join(missing)}. See heavy/HEAVY-TIER-DEPLOY.md."
-        )
+def _env(name: str) -> str:
+    return os.environ.get(name, _DEFAULTS[name])
 
 
 def main() -> int:
-    _require_env()
-
     m = load_manifest(HERE / "matrix.yaml")
     cells = select_heavy_subset(expand_matrix(m), m)
 
-    k3d.wait_ready()
-
     client = AmpClient(
-        base_url=os.environ["AMP_API_BASE_URL"],
+        base_url=_env("AMP_API_BASE_URL"),
         idp=IdpCredentials(
-            token_url=os.environ["IDP_TOKEN_URL"],
-            client_id=os.environ["IDP_CLIENT_ID"],
-            client_secret=os.environ["IDP_CLIENT_SECRET"],
+            token_url=_env("IDP_TOKEN_URL"),
+            client_id=_env("IDP_CLIENT_ID"),
+            client_secret=_env("IDP_CLIENT_SECRET"),
         ),
     )
+    observer_base_url = _env("TRACES_OBSERVER_BASE_URL")
+    agent_env = {k: os.environ[k] for k in _LLM_ENV_KEYS if os.environ.get(k)}
 
     reports_dir = HERE / "reports" / "heavy"
     overall_fail = False
     for cell in cells:
-        result = _run_cell(cell, client)
+        result = _run_cell(cell, client, observer_base_url, agent_env)
         write_cell_report(result, reports_dir=reports_dir)
         if result.result == "fail":
             overall_fail = True
     return 1 if overall_fail else 0
 
 
-def _run_cell(cell: Cell, client: AmpClient) -> CellResult:
+def _run_cell(
+    cell: Cell, client: AmpClient, observer_base_url: str, agent_env: dict[str, str]
+) -> CellResult:
     if cell.instrumentation_version is None:
         # Heavy tier only covers init-container-shipping providers today.
         # Manual cells are emission-only.
@@ -105,8 +110,8 @@ def _run_cell(cell: Cell, client: AmpClient) -> CellResult:
         framework_package=cell.framework_package,
         framework_version=cell.framework_version,
         python_version=cell.python,
+        agent_env=agent_env,
     )
-    observer_base_url = os.environ["TRACES_OBSERVER_BASE_URL"]
     try:
         _invoke_agent(deployed)
         spans = poll_traces(client, deployed, observer_base_url)

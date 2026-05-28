@@ -35,7 +35,6 @@ on:
 permissions:
   contents: write          # needed when include_record_mode opens a PR
   pull-requests: write
-  actions: read            # `gh run download` for heavy snapshot
 
 concurrency:
   group: instrumentation-matrix-manual-${{ github.run_id }}
@@ -155,37 +154,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: run-cells
     if: ${{ inputs.include_heavy_tier }}
-    # Heavy tier bodies are scaffold-only; see heavy/HEAVY-TIER-DEPLOY.md.
-    # Will fail at the env precheck until secrets land.
+    # Deploy/poll bodies are implemented but the build-from-source bring-up
+    # is unvalidated in CI — keep continue-on-error until a real run is green.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Install k3d + helm + kubectl
-        run: |
-          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
-          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
-      - name: Restore AMP snapshot
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p /tmp/amp-snapshot
-          # `gh run download` has no --workflow flag; resolve the latest
-          # successful snapshot run id first, then download by id.
-          run_id=$(gh run list \
-            --repo "${{ github.repository }}" \
-            --workflow heavy-tier-snapshot.yaml \
-            --status success -L 1 \
-            --json databaseId --jq '.[0].databaseId // empty')
-          if [ -n "$run_id" ] && gh run download "$run_id" \
-              --repo "${{ github.repository }}" \
-              --name amp-heavy-snapshot \
-              --dir /tmp/amp-snapshot; then
-            echo "snapshot restored from run $run_id"
-          else
-            echo "::warning::no heavy-tier snapshot available; heavy tier will fail"
-          fi
+      # Build AMP component images from this branch + stand up the stack on
+      # k3d (build-from-source, not released images).
+      - uses: ./.github/actions/amp-dev-stack
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -194,12 +170,9 @@ jobs:
       - run: pip install nox pyyaml requests
       - name: Run heavy tier
         working-directory: test/instrumentation-matrix
+        # URLs + IDP creds default to the dev bring-up's values; only the LLM
+        # keys are secrets, forwarded into each deployed agent.
         env:
-          AMP_API_BASE_URL: ${{ secrets.AMP_API_BASE_URL }}
-          TRACES_OBSERVER_BASE_URL: ${{ secrets.TRACES_OBSERVER_BASE_URL }}
-          IDP_TOKEN_URL: ${{ secrets.IDP_TOKEN_URL }}
-          IDP_CLIENT_ID: ${{ secrets.IDP_CLIENT_ID }}
-          IDP_CLIENT_SECRET: ${{ secrets.IDP_CLIENT_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: nox -s heavy

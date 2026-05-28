@@ -1,11 +1,24 @@
 # Heavy-tier deploy contract
 
-The heavy tier deploys one agent per heavy-subset cell against the k3d
-snapshot built by `.github/workflows/heavy-tier-snapshot.yaml`, invokes it,
-polls `traces-observer-service`, and validates the resulting spans against
-the contract. This doc captures the deploy mechanism and the operational
-contract — what the driver assumes, what env vars it consumes, what timeouts
-it enforces.
+The heavy tier deploys one agent per heavy-subset cell against a live AMP
+stack, invokes it, polls `traces-observer-service`, and validates the
+resulting spans against the contract. This doc captures the deploy mechanism
+and the operational contract — what the driver assumes, what env it consumes,
+what timeouts it enforces.
+
+## Bring-up: build-from-source, not the released quick-start
+
+The CI heavy job stands up AMP from the **working tree** via the dev
+`make setup` chain (encapsulated in the `amp-dev-stack` composite action):
+`setup-k3d` → `setup-openchoreo` (builds + `k3d image import`s the
+traces-observer + python-instrumentation-provider images from source) →
+`setup-platform` (agent-manager-service via docker-compose) → migrate →
+port-forward → gateway.
+
+This is deliberately **not** `deployments/quick-start/install.sh`, which
+deploys *released* images at a pinned `VERSION` (that's what the e2e suite
+uses). The matrix exists to catch regressions in the PR's observer +
+instrumentation code, so it must run the PR's images.
 
 ## Why not raw Workload manifests
 
@@ -24,28 +37,32 @@ created through `agent-manager-service`'s REST API, which:
 `test/e2e/framework/shared_agent.go` is the canonical Go reference. The
 heavy-tier Python driver mirrors that flow via `heavy.amp_client.AmpClient`.
 
-## Required environment variables
+## Environment
+
+The only real **secrets** are the LLM keys. Everything else defaults to the
+values the dev bring-up exposes (the same defaults the e2e config uses) and
+is overridable but never required.
+
+| Variable | Kind | Default / source |
+|---|---|---|
+| `OPENAI_API_KEY` | **secret** | repo secret; forwarded into each deployed agent so it can make real calls |
+| `ANTHROPIC_API_KEY` | **secret** | repo secret; for the anthropic-direct cell |
+| `AMP_API_BASE_URL` | default | `http://localhost:9000` |
+| `TRACES_OBSERVER_BASE_URL` | default | `http://localhost:9098` |
+| `IDP_TOKEN_URL` | default | `http://thunder.amp.localhost:8080/oauth2/token` |
+| `IDP_CLIENT_ID` | default | `amp-api-client` |
+| `IDP_CLIENT_SECRET` | default | `amp-api-client-secret` |
+
+The LLM keys are forwarded into the agent at create time as sensitive env
+vars — that's how the deployed pod makes real provider calls (the emission
+tier replays cassettes instead; heavy makes real calls on purpose). A cell
+whose framework needs a key that isn't set will fail its call, which the
+matrix surfaces. Manual-provider cells are skipped (emission-only).
 
 AMP authenticates via Thunder IDP using the OAuth2 `client_credentials`
-grant — there is no static admin token. The driver fetches a short-lived
-access token at startup and refreshes as needed, mirroring
+grant — no static admin token. The driver fetches a short-lived access token
+at startup and refreshes as needed, mirroring
 `test/e2e/framework/auth.go::FetchToken`.
-
-| Variable | Source | Purpose |
-|---|---|---|
-| `AMP_API_BASE_URL` | snapshot workflow output | cluster-local URL of agent-manager-service, e.g. `http://agent-manager-service.default.svc.cluster.local:8080` |
-| `TRACES_OBSERVER_BASE_URL` | snapshot workflow output | URL the driver polls — e.g. `http://traces-observer-service.default.svc.cluster.local:9098` |
-| `IDP_TOKEN_URL` | constant per cluster | Thunder OAuth2 token endpoint, e.g. `http://thunder.amp.localhost:8080/oauth2/token` |
-| `IDP_CLIENT_ID` | repo secret / cluster config | OAuth2 client ID (local-dev default: `amp-api-client`) |
-| `IDP_CLIENT_SECRET` | repo secret / cluster config | OAuth2 client secret (local-dev default: `amp-api-client-secret`) |
-| `OPENAI_API_KEY` | repo secret | real key — the deployed agent makes real LLM calls; cassettes are emission-tier only |
-| `ANTHROPIC_API_KEY` | repo secret | as above, for anthropic-direct heavy cells |
-
-All five AMP / IDP variables are required; `main()` fails fast in under a
-second if any is unset, before the cluster wait kicks in. LLM keys are
-required per the cells that need them (the driver deploys only cells whose
-providers actually issue HTTP calls — i.e., it skips manual cells, which
-run emission-only).
 
 ### Token fetch sequence
 
@@ -120,9 +137,9 @@ indexing lag.
 
 ## Timeout budget
 
-- **Build readiness**: 240s. AMP's image pull + buildpack run + pod start
-  can take ~3 min on a cold snapshot. Cells that don't reach `Ready` in
-  240s are reported as `pipeline-error`.
+- **Build readiness**: 600s. AMP's buildpack run + image push + pod start
+  can take several minutes. Cells that don't reach `Ready` in time are
+  reported as `pipeline-error`.
 - **Span emission**: 120s after the first `/chat` call returns 200. Most
   cells emit within 10s; the long tail accommodates OpenSearch indexing
   lag.
@@ -141,15 +158,20 @@ ubuntu-latest 60-minute budget.
 invoke, and the list→summaries→detail span fetch. Mocked-HTTP unit tests
 cover the control flow (`tests/test_heavy_client.py`).
 
-They have **not** run against a live AMP stack — no heavy-tier snapshot
-exists yet — so two things are first-run-tunable:
+They have **not** run against a live AMP stack, so three things are
+first-run-tunable:
 
-1. **Timing constants** (build 600s, deploy 300s) — adjust to real
-   cold-snapshot build times.
-2. **The observer summaries-endpoint params.** `poll_traces` sends both the
+1. **The `amp-dev-stack` bring-up** (`.github/actions/amp-dev-stack`). The
+   `make setup` chain hasn't been exercised on a CI runner — watch
+   `setup-platform.sh`'s Node check, whether docker-compose tries to start
+   the console (not needed), and the background port-forwards binding
+   9000/9098.
+2. **Timing constants** (build 600s, deploy 300s) — adjust to real build
+   times once observed.
+3. **The observer summaries-endpoint params.** `poll_traces` sends both the
    list-traces names (`organization`/`project`/`agent`) and best-effort
-   `namespace`/`component` on the per-trace `/spans` call; the exact mapping
-   needs confirming against a live observer.
+   `namespace`/`component` on the per-trace `/spans` call; confirm the exact
+   mapping against a live observer.
 
 The heavy CI jobs stay `continue-on-error: true` until a real run validates
 this end to end — then drop that flag.

@@ -146,6 +146,7 @@ class AmpClient:
         framework_package: str,
         framework_version: str,
         python_version: str,
+        agent_env: dict[str, str] | None = None,
     ) -> DeployedAgent:
         """Create project + agent + build + deploy + API key; return the
         endpoint and key. Raises AmpError / TimeoutError on failure.
@@ -153,9 +154,22 @@ class AmpClient:
         `cell_id` is sanitised into the project/agent names. The cell's
         `instrumentation_version` pins the init-container image; the
         framework pins ride in the build/runtime config of the sample.
+        `agent_env` (LLM keys) is injected as sensitive env on the agent so
+        the deployed pod can make real provider calls.
         """
         name = _safe_name(cell_id)
         org = self.org
+
+        # LLM keys (sensitive) + the framework pin (informational).
+        env = [
+            {"key": k, "value": v, "isSensitive": True}
+            for k, v in (agent_env or {}).items()
+        ]
+        env.append({
+            "key": "AMP_MATRIX_FRAMEWORK",
+            "value": f"{framework_package}=={framework_version}",
+            "isSensitive": False,
+        })
 
         # (2) project
         self._request(
@@ -194,14 +208,7 @@ class AmpClient:
                 "configurations": {
                     "enableAutoInstrumentation": True,
                     "instrumentationVersion": instrumentation_version,
-                    "env": [
-                        # framework pin is informational here; the sample's
-                        # own requirements drive the actual install. Recorded
-                        # so the build env reflects the cell.
-                        {"key": "AMP_MATRIX_FRAMEWORK",
-                         "value": f"{framework_package}=={framework_version}",
-                         "isSensitive": False},
-                    ],
+                    "env": env,
                 },
                 "inputInterface": {"type": "HTTP"},
             },

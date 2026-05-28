@@ -79,7 +79,7 @@ A Python-based, manifest-driven, two-tier compatibility harness at
 | Tier        | Question it answers                                                              | Per-cell cost | Where it runs                                                                            |
 | ---         | ---                                                                              | ---           | ---                                                                                      |
 | Emission    | Does the instrumentation provider still emit conforming spans for this combo?    | 5–15 s        | In-process, per-cell `venv`, `InMemorySpanExporter`, VCR cassette for LLM HTTP.          |
-| Heavy       | Do conforming spans flow through Obs Gateway → Collector → OpenSearch → traces-observer-service and arrive as well-formed `AmpAttributes`? | 6–10 min      | k3d in CI (with pre-baked cluster snapshot), restricted to a representative cell subset. |
+| Heavy       | Do conforming spans flow through Obs Gateway → Collector → OpenSearch → traces-observer-service and arrive as well-formed `AmpAttributes`? | 15–20 min     | k3d in CI (AMP built from source via `make setup`), restricted to a representative cell subset. |
 
 ### 3.2 What each tier covers and misses
 
@@ -731,7 +731,7 @@ k3d on a GHA-hosted runner (default) with a self-hosted-runner escape hatch.
 ┌─────────────────────────────── GHA job ────────────────────────────┐
 │ ubuntu-latest                                                       │
 │                                                                      │
-│ ┌─ k3d cluster (image set restored from snapshot artifact) ───────┐│
+│ ┌─ k3d cluster (built from source via `make setup` / amp-dev-stack)┐│
 │ │  • agent-manager-service        • Thunder IDP                    ││
 │ │  • traces-observer-service      • Obs Gateway                    ││
 │ │  • OTel Collector               • OpenSearch                     ││
@@ -758,14 +758,17 @@ Workload manifests. The build request carries the cell's
 `instrumentation_version`, `framework_package==framework_version`, and
 `python_version`; `agent-manager-service` picks the right init-container
 image and patches `requirements.txt` before the build. The driver records
-the deployed agent's `(namespace, project, component, environment)` on a
+the deployed agent's `(org, project, agent, environment)` on a
 `DeployedAgent` record so the subsequent observer poll has the keys
 `GET /api/v1/traces` requires.
 
-Auth is OAuth2 `client_credentials` against Thunder IDP — `IDP_TOKEN_URL`,
-`IDP_CLIENT_ID`, `IDP_CLIENT_SECRET` are the required env vars. The driver
-fails fast in under a second if any required env var (those three plus
-`AMP_API_BASE_URL` and `TRACES_OBSERVER_BASE_URL`) is unset.
+Auth is OAuth2 `client_credentials` against Thunder IDP. The service URLs
+(`AMP_API_BASE_URL`, `TRACES_OBSERVER_BASE_URL`) and IDP creds
+(`IDP_TOKEN_URL`, `IDP_CLIENT_ID`, `IDP_CLIENT_SECRET`) **default** to the
+values the dev bring-up exposes (the same defaults the e2e config uses) —
+they're overridable but never required. The only real secrets are the LLM
+keys, which the driver forwards into each deployed agent so it can make
+real provider calls.
 
 ### 9.4 One cluster, many cells
 
@@ -778,26 +781,24 @@ fails fast in under a second if any required env var (those three plus
 - OpenSearch state is reset between cells via `spans-*` index deletion in
   the `openchoreo-observability-plane` namespace.
 
-### 9.5 Pre-baked cluster snapshot
+### 9.5 Build-from-source bring-up
 
-A separate, low-frequency workflow (`heavy-tier-snapshot.yaml`) builds an
-AMP-ready k3d image set:
+The heavy CI job stands up AMP from the **working tree** via the dev
+`make setup` chain, wrapped in the `.github/actions/amp-dev-stack`
+composite action: `setup-k3d` → `setup-openchoreo` (which builds the
+traces-observer + python-instrumentation-provider images from source and
+`k3d image import`s them) → `setup-platform` (agent-manager-service via
+docker-compose) → migrate → port-forward → gateway.
 
-1. Spin up k3d, run `deployments/scripts/setup-{prerequisites,openchoreo,
-   platform}.sh` to bring up the AMP stack, wait per-namespace for
-   deployments to be Available.
-2. Enumerate the image set from `.github/release-config.json` (AMP product
-   images + every init-container image from the
-   `python-instrumentation-provider` matrix), `docker pull` them, and
-   `docker save` into one tarball.
-3. Publish as a GHA artifact. The heavy-tier driver's `restore_snapshot`
-   uses `k3d image import -c <cluster> <archive>` to load it on the
-   downstream run.
+This is deliberately **not** `deployments/quick-start/install.sh`, which
+deploys *released* images at a pinned `VERSION` (that's what the e2e suite
+uses). The matrix's purpose is to catch regressions in the PR's observer +
+instrumentation code, so it must run the PR's images — an earlier design
+that pre-baked a released-image snapshot was dropped for this reason.
 
-The snapshot triggers on `workflow_dispatch` and on changes to the helm
-charts, the setup scripts, the AMP service Dockerfiles, or
-`release-config.json`. Cleanup honors a `keep_cluster=true` dispatch input
-for debugging; push-triggered runs always clean up.
+The bring-up runs per heavy job (nightly / on-demand), ~15–20 min; that's
+acceptable for a non-PR tier and avoids the cross-workflow snapshot-artifact
+machinery the earlier design needed.
 
 ### 9.6 Heavy-tier failure categories
 
@@ -933,8 +934,8 @@ on:
 Jobs:
 
 1. `full-emission-matrix` — same as tier 1 but ungated by file paths.
-2. `heavy-tier` — needs `full-emission-matrix`; restores k3d snapshot,
-   iterates heavy cells, posts heavy-tier report.
+2. `heavy-tier` — needs `full-emission-matrix`; builds AMP from source on
+   k3d (amp-dev-stack), iterates heavy cells, posts heavy-tier report.
 3. `revalidate-known-broken` — re-runs every `known-broken` cell; opens an
    issue if any previously-broken cell now passes ("drop the exemption").
 4. `publish-matrix-summary` — aggregates emission + heavy reports, renders
@@ -1134,17 +1135,19 @@ test/instrumentation-matrix/
 │   ├── driver.py                          # orchestrator
 │   ├── amp_client.py                      # agent-manager-service REST client
 │   ├── observer.py                        # traces-observer-service query
-│   └── k3d.py                             # cluster ops (import snapshot, wait, reset)
+│   └── k3d.py                             # per-cell OpenSearch index reset
 ├── scripts/
 │   ├── record_cassette.py                 # one-shot cassette recorder (§7.4)
-│   └── scrub_cassettes.py                 # strip identifying headers post-record
+│   ├── scrub_cassettes.py                 # strip identifying headers post-record
+│   └── expand_filter.py                   # cell-id filter for the manual workflow
 └── reports/                               # per-run output (gitignored)
 
-.github/workflows/
-├── instrumentation-matrix-pr.yaml
-├── instrumentation-matrix-nightly.yaml    # Phase 8
-├── instrumentation-matrix-manual.yaml     # Phase 8
-└── heavy-tier-snapshot.yaml               # builds the k3d AMP-ready snapshot
+.github/
+├── actions/amp-dev-stack/                 # build-from-source AMP bring-up (§9.5)
+└── workflows/
+    ├── instrumentation-matrix-pr.yaml
+    ├── instrumentation-matrix-nightly.yaml
+    └── instrumentation-matrix-manual.yaml
 
 scripts/
 ├── check-cassettes.py                     # cassette secret-leak guard
@@ -1169,9 +1172,10 @@ These are deliberately deferred to v2+:
 6. **Heavy-tier first live run.** `heavy/amp_client.py` and
    `heavy/observer.py` are implemented against the e2e Go reference (with
    mocked-HTTP unit tests) but have never run against a live AMP stack. The
-   first real run needs a published snapshot + the IDP/AMP secrets, and will
-   likely require tuning the timing constants and the observer `/spans`
-   param mapping. Until then the heavy jobs are `continue-on-error: true`.
+   first real run needs the LLM-key secrets + a green `amp-dev-stack`
+   build-from-source bring-up, and will likely require tuning that bring-up,
+   the timing constants, and the observer `/spans` param mapping. Until then
+   the heavy jobs are `continue-on-error: true`.
 7. **Per-kind triage diffs.** Today's `.diff.md` pages list the union of
    `attributes.required` across the cell's expected kinds. A richer
    per-kind diff (expected schema slice vs captured span attribute map)

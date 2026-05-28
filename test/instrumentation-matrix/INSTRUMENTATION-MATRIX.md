@@ -150,7 +150,7 @@ When a cell exposes a regression you can't fix immediately:
 Pair every `known-broken` entry with an `F-NNN` entry in `FINDINGS.md` so the
 "why" survives.
 
-## 7. Heavy tier and snapshot maintenance
+## 7. Heavy tier and its bring-up
 
 The heavy tier (`nox -s heavy`, `heavy/driver.py`) deploys a representative
 cell subset (`harness/heavy_subset.py`: one per Traceloop version + one per
@@ -163,18 +163,22 @@ contract and flow.
 **Status:** the deploy / invoke / poll bodies in `heavy/amp_client.py` and
 `heavy/observer.py` are **implemented** against the Go e2e reference, with
 mocked-HTTP unit tests (`tests/test_heavy_client.py`). They haven't run
-against a live AMP stack yet (no snapshot exists), so the heavy jobs stay
-`continue-on-error: true` in CI until a real run validates end to end —
-expect the timing constants and the observer `/spans` param mapping to need
-a tune on first run (see `heavy/HEAVY-TIER-DEPLOY.md` → "Implementation
+against a live AMP stack yet, so the heavy jobs stay `continue-on-error:
+true` in CI until a real run validates end to end — expect the
+`amp-dev-stack` bring-up, the timing constants, and the observer `/spans`
+param mapping to need a tune on first run (see
+`heavy/HEAVY-TIER-DEPLOY.md` → "Implementation
 status").
 
-**Snapshot cadence:** `heavy-tier-snapshot.yaml` builds the pre-baked k3d
-image set (every AMP service image + every init-container image from
-`release-config.json`). It re-bakes on `workflow_dispatch` and whenever the
-helm charts, the `setup-*.sh` scripts, the service Dockerfiles, or
-`release-config.json` change — i.e., whenever the known-good combination it
-bundles shifts. The heavy driver restores it with `k3d image import`.
+**Bring-up:** the CI heavy job stands up AMP from the working tree via the
+dev `make setup` chain (the `.github/actions/amp-dev-stack` composite):
+`setup-k3d` → `setup-openchoreo` (builds + loads the traces-observer +
+instrumentation-provider images from source) → `setup-platform`
+(agent-manager-service via compose) → migrate → port-forward → gateway.
+This is **build-from-source**, not the released `quick-start/install.sh` the
+e2e suite uses — the matrix must exercise the PR's own observer +
+instrumentation code, so it builds those images rather than pulling a
+released tag.
 
 ## 8. Where the schemas come from
 
