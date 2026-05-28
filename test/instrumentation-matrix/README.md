@@ -2,7 +2,10 @@
 
 Per-PR + nightly compatibility matrix for AMP instrumentation. See
 [`INSTRUMENTATION-MATRIX-DESIGN.md`](./INSTRUMENTATION-MATRIX-DESIGN.md)
-for the architecture; this README is the operational quickstart.
+for the architecture and
+[`INSTRUMENTATION-MATRIX.md`](./INSTRUMENTATION-MATRIX.md) for the long-form
+operational runbook (adding cells, triaging reds, onboarding a Traceloop
+release, adding a provider). This README is the quickstart.
 
 ## Run locally
 
