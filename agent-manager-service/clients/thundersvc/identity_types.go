@@ -23,6 +23,7 @@ type ThunderUser struct {
 	ID         string            `json:"id"`
 	Type       string            `json:"type"`
 	OuID       string            `json:"ouId,omitempty"`
+	Display    string            `json:"display,omitempty"`
 	Attributes map[string]any    `json:"attributes,omitempty"`
 	Groups     []ThunderGroupRef `json:"groups,omitempty"`
 	CreatedAt  string            `json:"createdAt,omitempty"`
@@ -243,4 +244,18 @@ type thunderResourceList struct {
 type thunderActionList struct {
 	Actions      []ThunderAction `json:"actions"`
 	TotalResults int             `json:"totalResults"`
+}
+
+// ThunderOU represents a child organization unit in Thunder.
+type ThunderOU struct {
+	ID         string `json:"id"`
+	Handle     string `json:"handle"`
+	Name       string `json:"name"`
+	IsReadOnly bool   `json:"isReadOnly"`
+}
+
+// thunderChildOUList decodes the GET /organization-units/{id}/ous response.
+type thunderChildOUList struct {
+	TotalResults      int         `json:"totalResults"`
+	OrganizationUnits []ThunderOU `json:"organizationUnits"`
 }

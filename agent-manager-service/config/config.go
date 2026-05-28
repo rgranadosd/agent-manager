@@ -68,6 +68,10 @@ type Config struct {
 	// the /.well-known/oauth-protected-resource endpoint to serve.
 	OAuthAuthorizationServers []string
 
+	// OAuthScopesSupported is the list of OAuth 2.0 scopes supported by this resource.
+	// Advertised in the RFC 9728 protected resource metadata document.
+	OAuthScopesSupported []string
+
 	// IDP OAuth2 client credentials for service-to-service auth
 	IDP IDPConfig
 

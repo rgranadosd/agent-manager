@@ -107,7 +107,6 @@ func WithPathParamValidation(handler http.HandlerFunc, requiredParams ...string)
 	}
 }
 
-
 // extractPathParams extracts parameter names from a route pattern
 // Example: "GET /orgs/{orgName}/projects/{projName}" -> ["orgName", "projName"]
 func extractPathParams(pattern string) []string {

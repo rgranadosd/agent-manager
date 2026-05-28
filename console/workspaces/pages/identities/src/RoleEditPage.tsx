@@ -19,6 +19,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Autocomplete,
+  createFilterOptions,
   Box,
   Button,
   Checkbox,
@@ -74,6 +75,14 @@ const groupPermissions = (perms: ThunderPermission[]): PermissionGroup[] => {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([resource, permissions]) => ({ resource, permissions }));
 };
+
+const filterPermissions = createFilterOptions<ThunderPermission>({
+  stringify: (option) => {
+    const resource = permGroup(option);
+    const action = permLabel(option);
+    return `${resource} ${action}`;
+  },
+});
 
 export const RoleEditPage: React.FC = () => {
   const { orgId, roleId } = useParams<{ orgId: string; roleId: string }>();
@@ -355,6 +364,7 @@ export const RoleEditPage: React.FC = () => {
               onChange={handlePermissionsChange}
               getOptionLabel={(option) => permLabel(option as ThunderPermission)}
               groupBy={(option) => permGroup(option as ThunderPermission)}
+              filterOptions={filterPermissions}
               isOptionEqualToValue={(option, value) =>
                 (option as ThunderPermission).name === (value as ThunderPermission).name
               }

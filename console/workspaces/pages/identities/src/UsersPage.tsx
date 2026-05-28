@@ -71,6 +71,10 @@ export const UsersPage: React.FC = () => {
     ? generatePath(identitiesRoute.children.users.path + "/invite", { orgId })
     : "#";
 
+  const addUserPath = orgId
+    ? generatePath(identitiesRoute.children.users.path + "/add", { orgId })
+    : "#";
+
   const editUserPath = (userId: string) =>
     orgId
       ? generatePath(identitiesRoute.children.users.path + "/:userId/edit", { orgId, userId })
@@ -110,7 +114,14 @@ export const UsersPage: React.FC = () => {
         </Alert>
       )}
 
-      <Stack direction="row" justifyContent="flex-end" mb={2}>
+      <Stack direction="row" spacing={2} justifyContent="flex-end" mb={2}>
+        <Button
+          variant="outlined"
+          startIcon={<Plus />}
+          onClick={() => navigate(addUserPath)}
+        >
+          Add User
+        </Button>
         <Button
           variant="contained"
           startIcon={<Plus />}
@@ -125,7 +136,7 @@ export const UsersPage: React.FC = () => {
           <ListingTable.EmptyState
             illustration={<Users size={64} />}
             title="No users yet"
-            description='Click "Invite User" to invite one.'
+            description='Click "Add User" to create one or "Invite User" to invite someone.'
           />
         ) : (
           <ListingTable>

@@ -61,14 +61,25 @@ func RequireOrgMatch(resolver OrgResolver) func(http.HandlerFunc) http.HandlerFu
 				return
 			}
 			orgName := r.PathValue(utils.PathParamOrgName)
-			if claims.OuHandle != orgName {
+			// OuHandle may be absent in on-prem tokens; only enforce when present.
+			if claims.OuHandle != "" && claims.OuHandle != orgName {
 				utils.WriteErrorResponse(w, http.StatusForbidden, "org identity mismatch")
 				return
 			}
-			ouID, err := resolver.ResolveOUID(r.Context(), orgName)
-			if err != nil {
-				utils.WriteErrorResponse(w, http.StatusInternalServerError, "failed to resolve organization")
-				return
+			ouID := claims.OuId
+			if ouID == "" {
+				if !config.GetConfig().IsOnPremDeployment {
+					// Cloud: every token must carry ouId — no path-based fallback.
+					utils.WriteErrorResponse(w, http.StatusForbidden, "missing ou identity in token")
+					return
+				}
+				// On-prem: single-tenant, safe to resolve via Thunder.
+				var err error
+				ouID, err = resolver.ResolveOUID(r.Context(), orgName)
+				if err != nil {
+					utils.WriteErrorResponse(w, http.StatusInternalServerError, "failed to resolve organization")
+					return
+				}
 			}
 			ctx := WithResolvedOrg(r.Context(), ResolvedOrg{Name: orgName, OUID: ouID})
 			next(w, r.WithContext(ctx))

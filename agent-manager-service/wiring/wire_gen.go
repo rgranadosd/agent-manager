@@ -37,6 +37,9 @@ func InitializeAppParams(cfg *config.Config, db *gorm.DB, authProvider client.Au
 	configConfig := ProvideConfigFromPtr(cfg)
 	middleware := ProvideAuthMiddleware(configConfig)
 	logger := ProvideLogger()
+	thunderConfig := ProvideThunderConfig(configConfig)
+	identityClient := ProvideIdentityClient(thunderConfig)
+	orgResolver := ProvideOrgResolver(identityClient)
 	openChoreoClient, err := ProvideOCClient(configConfig, authProvider)
 	if err != nil {
 		return nil, err
@@ -144,9 +147,6 @@ func InitializeAppParams(cfg *config.Config, db *gorm.DB, authProvider client.Au
 	agentConfigurationController := controllers.NewAgentConfigurationController(agentConfigurationService)
 	gitSecretService := services.NewGitSecretService(openChoreoClient)
 	gitSecretController := controllers.NewGitSecretController(gitSecretService)
-	thunderConfig := ProvideThunderConfig(configConfig)
-	identityClient := ProvideIdentityClient(thunderConfig)
-	orgResolver := ProvideOrgResolver(identityClient)
 	identityController := controllers.NewIdentityController(identityClient)
 	monitorSchedulerService := services.NewMonitorSchedulerService(openChoreoClient, publisherCredentialProvisioner, logger, monitorExecutor, monitorRepository)
 	traceObserverSvcClient, err := ProvideTraceObserverClient(configConfig, authProvider)
@@ -198,10 +198,13 @@ func InitializeAppParams(cfg *config.Config, db *gorm.DB, authProvider client.Au
 // InitializeTestAppParamsWithClientMocks wires up application dependencies with test mocks
 func InitializeTestAppParamsWithClientMocks(cfg *config.Config, db *gorm.DB, authMiddleware jwtassertion.Middleware, testClients TestClients) (*AppParams, error) {
 	logger := ProvideLogger()
+	configConfig := ProvideConfigFromPtr(cfg)
+	thunderConfig := ProvideThunderConfig(configConfig)
+	identityClient := ProvideIdentityClient(thunderConfig)
+	orgResolver := ProvideOrgResolver(identityClient)
 	openChoreoClient := ProvideTestOpenChoreoClient(testClients)
 	observabilitySvcClient := ProvideTestObservabilitySvcClient(testClients)
 	secretManagementClient := ProvideTestSecretManagementClient(testClients)
-	configConfig := ProvideConfigFromPtr(cfg)
 	gitCredentialsService, err := ProvideGitCredentialsService(openChoreoClient, configConfig)
 	if err != nil {
 		return nil, err
@@ -297,9 +300,6 @@ func InitializeTestAppParamsWithClientMocks(cfg *config.Config, db *gorm.DB, aut
 	agentConfigurationController := controllers.NewAgentConfigurationController(agentConfigurationService)
 	gitSecretService := services.NewGitSecretService(openChoreoClient)
 	gitSecretController := controllers.NewGitSecretController(gitSecretService)
-	thunderConfig := ProvideThunderConfig(configConfig)
-	identityClient := ProvideIdentityClient(thunderConfig)
-	orgResolver := ProvideOrgResolver(identityClient)
 	identityController := controllers.NewIdentityController(identityClient)
 	monitorSchedulerService := services.NewMonitorSchedulerService(openChoreoClient, publisherCredentialProvisioner, logger, monitorExecutor, monitorRepository)
 	traceObserverSvcClient := ProvideTestTraceObserverClient(testClients)
@@ -695,6 +695,6 @@ func ProvideIdentityClient(cfg config.ThunderConfig) thundersvc.IdentityClient {
 }
 
 // ProvideOrgResolver creates the org resolver backed by Thunder, with a per-org OU ID cache.
-func ProvideOrgResolver(client thundersvc.IdentityClient) middleware.OrgResolver {
-	return middleware.NewOrgResolver(client)
+func ProvideOrgResolver(client2 thundersvc.IdentityClient) middleware.OrgResolver {
+	return middleware.NewOrgResolver(client2)
 }

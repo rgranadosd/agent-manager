@@ -26,21 +26,26 @@ import (
 func RegisterAgentConfigRoutes(rr *middleware.RouteRegistrar, ctrl controllers.AgentConfigurationController) {
 	rr.HandleFuncWithValidationAndAuthz(
 		"POST /orgs/{orgName}/projects/{projName}/agents/{agentName}/model-configs",
-		rbac.AgentUpdate, ctrl.CreateAgentModelConfig)
+		rbac.AgentUpdate, ctrl.CreateAgentModelConfig,
+	)
 
 	rr.HandleFuncWithValidationAndAuthz(
 		"GET /orgs/{orgName}/projects/{projName}/agents/{agentName}/model-configs",
-		rbac.AgentRead, ctrl.ListAgentModelConfigs)
+		rbac.AgentRead, ctrl.ListAgentModelConfigs,
+	)
 
 	rr.HandleFuncWithValidationAndAuthz(
 		"GET /orgs/{orgName}/projects/{projName}/agents/{agentName}/model-configs/{configId}",
-		rbac.AgentRead, ctrl.GetAgentModelConfig)
+		rbac.AgentRead, ctrl.GetAgentModelConfig,
+	)
 
 	rr.HandleFuncWithValidationAndAuthz(
 		"PUT /orgs/{orgName}/projects/{projName}/agents/{agentName}/model-configs/{configId}",
-		rbac.AgentUpdate, ctrl.UpdateAgentModelConfig)
+		rbac.AgentUpdate, ctrl.UpdateAgentModelConfig,
+	)
 
 	rr.HandleFuncWithValidationAndAuthz(
 		"DELETE /orgs/{orgName}/projects/{projName}/agents/{agentName}/model-configs/{configId}",
-		rbac.AgentDelete, ctrl.DeleteAgentModelConfig)
+		rbac.AgentDelete, ctrl.DeleteAgentModelConfig,
+	)
 }

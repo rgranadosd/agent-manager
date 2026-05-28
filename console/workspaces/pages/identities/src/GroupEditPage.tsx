@@ -167,7 +167,10 @@ export const GroupEditPage: React.FC = () => {
         await addMembers({ params: { orgName: orgId, groupId }, body: { userIds: idsToAdd } });
       }
       if (idsToRemove.length > 0) {
-        await removeMembers({ params: { orgName: orgId, groupId }, body: { userIds: idsToRemove } });
+        await removeMembers({
+          params: { orgName: orgId, groupId },
+          body: { userIds: idsToRemove },
+        });
       }
       setSaveSuccess(true);
       setPendingAdds([]);

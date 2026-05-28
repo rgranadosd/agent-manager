@@ -252,17 +252,6 @@ thunder:
       files:
         - 50-amp-api-client.sh
         - 51-user-schema-and-users.sh
-<<<<<<< feat-permission-model
-        - 52-amp-console-app.sh
-        - 53-workload-publisher-app.sh
-        - 54-observer-resource-reader-app.sh
-        - 55-amp-publisher-client.sh
-        - 56-amp-system-client.sh
-        - 57-amctl-client.sh
-        - 58-am-mcp-client.sh
-        - 59-amp-resource-server.sh
-        - 60-amp-default-roles.sh
-=======
         - 52-amp-console-branding.sh
         - 53-amp-console-app.sh
         - 54-workload-publisher-app.sh
@@ -271,7 +260,8 @@ thunder:
         - 57-amp-system-client.sh
         - 58-amctl-client.sh
         - 59-am-mcp-client.sh
->>>>>>> main
+        - 60-amp-resource-server.sh
+        - 61-amp-default-roles.sh
     # Observer Resource Reader Client configuration (for observability plane to read resources)
     observerResourceReaderClient:
       clientId: "openchoreo-observer-resource-reader-client" # clusterauthzrolebinding is already created with this clientId by openchoreo, so it should not be changed unless the corresponding ClusterAuthzRoleBinding is also updated
@@ -418,9 +408,8 @@ thunder:
         - "username"
         - "groups"
         - "ouId"
-<<<<<<< feat-permission-model
         - "ouHandle"
-=======
+
     # Agent Manager Console Theme (applied to amp-console-client sign-in page)
     ampConsoleTheme:
       handle: "wso2-agent-manager-console"
@@ -527,7 +516,6 @@ thunder:
             layout: "split"
           common:
             layout: "split"
->>>>>>> main
     # Default Organization unit configuration
     organizationUnit:
       name: "Default"

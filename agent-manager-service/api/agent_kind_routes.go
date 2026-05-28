@@ -17,19 +17,19 @@
 package api
 
 import (
-
 	"github.com/wso2/agent-manager/agent-manager-service/controllers"
 	"github.com/wso2/agent-manager/agent-manager-service/middleware"
+	"github.com/wso2/agent-manager/agent-manager-service/rbac"
 )
 
 func registerAgentKindRoutes(rr *middleware.RouteRegistrar, ctrl controllers.AgentKindController) {
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/agent-kinds", ctrl.ListKinds)
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/agent-kinds/{kindName}", ctrl.GetKind)
-	rr.HandleFuncWithValidation("PUT /orgs/{orgName}/agent-kinds/{kindName}", ctrl.UpdateKind)
-	rr.HandleFuncWithValidation("DELETE /orgs/{orgName}/agent-kinds/{kindName}", ctrl.DeleteKind)
-	rr.HandleFuncWithValidation("POST /orgs/{orgName}/agent-kinds/{kindName}/versions", ctrl.AddVersion)
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/agent-kinds/{kindName}/versions", ctrl.ListVersions)
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/agent-kinds/{kindName}/versions/{versionTag}", ctrl.GetVersion)
-	rr.HandleFuncWithValidation("DELETE /orgs/{orgName}/agent-kinds/{kindName}/versions/{versionTag}", ctrl.DeleteVersion)
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/agent-kinds/{kindName}/agents", ctrl.ListKindAgents)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/agent-kinds", rbac.AgentKindRead, ctrl.ListKinds)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/agent-kinds/{kindName}", rbac.AgentKindRead, ctrl.GetKind)
+	rr.HandleFuncWithValidationAndAuthz("PUT /orgs/{orgName}/agent-kinds/{kindName}", rbac.AgentKindUpdate, ctrl.UpdateKind)
+	rr.HandleFuncWithValidationAndAuthz("DELETE /orgs/{orgName}/agent-kinds/{kindName}", rbac.AgentKindDelete, ctrl.DeleteKind)
+	rr.HandleFuncWithValidationAndAuthz("POST /orgs/{orgName}/agent-kinds/{kindName}/versions", rbac.AgentKindUpdate, ctrl.AddVersion)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/agent-kinds/{kindName}/versions", rbac.AgentKindRead, ctrl.ListVersions)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/agent-kinds/{kindName}/versions/{versionTag}", rbac.AgentKindRead, ctrl.GetVersion)
+	rr.HandleFuncWithValidationAndAuthz("DELETE /orgs/{orgName}/agent-kinds/{kindName}/versions/{versionTag}", rbac.AgentKindDelete, ctrl.DeleteVersion)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/agent-kinds/{kindName}/agents", rbac.AgentKindRead, ctrl.ListKindAgents)
 }

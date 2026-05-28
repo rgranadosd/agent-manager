@@ -1155,7 +1155,7 @@ data:
       fi
     fi
 
-  59-amp-resource-server.sh: |
+  60-amp-resource-server.sh: |
     #!/bin/bash
     set -e
 
@@ -1319,6 +1319,7 @@ data:
     R_PROXY=$(create_or_get_resource      "$RS_ID" "LLM Proxy"                "llm-proxy"              "LLM proxy management")
     R_EVAL=$(create_or_get_resource       "$RS_ID" "Evaluator"                "evaluator"              "Evaluator management")
     R_AGENT=$(create_or_get_resource      "$RS_ID" "Agent"                    "agent"                  "Agent management")
+    R_AGENT_KIND=$(create_or_get_resource "$RS_ID" "Agent Kind"               "agent-kind"             "Agent kind management")
     R_MON=$(create_or_get_resource        "$RS_ID" "Monitor"                  "monitor"                "Monitor management")
     R_OBS=$(create_or_get_resource        "$RS_ID" "Observability"            "observability"          "Observability dashboards and metrics")
     R_ROLE=$(create_or_get_resource       "$RS_ID" "Role"                     "role"                   "Role management")
@@ -1442,6 +1443,12 @@ data:
     # agent/token actions  → amp:agent:token:<action>
     create_action "$RS_ID" "$R_AGENT_TOKEN"  "Manage"                 "manage"                 "Generate agent tokens"
 
+    # agent-kind actions  → amp:agent-kind:<action>
+    create_action "$RS_ID" "$R_AGENT_KIND"   "Create"                 "create"                 "Create an agent kind"
+    create_action "$RS_ID" "$R_AGENT_KIND"   "Read"                   "read"                   "View agent kinds and versions"
+    create_action "$RS_ID" "$R_AGENT_KIND"   "Update"                 "update"                 "Update an agent kind"
+    create_action "$RS_ID" "$R_AGENT_KIND"   "Delete"                 "delete"                 "Delete an agent kind"
+
     # monitor actions  → amp:monitor:<action>
     create_action "$RS_ID" "$R_MON"          "Create"                 "create"                 "Create a monitor"
     create_action "$RS_ID" "$R_MON"          "Read"                   "read"                   "View monitors, runs, and run logs"
@@ -1476,9 +1483,9 @@ data:
     # repository actions  → amp:repository:<action>
     create_action "$RS_ID" "$R_REPO"         "Read"                   "read"                   "Browse repository branches and commits"
 
-    log_info "Agent Manager resource server registration complete (85 permissions registered)."
+    log_info "Agent Manager resource server registration complete (89 permissions registered)."
 
-  60-amp-default-roles.sh: |
+  61-amp-default-roles.sh: |
     #!/bin/bash
     set -e
 
@@ -1517,7 +1524,7 @@ data:
     fi
     AMP_RS_ID=$(echo "$BODY" | sed 's/},{/}\n{/g' | grep '"identifier":"amp"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
     if [[ -z "$AMP_RS_ID" ]]; then
-      log_error "Could not find AMP resource server — run 59-amp-resource-server.sh first"
+      log_error "Could not find AMP resource server — run 60-amp-resource-server.sh first"
       exit 1
     fi
     log_info "AMP resource server ID: $AMP_RS_ID"

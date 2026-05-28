@@ -17,16 +17,16 @@
 package api
 
 import (
-
 	"github.com/wso2/agent-manager/agent-manager-service/controllers"
 	"github.com/wso2/agent-manager/agent-manager-service/middleware"
+	"github.com/wso2/agent-manager/agent-manager-service/rbac"
 )
 
 // RegisterAgentAPIKeyRoutes registers API key routes for agents
 func RegisterAgentAPIKeyRoutes(rr *middleware.RouteRegistrar, ctrl controllers.AgentAPIKeyController) {
-	rr.HandleFuncWithValidation("POST /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys", ctrl.CreateAPIKey)
-	rr.HandleFuncWithValidation("POST /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/test", ctrl.IssueTestAPIKey)
-	rr.HandleFuncWithValidation("GET /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys", ctrl.ListAPIKeys)
-	rr.HandleFuncWithValidation("DELETE /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/{keyName}", ctrl.RevokeAPIKey)
-	rr.HandleFuncWithValidation("PUT /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/{keyName}", ctrl.RotateAPIKey)
+	rr.HandleFuncWithValidationAndAuthz("POST /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys", rbac.AgentAPIKeyManage, ctrl.CreateAPIKey)
+	rr.HandleFuncWithValidationAndAuthz("POST /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/test", rbac.AgentAPIKeyManage, ctrl.IssueTestAPIKey)
+	rr.HandleFuncWithValidationAndAuthz("GET /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys", rbac.AgentAPIKeyManage, ctrl.ListAPIKeys)
+	rr.HandleFuncWithValidationAndAuthz("DELETE /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/{keyName}", rbac.AgentAPIKeyManage, ctrl.RevokeAPIKey)
+	rr.HandleFuncWithValidationAndAuthz("PUT /orgs/{orgName}/projects/{projName}/agents/{agentName}/environments/{envID}/api-keys/{keyName}", rbac.AgentAPIKeyManage, ctrl.RotateAPIKey)
 }

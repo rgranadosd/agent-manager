@@ -17,13 +17,15 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/wso2/agent-manager/agent-manager-service/clients/thundersvc"
-	"github.com/wso2/agent-manager/agent-manager-service/middleware"
+	"github.com/wso2/agent-manager/agent-manager-service/config"
+	"github.com/wso2/agent-manager/agent-manager-service/middleware/jwtassertion"
 	"github.com/wso2/agent-manager/agent-manager-service/middleware/logger"
 	"github.com/wso2/agent-manager/agent-manager-service/utils"
 )
@@ -82,9 +84,9 @@ func (c *identityController) ListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -97,12 +99,21 @@ func (c *identityController) ListUsers(w http.ResponseWriter, r *http.Request) {
 		offset = 0
 	}
 
-	users, total, err := c.client.ListUsersByOUHandle(ctx, org.Name, offset, limit)
+	users, total, err := c.client.ListUsersByOUId(ctx, claims.OuId, offset, limit)
 	if err != nil {
-		log.Error("ListUsers failed", "ouHandle", org.Name, "error", err)
+		log.Error("ListUsers failed", "ouID", claims.OuId, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to list users")
 		return
 	}
+
+	// Normalize user data: if Display is set but attributes is empty,
+	// populate attributes with the username from Display field (from OU-scoped endpoint)
+	for i := range users {
+		if users[i].Display != "" && users[i].Attributes == nil {
+			users[i].Attributes = map[string]any{"username": users[i].Display}
+		}
+	}
+
 	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"users": users, "total": total, "offset": offset, "limit": limit})
 }
 
@@ -110,6 +121,12 @@ func (c *identityController) GetUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	userID := r.PathValue(utils.PathParamUserID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
 
 	user, err := c.client.GetUser(ctx, userID)
 	if err != nil {
@@ -121,6 +138,10 @@ func (c *identityController) GetUser(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get user")
 		return
 	}
+
+	if !validateUserOwnership(w, ctx, user, claims.OuId) {
+		return
+	}
 	utils.WriteSuccessResponse(w, http.StatusOK, user)
 }
 
@@ -128,9 +149,9 @@ func (c *identityController) CreateUser(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -153,7 +174,7 @@ func (c *identityController) CreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ouID := org.OUID
+	ouID := claims.OuId
 
 	attrs := map[string]string{"username": body.Username}
 	for _, claim := range body.Claims {
@@ -188,13 +209,13 @@ func (c *identityController) UpdateUser(w http.ResponseWriter, r *http.Request) 
 	log := logger.GetLogger(ctx)
 	userID := r.PathValue(utils.PathParamUserID)
 
-	var req thundersvc.UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
-	user, err := c.client.UpdateUser(ctx, userID, req)
+	user, err := c.client.GetUser(ctx, userID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
@@ -204,13 +225,55 @@ func (c *identityController) UpdateUser(w http.ResponseWriter, r *http.Request) 
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update user")
 		return
 	}
-	utils.WriteSuccessResponse(w, http.StatusOK, user)
+
+	if !validateUserOwnership(w, ctx, user, claims.OuId) {
+		return
+	}
+
+	var req thundersvc.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updatedUser, err := c.client.UpdateUser(ctx, userID, req)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
+			return
+		}
+		log.Error("UpdateUser failed", "userID", userID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update user")
+		return
+	}
+	utils.WriteSuccessResponse(w, http.StatusOK, updatedUser)
 }
 
 func (c *identityController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	userID := r.PathValue(utils.PathParamUserID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	user, err := c.client.GetUser(ctx, userID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
+			return
+		}
+		log.Error("DeleteUser failed", "userID", userID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to delete user")
+		return
+	}
+
+	if !validateUserOwnership(w, ctx, user, claims.OuId) {
+		return
+	}
 
 	if err := c.client.DeleteUser(ctx, userID); err != nil {
 		if thundersvc.IsNotFound(err) {
@@ -229,12 +292,29 @@ func (c *identityController) GetUserGroups(w http.ResponseWriter, r *http.Reques
 	log := logger.GetLogger(ctx)
 	userID := r.PathValue(utils.PathParamUserID)
 
-	groups, err := c.client.GetUserGroups(ctx, userID)
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	user, err := c.client.GetUser(ctx, userID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
 			return
 		}
+		log.Error("GetUserGroups failed", "userID", userID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get user groups")
+		return
+	}
+
+	if !validateUserOwnership(w, ctx, user, claims.OuId) {
+		return
+	}
+
+	groups, err := c.client.GetUserGroups(ctx, userID)
+	if err != nil {
 		log.Error("GetUserGroups failed", "userID", userID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get user groups")
 		return
@@ -247,12 +327,29 @@ func (c *identityController) GetUserRoles(w http.ResponseWriter, r *http.Request
 	log := logger.GetLogger(ctx)
 	userID := r.PathValue(utils.PathParamUserID)
 
-	roles, err := c.client.GetUserRoles(ctx, userID)
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	user, err := c.client.GetUser(ctx, userID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
 			return
 		}
+		log.Error("GetUserRoles failed", "userID", userID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get user roles")
+		return
+	}
+
+	if !validateUserOwnership(w, ctx, user, claims.OuId) {
+		return
+	}
+
+	roles, err := c.client.GetUserRoles(ctx, userID)
+	if err != nil {
 		log.Error("GetUserRoles failed", "userID", userID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get user roles")
 		return
@@ -263,6 +360,12 @@ func (c *identityController) GetUserRoles(w http.ResponseWriter, r *http.Request
 func (c *identityController) InviteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
 
 	var body struct {
 		Email string `json:"email"`
@@ -276,9 +379,15 @@ func (c *identityController) InviteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	inviteLink, err := c.client.InviteUser(ctx, body.Email)
+	// On-prem: Thunder's invite flow has no OU selection step (no child OUs).
+	// Cloud: pass the child OU ID so Thunder scopes the invite correctly.
+	ouIDForInvite := ""
+	if !config.GetConfig().IsOnPremDeployment {
+		ouIDForInvite = claims.OuId
+	}
+	inviteLink, err := c.client.InviteUser(ctx, body.Email, ouIDForInvite)
 	if err != nil {
-		log.Error("InviteUser failed", "error", err)
+		log.Error("InviteUser failed", "ouID", claims.OuId, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to invite user")
 		return
 	}
@@ -291,9 +400,9 @@ func (c *identityController) ListGroups(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -306,12 +415,20 @@ func (c *identityController) ListGroups(w http.ResponseWriter, r *http.Request) 
 		offset = 0
 	}
 
-	groups, total, err := c.client.ListGroups(ctx, org.OUID, offset, limit)
+	groups, total, err := c.client.ListGroupsByOUId(ctx, claims.OuId, offset, limit)
 	if err != nil {
-		log.Error("ListGroups failed", "ouID", org.OUID, "error", err)
+		log.Error("ListGroups failed", "ouID", claims.OuId, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to list groups")
 		return
 	}
+
+	// Populate OuID for groups from OU-scoped endpoint (they don't return it)
+	for i := range groups {
+		if groups[i].OuID == "" {
+			groups[i].OuID = claims.OuId
+		}
+	}
+
 	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"groups": groups, "total": total, "offset": offset, "limit": limit})
 }
 
@@ -319,6 +436,12 @@ func (c *identityController) GetGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
 
 	group, err := c.client.GetGroup(ctx, groupID)
 	if err != nil {
@@ -330,6 +453,11 @@ func (c *identityController) GetGroup(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get group")
 		return
 	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
+
 	utils.WriteSuccessResponse(w, http.StatusOK, group)
 }
 
@@ -337,9 +465,9 @@ func (c *identityController) CreateGroup(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -352,7 +480,7 @@ func (c *identityController) CreateGroup(w http.ResponseWriter, r *http.Request)
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	req.OuID = org.OUID
+	req.OuID = claims.OuId
 
 	group, err := c.client.CreateGroup(ctx, req)
 	if err != nil {
@@ -368,13 +496,13 @@ func (c *identityController) UpdateGroup(w http.ResponseWriter, r *http.Request)
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
 
-	var req thundersvc.UpdateGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
-	group, err := c.client.UpdateGroup(ctx, groupID, req)
+	group, err := c.client.GetGroup(ctx, groupID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
@@ -384,13 +512,55 @@ func (c *identityController) UpdateGroup(w http.ResponseWriter, r *http.Request)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update group")
 		return
 	}
-	utils.WriteSuccessResponse(w, http.StatusOK, group)
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
+
+	var req thundersvc.UpdateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updatedGroup, err := c.client.UpdateGroup(ctx, groupID, req)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
+			return
+		}
+		log.Error("UpdateGroup failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update group")
+		return
+	}
+	utils.WriteSuccessResponse(w, http.StatusOK, updatedGroup)
 }
 
 func (c *identityController) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	group, err := c.client.GetGroup(ctx, groupID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
+			return
+		}
+		log.Error("DeleteGroup failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to delete group")
+		return
+	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
 
 	if err := c.client.DeleteGroup(ctx, groupID); err != nil {
 		if thundersvc.IsNotFound(err) {
@@ -409,6 +579,27 @@ func (c *identityController) AddGroupMembers(w http.ResponseWriter, r *http.Requ
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	group, err := c.client.GetGroup(ctx, groupID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
+			return
+		}
+		log.Error("AddGroupMembers failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add group members")
+		return
+	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
+
 	var req struct {
 		UserIDs []string `json:"userIds"`
 	}
@@ -422,10 +613,6 @@ func (c *identityController) AddGroupMembers(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := c.client.AddGroupMembers(ctx, groupID, req.UserIDs); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
-			return
-		}
 		log.Error("AddGroupMembers failed", "groupID", groupID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add group members")
 		return
@@ -437,6 +624,27 @@ func (c *identityController) RemoveGroupMembers(w http.ResponseWriter, r *http.R
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	group, err := c.client.GetGroup(ctx, groupID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
+			return
+		}
+		log.Error("RemoveGroupMembers failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove group members")
+		return
+	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
 
 	var req struct {
 		UserIDs []string `json:"userIds"`
@@ -451,10 +659,6 @@ func (c *identityController) RemoveGroupMembers(w http.ResponseWriter, r *http.R
 	}
 
 	if err := c.client.RemoveGroupMembers(ctx, groupID, req.UserIDs); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
-			return
-		}
 		log.Error("RemoveGroupMembers failed", "groupID", groupID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove group members")
 		return
@@ -467,6 +671,27 @@ func (c *identityController) GetGroupMembers(w http.ResponseWriter, r *http.Requ
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	group, err := c.client.GetGroup(ctx, groupID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
+			return
+		}
+		log.Error("GetGroupMembers failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get group members")
+		return
+	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
+
 	offset := getIntQueryParam(r, "offset", 0)
 	limit := getIntQueryParam(r, "limit", 20)
 	if limit <= 0 || limit > 100 {
@@ -475,10 +700,6 @@ func (c *identityController) GetGroupMembers(w http.ResponseWriter, r *http.Requ
 
 	members, total, err := c.client.GetGroupMembers(ctx, groupID, offset, limit)
 	if err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
-			return
-		}
 		log.Error("GetGroupMembers failed", "groupID", groupID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get group members")
 		return
@@ -491,12 +712,29 @@ func (c *identityController) GetGroupRoles(w http.ResponseWriter, r *http.Reques
 	log := logger.GetLogger(ctx)
 	groupID := r.PathValue(utils.PathParamGroupID)
 
-	roles, err := c.client.GetGroupRoles(ctx, groupID)
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	group, err := c.client.GetGroup(ctx, groupID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
 			return
 		}
+		log.Error("GetGroupRoles failed", "groupID", groupID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get group roles")
+		return
+	}
+
+	if !validateGroupOwnership(w, ctx, group, claims.OuId) {
+		return
+	}
+
+	roles, err := c.client.GetGroupRoles(ctx, groupID)
+	if err != nil {
 		log.Error("GetGroupRoles failed", "groupID", groupID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get group roles")
 		return
@@ -510,9 +748,9 @@ func (c *identityController) ListRoles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -522,19 +760,35 @@ func (c *identityController) ListRoles(w http.ResponseWriter, r *http.Request) {
 		limit = 20
 	}
 
-	roles, total, err := c.client.ListRoles(ctx, org.OUID, offset, limit)
+	roles, _, err := c.client.ListRoles(ctx, claims.OuId, offset, limit)
 	if err != nil {
-		log.Error("ListRoles failed", "ouID", org.OUID, "error", err)
+		log.Error("ListRoles failed", "ouID", claims.OuId, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to list roles")
 		return
 	}
-	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"roles": roles, "total": total, "offset": offset, "limit": limit})
+
+	// Filter roles to only include those belonging to the caller's OU
+	// Thunder's ListRoles endpoint returns all roles, not OU-scoped
+	filteredRoles := make([]thundersvc.ThunderRole, 0, len(roles))
+	for _, role := range roles {
+		if role.OuID == claims.OuId {
+			filteredRoles = append(filteredRoles, role)
+		}
+	}
+
+	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"roles": filteredRoles, "total": len(filteredRoles), "offset": 0, "limit": limit})
 }
 
 func (c *identityController) GetRole(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
 
 	role, err := c.client.GetRole(ctx, roleID)
 	if err != nil {
@@ -546,6 +800,11 @@ func (c *identityController) GetRole(w http.ResponseWriter, r *http.Request) {
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get role")
 		return
 	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
 	utils.WriteSuccessResponse(w, http.StatusOK, role)
 }
 
@@ -553,9 +812,9 @@ func (c *identityController) CreateRole(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	org, ok := middleware.GetResolvedOrg(ctx)
-	if !ok {
-		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to resolve organization unit")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
@@ -568,7 +827,7 @@ func (c *identityController) CreateRole(w http.ResponseWriter, r *http.Request) 
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	req.OuID = org.OUID
+	req.OuID = claims.OuId
 
 	role, err := c.client.CreateRole(ctx, req)
 	if err != nil {
@@ -584,13 +843,13 @@ func (c *identityController) UpdateRole(w http.ResponseWriter, r *http.Request) 
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
-	var req thundersvc.UpdateRoleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
 		return
 	}
 
-	role, err := c.client.UpdateRole(ctx, roleID, req)
+	role, err := c.client.GetRole(ctx, roleID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
@@ -600,13 +859,55 @@ func (c *identityController) UpdateRole(w http.ResponseWriter, r *http.Request) 
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update role")
 		return
 	}
-	utils.WriteSuccessResponse(w, http.StatusOK, role)
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
+	var req thundersvc.UpdateRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updatedRole, err := c.client.UpdateRole(ctx, roleID, req)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("UpdateRole failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update role")
+		return
+	}
+	utils.WriteSuccessResponse(w, http.StatusOK, updatedRole)
 }
 
 func (c *identityController) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
+
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("DeleteRole failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to delete role")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
 
 	if err := c.client.DeleteRole(ctx, roleID); err != nil {
 		if thundersvc.IsNotFound(err) {
@@ -625,12 +926,29 @@ func (c *identityController) GetRoleAssignments(w http.ResponseWriter, r *http.R
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
-	assignments, err := c.client.GetRoleAssignments(ctx, roleID)
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
 	if err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
 			return
 		}
+		log.Error("GetRoleAssignments failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get role assignments")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
+	assignments, err := c.client.GetRoleAssignments(ctx, roleID)
+	if err != nil {
 		log.Error("GetRoleAssignments failed", "roleID", roleID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to get role assignments")
 		return
@@ -643,6 +961,27 @@ func (c *identityController) AddRolePermissions(w http.ResponseWriter, r *http.R
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("AddRolePermissions failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add role permissions")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
 	var req thundersvc.RolePermissionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
@@ -650,10 +989,6 @@ func (c *identityController) AddRolePermissions(w http.ResponseWriter, r *http.R
 	}
 
 	if err := c.client.AddRolePermissions(ctx, roleID, req); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
-			return
-		}
 		log.Error("AddRolePermissions failed", "roleID", roleID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add role permissions")
 		return
@@ -666,6 +1001,27 @@ func (c *identityController) RemoveRolePermissions(w http.ResponseWriter, r *htt
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("RemoveRolePermissions failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove role permissions")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
 	var req thundersvc.RolePermissionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
@@ -673,10 +1029,6 @@ func (c *identityController) RemoveRolePermissions(w http.ResponseWriter, r *htt
 	}
 
 	if err := c.client.RemoveRolePermissions(ctx, roleID, req); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
-			return
-		}
 		log.Error("RemoveRolePermissions failed", "roleID", roleID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove role permissions")
 		return
@@ -689,6 +1041,27 @@ func (c *identityController) AddRoleAssignees(w http.ResponseWriter, r *http.Req
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("AddRoleAssignees failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add role assignees")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
 	req, err := decodeRoleAssigneeRequest(r)
 	if err != nil {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
@@ -696,10 +1069,6 @@ func (c *identityController) AddRoleAssignees(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := c.client.AddRoleAssignees(ctx, roleID, req); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
-			return
-		}
 		log.Error("AddRoleAssignees failed", "roleID", roleID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to add role assignees")
 		return
@@ -712,6 +1081,27 @@ func (c *identityController) RemoveRoleAssignees(w http.ResponseWriter, r *http.
 	log := logger.GetLogger(ctx)
 	roleID := r.PathValue(utils.PathParamRoleID)
 
+	claims := jwtassertion.GetTokenClaims(ctx)
+	if claims == nil || claims.OuId == "" {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Missing OU information in token")
+		return
+	}
+
+	role, err := c.client.GetRole(ctx, roleID)
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
+			return
+		}
+		log.Error("RemoveRoleAssignees failed", "roleID", roleID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove role assignees")
+		return
+	}
+
+	if !validateRoleOwnership(w, ctx, role, claims.OuId) {
+		return
+	}
+
 	req, err := decodeRoleAssigneeRequest(r)
 	if err != nil {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
@@ -719,10 +1109,6 @@ func (c *identityController) RemoveRoleAssignees(w http.ResponseWriter, r *http.
 	}
 
 	if err := c.client.RemoveRoleAssignees(ctx, roleID, req); err != nil {
-		if thundersvc.IsNotFound(err) {
-			utils.WriteErrorResponse(w, http.StatusNotFound, "Role not found")
-			return
-		}
 		log.Error("RemoveRoleAssignees failed", "roleID", roleID, "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to remove role assignees")
 		return
@@ -766,4 +1152,31 @@ func (c *identityController) ListAMPPermissions(w http.ResponseWriter, r *http.R
 		return
 	}
 	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"permissions": perms, "resourceServerId": rsID})
+}
+
+// validateUserOwnership checks if a user belongs to the caller's OU
+func validateUserOwnership(w http.ResponseWriter, ctx context.Context, user *thundersvc.ThunderUser, callerOuID string) bool {
+	if user.OuID != "" && user.OuID != callerOuID {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "User does not belong to your organization")
+		return false
+	}
+	return true
+}
+
+// validateGroupOwnership checks if a group belongs to the caller's OU
+func validateGroupOwnership(w http.ResponseWriter, ctx context.Context, group *thundersvc.ThunderGroup, callerOuID string) bool {
+	if group.OuID != "" && group.OuID != callerOuID {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Group does not belong to your organization")
+		return false
+	}
+	return true
+}
+
+// validateRoleOwnership checks if a role belongs to the caller's OU
+func validateRoleOwnership(w http.ResponseWriter, ctx context.Context, role *thundersvc.ThunderRole, callerOuID string) bool {
+	if role.OuID != "" && role.OuID != callerOuID {
+		utils.WriteErrorResponse(w, http.StatusForbidden, "Role does not belong to your organization")
+		return false
+	}
+	return true
 }

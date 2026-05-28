@@ -62,6 +62,7 @@ export interface InviteUserResponse {
 
 export interface ThunderGroup {
   id: string;
+  ouId?: string;
   name: string;
   description?: string;
   createdAt?: string;
@@ -86,6 +87,7 @@ export interface UpdateGroupRequest {
 
 export interface ThunderRole {
   id: string;
+  ouId?: string;
   name: string;
   description?: string;
   permissions?: RolePermissionRequest[];

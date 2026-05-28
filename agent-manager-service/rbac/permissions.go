@@ -138,6 +138,15 @@ const (
 	AgentRollback            Permission = "agent:rollback"
 	AgentSuspend             Permission = "agent:suspend"
 	AgentTokenManage         Permission = "agent:token:manage"
+	AgentAPIKeyManage        Permission = "agent:api-key:manage"
+)
+
+// Agent Kind permissions
+const (
+	AgentKindRead   Permission = "agent-kind:read"
+	AgentKindCreate Permission = "agent-kind:create"
+	AgentKindUpdate Permission = "agent-kind:update"
+	AgentKindDelete Permission = "agent-kind:delete"
 )
 
 // Monitor permissions

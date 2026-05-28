@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/wso2/agent-manager/agent-manager-service/middleware/logger"
 	"github.com/wso2/agent-manager/agent-manager-service/rbac"
 )
 
@@ -32,17 +33,18 @@ import (
 type IdentityClient interface {
 	// Users
 	ListUsers(ctx context.Context, offset, limit int) ([]ThunderUser, int, error)
-	ListUsersByOUHandle(ctx context.Context, ouHandle string, offset, limit int) ([]ThunderUser, int, error)
+	ListUsersByOUId(ctx context.Context, ouID string, offset, limit int) ([]ThunderUser, int, error)
 	GetUser(ctx context.Context, userID string) (*ThunderUser, error)
 	CreateUser(ctx context.Context, req CreateUserRequest) (*ThunderUser, error)
 	UpdateUser(ctx context.Context, userID string, req UpdateUserRequest) (*ThunderUser, error)
 	DeleteUser(ctx context.Context, userID string) error
 	GetUserGroups(ctx context.Context, userID string) ([]ThunderGroup, error)
 	GetUserRoles(ctx context.Context, userID string) ([]ThunderRole, error)
-	InviteUser(ctx context.Context, email string) (string, error)
+	InviteUser(ctx context.Context, email string, ouID string) (string, error)
 
 	// Groups
 	ListGroups(ctx context.Context, ouID string, offset, limit int) ([]ThunderGroup, int, error)
+	ListGroupsByOUId(ctx context.Context, ouID string, offset, limit int) ([]ThunderGroup, int, error)
 	GetGroup(ctx context.Context, groupID string) (*ThunderGroup, error)
 	CreateGroup(ctx context.Context, req CreateGroupRequest) (*ThunderGroup, error)
 	UpdateGroup(ctx context.Context, groupID string, req UpdateGroupRequest) (*ThunderGroup, error)
@@ -69,6 +71,7 @@ type IdentityClient interface {
 
 	// Organization units
 	GetOUIDByHandle(ctx context.Context, handle string) (string, error)
+	ListChildOUs(ctx context.Context, parentOUID string, limit, offset int) ([]ThunderOU, int, error)
 }
 
 // NewIdentityClient creates a Thunder client for identity management operations.
@@ -100,32 +103,6 @@ func (c *thunderClient) ListUsers(ctx context.Context, offset, limit int) ([]Thu
 		return nil, 0, fmt.Errorf("thunder list users decode: %w", err)
 	}
 	return wrapped.Users, wrapped.TotalResults, nil
-}
-
-func (c *thunderClient) ListUsersByOUHandle(ctx context.Context, ouHandle string, offset, limit int) ([]ThunderUser, int, error) {
-	token, err := c.getSystemToken(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-	// /users/tree/{handle} returns only IDs; fetch full details per user.
-	url := fmt.Sprintf("%s/users/tree/%s?offset=%d&limit=%d", c.baseURL, ouHandle, offset, limit)
-	body, err := c.doRequest(ctx, http.MethodGet, url, token, nil)
-	if err != nil {
-		return nil, 0, fmt.Errorf("thunder list users by ou handle: %w", err)
-	}
-	var wrapped thunderUserList
-	if err := json.Unmarshal(body, &wrapped); err != nil {
-		return nil, 0, fmt.Errorf("thunder list users by ou handle decode: %w", err)
-	}
-	users := make([]ThunderUser, 0, len(wrapped.Users))
-	for _, stub := range wrapped.Users {
-		full, err := c.GetUser(ctx, stub.ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("thunder list users by ou handle (get user %s): %w", stub.ID, err)
-		}
-		users = append(users, *full)
-	}
-	return users, wrapped.TotalResults, nil
 }
 
 func (c *thunderClient) GetUser(ctx context.Context, userID string) (*ThunderUser, error) {
@@ -271,6 +248,27 @@ func (c *thunderClient) ListGroups(ctx context.Context, ouID string, offset, lim
 	return all[offset:end], total, nil
 }
 
+// ListGroupsByOUId fetches groups directly from Thunder's OU-scoped endpoint.
+// Uses /organization-units/{ouId}/groups which is more efficient than fetching all groups.
+func (c *thunderClient) ListGroupsByOUId(ctx context.Context, ouID string, offset, limit int) ([]ThunderGroup, int, error) {
+	token, err := c.getSystemToken(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	url := fmt.Sprintf("%s/organization-units/%s/groups?offset=%d&limit=%d", c.baseURL, ouID, offset, limit)
+	body, err := c.doRequest(ctx, http.MethodGet, url, token, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("thunder list groups by ou id: %w", err)
+	}
+
+	var wrapped thunderGroupList
+	if err := json.Unmarshal(body, &wrapped); err != nil {
+		return nil, 0, fmt.Errorf("thunder list groups by ou id decode: %w", err)
+	}
+	return wrapped.Groups, wrapped.TotalResults, nil
+}
+
 func (c *thunderClient) GetGroup(ctx context.Context, groupID string) (*ThunderGroup, error) {
 	token, err := c.getSystemToken(ctx)
 	if err != nil {
@@ -378,12 +376,17 @@ func (c *thunderClient) GetGroupMembers(ctx context.Context, groupID string, off
 		return nil, 0, fmt.Errorf("thunder get group members decode: %w", err)
 	}
 	users := make([]ThunderUser, 0, len(resp.Members))
+	log := logger.GetLogger(ctx)
 	for _, m := range resp.Members {
 		if m.Type != "user" {
 			continue
 		}
 		user, err := c.GetUser(ctx, m.ID)
 		if err != nil {
+			if IsNotFound(err) {
+				log.Warn("skipping deleted group member", "groupID", groupID, "userID", m.ID)
+				continue
+			}
 			return nil, 0, fmt.Errorf("thunder get group member %s: %w", m.ID, err)
 		}
 		users = append(users, *user)
@@ -605,17 +608,26 @@ func (c *thunderClient) GetRoleAssignments(ctx context.Context, roleID string) (
 		return nil, fmt.Errorf("thunder get role assignments decode: %w", err)
 	}
 	result := &RoleAssignments{}
+	log := logger.GetLogger(ctx)
 	for _, a := range resp.Assignments {
 		switch a.Type {
 		case "user":
 			user, err := c.GetUser(ctx, a.ID)
 			if err != nil {
+				if IsNotFound(err) {
+					log.Warn("skipping deleted role assignment user", "roleID", roleID, "userID", a.ID)
+					continue
+				}
 				return nil, fmt.Errorf("thunder get role assignment user %s: %w", a.ID, err)
 			}
 			result.Users = append(result.Users, *user)
 		case "group":
 			group, err := c.GetGroup(ctx, a.ID)
 			if err != nil {
+				if IsNotFound(err) {
+					log.Warn("skipping deleted role assignment group", "roleID", roleID, "groupID", a.ID)
+					continue
+				}
 				return nil, fmt.Errorf("thunder get role assignment group %s: %w", a.ID, err)
 			}
 			result.Groups = append(result.Groups, *group)
@@ -769,7 +781,8 @@ func (c *thunderClient) ListAMPPermissions(ctx context.Context) ([]ThunderPermis
 		}
 	}
 	if ampRSID == "" {
-		return nil, "", fmt.Errorf("amp resource server not found in Thunder (has it been registered?)")
+		// Return empty list if amp resource server not found - permissions can be managed without it
+		return []ThunderPermission{}, "", nil
 	}
 
 	// Fetch all resources for the amp resource server using pagination.
@@ -823,15 +836,36 @@ func (c *thunderClient) ListAMPPermissions(ctx context.Context) ([]ThunderPermis
 	return perms, ampRSID, nil
 }
 
+// ListUsersByOUId fetches users directly from Thunder's OU-scoped endpoint.
+// Uses /organization-units/{ouId}/users which is more efficient than fetching all users.
+func (c *thunderClient) ListUsersByOUId(ctx context.Context, ouID string, offset, limit int) ([]ThunderUser, int, error) {
+	token, err := c.getSystemToken(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	url := fmt.Sprintf("%s/organization-units/%s/users?offset=%d&limit=%d&include=display", c.baseURL, ouID, offset, limit)
+	body, err := c.doRequest(ctx, http.MethodGet, url, token, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("thunder list users by ou id: %w", err)
+	}
+
+	var wrapped thunderUserList
+	if err := json.Unmarshal(body, &wrapped); err != nil {
+		return nil, 0, fmt.Errorf("thunder list users by ou id decode: %w", err)
+	}
+	return wrapped.Users, wrapped.TotalResults, nil
+}
+
 // InviteUser executes Thunder's USER_ONBOARDING flow for the given email address and
 // returns the invite link from the final step's additionalData.
-func (c *thunderClient) InviteUser(ctx context.Context, email string) (string, error) {
+func (c *thunderClient) InviteUser(ctx context.Context, email string, ouID string) (string, error) {
 	token, err := c.getSystemToken(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// Step 1: start the onboarding flow
+	// Step 1: start the onboarding flow.
 	body1, err := c.doRequest(ctx, http.MethodPost, c.baseURL+"/flow/execute", token,
 		map[string]any{"flowType": "USER_ONBOARDING", "verbose": true})
 	if err != nil {
@@ -845,7 +879,7 @@ func (c *thunderClient) InviteUser(ctx context.Context, email string) (string, e
 	}
 	execID := startResp.ExecutionID
 
-	// Step 2: select user type — Thunder requires this before accepting the email.
+	// Step 2: select user type.
 	_, err = c.doRequest(ctx, http.MethodPost, c.baseURL+"/flow/execute", token,
 		map[string]any{
 			"executionId": execID,
@@ -857,8 +891,23 @@ func (c *thunderClient) InviteUser(ctx context.Context, email string) (string, e
 		return "", fmt.Errorf("thunder invite user submit type: %w", err)
 	}
 
-	// Step 3: submit email and get invite link.
-	body3, err := c.doRequest(ctx, http.MethodPost, c.baseURL+"/flow/execute", token,
+	// Step 3: select the target OU — only for cloud deployments with child OUs.
+	// On-prem Thunder flows go directly from user type to email with no OU selection.
+	if ouID != "" {
+		_, err = c.doRequest(ctx, http.MethodPost, c.baseURL+"/flow/execute", token,
+			map[string]any{
+				"executionId": execID,
+				"inputs":      map[string]string{"ouId": ouID},
+				"verbose":     true,
+				"action":      "action_ou_selection",
+			})
+		if err != nil {
+			return "", fmt.Errorf("thunder invite user submit ou: %w", err)
+		}
+	}
+
+	// Step 4: submit email and get invite link.
+	body4, err := c.doRequest(ctx, http.MethodPost, c.baseURL+"/flow/execute", token,
 		map[string]any{
 			"executionId": execID,
 			"inputs":      map[string]string{"email": email},
@@ -871,13 +920,13 @@ func (c *thunderClient) InviteUser(ctx context.Context, email string) (string, e
 
 	// Parse into a generic map so we can traverse whatever structure Thunder returns.
 	var raw map[string]any
-	if err := json.Unmarshal(body3, &raw); err != nil {
+	if err := json.Unmarshal(body4, &raw); err != nil {
 		return "", fmt.Errorf("thunder invite user submit email decode: %w", err)
 	}
 
 	link := extractInviteLink(raw)
 	if link == "" {
-		return "", fmt.Errorf("thunder invite user: inviteLink not found in response: %s", string(body3))
+		return "", fmt.Errorf("thunder invite user: inviteLink not found in response: %s", string(body4))
 	}
 	return link, nil
 }
@@ -986,6 +1035,24 @@ func (e *NotFoundError) Error() string {
 func IsNotFound(err error) bool {
 	var nfe *NotFoundError
 	return errors.As(err, &nfe)
+}
+
+// ListChildOUs returns the direct child OUs of the given parent OU ID.
+func (c *thunderClient) ListChildOUs(ctx context.Context, parentOUID string, limit, offset int) ([]ThunderOU, int, error) {
+	token, err := c.getSystemToken(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	url := fmt.Sprintf("%s/organization-units/%s/ous?limit=%d&offset=%d", c.baseURL, parentOUID, limit, offset)
+	body, err := c.doRequest(ctx, http.MethodGet, url, token, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("thunder list child ous: %w", err)
+	}
+	var wrapped thunderChildOUList
+	if err := json.Unmarshal(body, &wrapped); err != nil {
+		return nil, 0, fmt.Errorf("thunder list child ous decode: %w", err)
+	}
+	return wrapped.OrganizationUnits, wrapped.TotalResults, nil
 }
 
 // GetOUIDByHandle returns the Thunder OU ID for the given org handle by calling
