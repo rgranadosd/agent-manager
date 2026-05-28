@@ -37,8 +37,14 @@ runs:
     - name: Install helm + kubectl
       shell: bash
       run: |
+        set -euo pipefail
+        # get-helm-3 verifies the downloaded archive's checksum itself.
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        # kubectl: verify against the official published sha256 (self-fetched,
+        # so no hardcoded hash to rot when the pin bumps).
         curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+        curl -fsSL -o /tmp/kubectl.sha256 "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl.sha256"
+        echo "$(cat /tmp/kubectl.sha256)  /tmp/kubectl" | sha256sum --check
         sudo install /tmp/kubectl /usr/local/bin/kubectl
     - name: Bring up AMP (build-from-source)
       shell: bash

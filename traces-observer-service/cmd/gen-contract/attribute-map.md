@@ -51,8 +51,8 @@ a finding by the Phase 1 matrix run.
 | Key | Read for | Required? |
 | --- | --- | --- |
 | `gen_ai.operation.name` | classification (`{embeddings, embedding}`) | **yes** |
-| `gen_ai.request.model` / `gen_ai.response.model` | `EmbeddingData.Model` | **yes** (one of the two) |
-| `gen_ai.system` / `gen_ai.provider.name` | `EmbeddingData.Vendor` (via `extractVendor`) | **one of** (`VendorAnyOf` in `contract.go`) |
+| `gen_ai.request.model` / `gen_ai.response.model` | `EmbeddingData.Model` | **one of** (`EmbeddingModelAnyOf` in `contract.go`) |
+| `gen_ai.system` / `gen_ai.provider.name` | `EmbeddingData.Vendor` (via `extractVendor`) | no — intentionally not required (F-006: Traceloop's LlamaIndex embedding omits vendor) |
 | `gen_ai.usage.*` | `EmbeddingData.TokenUsage` | no |
 | `gen_ai.embedding.dimension` | classification fallback only | no |
 
