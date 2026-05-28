@@ -196,7 +196,7 @@ reused, so removed numbers just leave a gap.)
 
 - **Status**: mitigated
 - **Combo**: heavy tier, all cells (most visible on `crewai`, `llama-index`)
-- **Discovered**: 2026-05-29 (first green heavy run + design review)
+- **Discovered**: 2026-05-28 (first green heavy run + design review)
 - **Symptom**: the heavy subset is selected "one per framework", but the
   driver deploys a single fixed sample (`samples/customer-support-agent`, a
   LangChain/LangGraph app) for every cell. So a cell labelled `crewai` runs a

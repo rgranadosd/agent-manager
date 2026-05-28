@@ -79,7 +79,14 @@ echo "🚀 Starting Agent Manager platform services..."
 export CONSOLE_HOST_PATH="$(cd "$SCRIPT_DIR/../../console" && pwd)"
 # COMPOSE_SERVICES optionally restricts the bring-up to a subset of services
 # (e.g. CI heavy tier skips the console). Unset = all services (local default).
-docker compose -f "$COMPOSE_FILE" up -d ${COMPOSE_SERVICES:-}
+# Split on whitespace into an array so multiple services work without exposing
+# the value to glob expansion.
+if [ -n "${COMPOSE_SERVICES:-}" ]; then
+    read -r -a compose_services <<< "${COMPOSE_SERVICES}"
+    docker compose -f "$COMPOSE_FILE" up -d "${compose_services[@]}"
+else
+    docker compose -f "$COMPOSE_FILE" up -d
+fi
 
 echo ""
 echo "⏳ Waiting for services to be healthy..."
