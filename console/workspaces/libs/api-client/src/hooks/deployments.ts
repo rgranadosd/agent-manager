@@ -24,7 +24,11 @@ import {
   getAgentConfigurations,
   listEnvironments,
   getDeploymentPipeline,
+  listDeploymentPipelines,
   updateDeploymentState,
+  promoteAgent,
+  updateDeploymentPipeline,
+  updateEnvironment,
 } from '../apis';
 import { useAuthHooks } from '@agent-management-platform/auth';
 import type {
@@ -42,10 +46,21 @@ import type {
   EnvironmentListResponse,
   GetDeploymentPipelinePathParams,
   DeploymentPipelineResponse,
+  DeploymentPipelineListResponse,
+  ListDeploymentPipelinesPathParams,
+  ListDeploymentPipelinesQuery,
   DeploymentDetailsResponse,
   UpdateDeploymentStatePathParams,
   UpdateDeploymentStateRequest,
   UpdateDeploymentStateResponse,
+  PromoteAgentPathParams,
+  PromoteAgentRequest,
+  PromoteAgentResponse,
+  UpdateDeploymentPipelinePathParams,
+  UpdateDeploymentPipelineRequest,
+  UpdateEnvironmentPathParams,
+  UpdateEnvironmentRequest,
+  Environment,
 } from '@agent-management-platform/types';
 import { POLL_INTERVAL } from '../utils';
 import { useApiMutation, useApiQuery } from './react-query-notifications';
@@ -125,6 +140,19 @@ export function useGetDeploymentPipeline(params: GetDeploymentPipelinePathParams
   });
 }
 
+export function useListDeploymentPipelines(
+  params: ListDeploymentPipelinesPathParams,
+  query?: ListDeploymentPipelinesQuery,
+  options?: { enabled?: boolean },
+) {
+  const { getToken } = useAuthHooks();
+  return useApiQuery<DeploymentPipelineListResponse>({
+    queryKey: ['deployment-pipelines', params.orgName, query],
+    queryFn: () => listDeploymentPipelines(params, query, getToken),
+    enabled: options?.enabled ?? !!params.orgName,
+  });
+}
+
 export function useUpdateDeploymentState() {
   const queryClient = useQueryClient();
   const { getToken } = useAuthHooks();
@@ -134,6 +162,46 @@ export function useUpdateDeploymentState() {
     mutationFn: ({ params, body }) => updateDeploymentState(params, body, getToken),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-deployments'] });
+    },
+  });
+}
+
+export function usePromoteAgent() {
+  const queryClient = useQueryClient();
+  const { getToken } = useAuthHooks();
+  return useApiMutation<PromoteAgentResponse, unknown,
+  { params: PromoteAgentPathParams; body: PromoteAgentRequest }>({
+    action: { verb: 'promote', target: 'agent' },
+    mutationFn: ({ params, body }) => promoteAgent(params, body, getToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-deployments'] });
+      queryClient.invalidateQueries({ queryKey: ['agent'] });
+    },
+  });
+}
+
+export function useUpdateDeploymentPipeline() {
+  const queryClient = useQueryClient();
+  const { getToken } = useAuthHooks();
+  return useApiMutation<DeploymentPipelineResponse, unknown,
+  { params: UpdateDeploymentPipelinePathParams; body: UpdateDeploymentPipelineRequest }>({
+    action: { verb: 'update', target: 'deployment pipeline' },
+    mutationFn: ({ params, body }) => updateDeploymentPipeline(params, body, getToken),
+    onSuccess: (_, { params }) => {
+      queryClient.invalidateQueries({ queryKey: ['deployment-pipeline', params] });
+    },
+  });
+}
+
+export function useUpdateEnvironment() {
+  const queryClient = useQueryClient();
+  const { getToken } = useAuthHooks();
+  return useApiMutation<Environment, unknown,
+  { params: UpdateEnvironmentPathParams; body: UpdateEnvironmentRequest }>({
+    action: { verb: 'update', target: 'environment' },
+    mutationFn: ({ params, body }) => updateEnvironment(params, body, getToken),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['environments'] });
     },
   });
 }

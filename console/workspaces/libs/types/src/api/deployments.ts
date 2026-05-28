@@ -170,3 +170,45 @@ export interface UpdateDeploymentStateResponse {
 }
 
 export type UpdateDeploymentStatePathParams = AgentPathParams;
+
+// Promote Agent
+export interface PromoteAgentRequest {
+  sourceEnvironment: string;
+  targetEnvironment: string;
+  useConfigFromSourceEnv?: boolean;
+  env?: EnvironmentVariable[];
+  files?: FileMount[];
+  enableAutoInstrumentation?: boolean;
+  enableApiKeySecurity?: boolean;
+  corsConfig?: CorsConfig;
+}
+
+export interface PromoteAgentResponse {
+  agentName?: string;
+  projectName?: string;
+  sourceEnvironment?: string;
+  targetEnvironment?: string;
+}
+
+export type PromoteAgentPathParams = AgentPathParams;
+
+// Update Deployment Pipeline
+export interface UpdateDeploymentPipelineRequest {
+  displayName?: string;
+  description?: string;
+  promotionPaths: PromotionPath[];
+}
+
+export type UpdateDeploymentPipelinePathParams = OrgProjPathParams;
+
+// Update Environment
+export interface UpdateEnvironmentRequest {
+  displayName?: string;
+  description?: string;
+  isProduction?: boolean;
+}
+
+export interface UpdateEnvironmentPathParams {
+  orgName: string | undefined;
+  envID: string | undefined;
+}
