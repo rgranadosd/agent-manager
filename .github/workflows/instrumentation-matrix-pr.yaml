@@ -1,4 +1,4 @@
-name: Instrumentation matrix — PR
+name: Instrumentation matrix tests - PR
 
 on:
   pull_request:

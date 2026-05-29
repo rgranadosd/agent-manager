@@ -9,14 +9,6 @@ description: >
 
   Mirrors the local `make setup` chain, minus Colima (macOS-only) and the
   console (UI, not needed by the heavy tier).
-
-  FIRST-RUN-TUNABLE: this has not yet run in CI. The likely friction points
-  are setup-platform.sh's Node version check, whether the docker-compose
-  side starts the console (we don't need it), and the background
-  port-forwards binding 9000/9098. Tune here as the first real run surfaces
-  issues; the heavy jobs that call this are continue-on-error until it's
-  green.
-
 runs:
   using: composite
   steps:

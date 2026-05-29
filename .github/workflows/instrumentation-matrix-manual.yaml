@@ -1,8 +1,4 @@
-name: Instrumentation matrix — manual
-
-# Tier 3: workflow_dispatch with cell-filter inputs. Lets an engineer
-# rerun a targeted slice of the matrix (one Traceloop version, one
-# framework, …) or refresh cassettes. Optionally includes the heavy tier.
+name: Instrumentation matrix test - manual
 
 on:
   workflow_dispatch:
