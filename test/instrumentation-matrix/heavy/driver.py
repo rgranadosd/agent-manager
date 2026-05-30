@@ -54,6 +54,12 @@ _DEFAULTS = {
     "IDP_TOKEN_URL": "http://localhost:8090/oauth2/token",
     "IDP_CLIENT_ID": "amp-api-client",
     "IDP_CLIENT_SECRET": "amp-api-client-secret",
+    # GitHub source the in-cluster buildpack clones each deployed sample from.
+    # Defaults to wso2/agent-manager@main; the CI workflows set
+    # AMP_AGENT_REPO_BRANCH to the ref under test so a PR can validate a
+    # new/changed sample on its own branch before it merges to main.
+    "AMP_AGENT_REPO_URL": "https://github.com/wso2/agent-manager",
+    "AMP_AGENT_REPO_BRANCH": "main",
 }
 
 # Secrets the deployed sample agent needs to start and make real calls:
@@ -190,6 +196,8 @@ def _run_cell(
         framework_version=cell.framework_version,
         python_version=cell.python,
         agent_env=agent_env,
+        repo_url=_env("AMP_AGENT_REPO_URL"),
+        repo_branch=_env("AMP_AGENT_REPO_BRANCH"),
     )
     _log(f"      deployed {deployed.agent_name}; invoking /chat…")
     try:
