@@ -114,7 +114,7 @@ func TestCreate_NoDescription(t *testing.T) {
 func testProjectCreateCmd(t *testing.T, ios *iostreams.IOStreams, clientFn func(context.Context) (*amsvc.ClientWithResponses, error)) *cobra.Command {
 	t.Helper()
 	f := &cmdutil.Factory{
-		IOStreams:     ios,
+		IOStreams:    ios,
 		AgentManager: clientFn,
 		Config: func() (*config.Config, error) {
 			return &config.Config{

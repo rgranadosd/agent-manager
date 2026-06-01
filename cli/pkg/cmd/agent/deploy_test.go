@@ -321,14 +321,14 @@ func newTestDeployIO(canPrompt, jsonMode bool) (*iostreams.IOStreams, *bytes.Buf
 
 func stubBuildableAgent() map[string]any {
 	return map[string]any{
-		"name":        "order-bot",
-		"displayName": "Order Bot",
-		"description": "",
-		"projectName": "triage",
-		"createdAt":   "2026-05-13T10:00:00Z",
+		"name":         "order-bot",
+		"displayName":  "Order Bot",
+		"description":  "",
+		"projectName":  "triage",
+		"createdAt":    "2026-05-13T10:00:00Z",
 		"provisioning": map[string]any{"type": "internal"},
-		"agentType":   map[string]any{"type": "chat"},
-		"uuid":        "00000000-0000-0000-0000-000000000001",
+		"agentType":    map[string]any{"type": "chat"},
+		"uuid":         "00000000-0000-0000-0000-000000000001",
 	}
 }
 
@@ -369,10 +369,13 @@ func stubConfigurations(items []map[string]any) map[string]any {
 		items = []map[string]any{}
 	}
 	return map[string]any{
-		"agentName":      "order-bot",
-		"projectName":    "triage",
-		"environment":    "dev",
-		"configurations": items,
+		"agentName":   "order-bot",
+		"projectName": "triage",
+		"environment": "dev",
+		"configurations": map[string]any{
+			"env":   items,
+			"files": []map[string]any{},
+		},
 	}
 }
 
@@ -458,9 +461,9 @@ func TestDeploy_NoBuilds_ReturnsBuildNotDeployable(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: prompter,
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -491,9 +494,9 @@ func TestDeploy_NotBuildable_PassthroughError(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -524,9 +527,9 @@ func TestDeploy_EmptyPipeline_ReturnsInternal(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -586,9 +589,9 @@ func TestDeploy_BuildNameSuccess_PreservesExistingEnv(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 		BuildName: "specific-b",
 	})
 	if err != nil {
@@ -633,9 +636,9 @@ func deployStatusErrorTest(t *testing.T, status, wantSubstr string) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -684,9 +687,9 @@ func TestDeploy_BuildCompletedButNoImageID_Errors(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -744,10 +747,10 @@ func TestDeploy_EnvNewKey_NoConflict(t *testing.T) {
 	prompter := &fakeDeployPrompter{}
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: prompter,
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"NEW_KEY=hello"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"NEW_KEY=hello"},
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)
@@ -778,11 +781,11 @@ func TestDeploy_EnvConflict_YesFlagBypassesPrompt(t *testing.T) {
 	prompter := &fakeDeployPrompter{}
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: prompter,
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"A=2"},
-		Yes:       true,
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"A=2"},
+		Yes:      true,
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)
@@ -813,10 +816,10 @@ func TestDeploy_EnvConflict_PromptAccepted(t *testing.T) {
 	prompter := &fakeDeployPrompter{confirmAnswer: true}
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: prompter,
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"A=2"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"A=2"},
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)
@@ -845,10 +848,10 @@ func TestDeploy_EnvConflict_PromptDeclined(t *testing.T) {
 	prompter := &fakeDeployPrompter{confirmAnswer: false}
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: prompter,
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"A=2"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"A=2"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -880,10 +883,10 @@ func TestDeploy_EnvConflict_JSONModeWithoutYes_Errors(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"A=2"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"A=2"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -913,10 +916,10 @@ func TestDeploy_EnvConflict_NonTTYWithoutYes_Errors(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"A=2"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"A=2"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -936,8 +939,11 @@ func sensitiveConfigsRoute() (string, stubResponse) {
 			"agentName":   "order-bot",
 			"projectName": "triage",
 			"environment": "dev",
-			"configurations": []any{
-				map[string]any{"key": "PINECONE_API_KEY", "value": "", "isSensitive": true},
+			"configurations": map[string]any{
+				"env": []any{
+					map[string]any{"key": "PINECONE_API_KEY", "value": "", "isSensitive": true},
+				},
+				"files": []any{},
 			},
 		}}
 }
@@ -947,9 +953,9 @@ func TestDeploy_EnvSensitiveConflict_WithYes_JSONReportsKeyOnly(t *testing.T) {
 	requests := []recordedRequest{}
 	sk, sv := sensitiveConfigsRoute()
 	routes := map[string]stubResponse{
-		"GET /orgs/acme/projects/triage/agents/order-bot":              {200, stubBuildableAgent()},
-		"GET /orgs/acme/projects/triage/agents/order-bot/builds":       {200, stubBuildsListLatest("b1", "img1", "Completed")},
-		"GET /orgs/acme/projects/triage/deployment-pipeline":           {200, stubPipelineDevToProd()},
+		"GET /orgs/acme/projects/triage/agents/order-bot":        {200, stubBuildableAgent()},
+		"GET /orgs/acme/projects/triage/agents/order-bot/builds": {200, stubBuildsListLatest("b1", "img1", "Completed")},
+		"GET /orgs/acme/projects/triage/deployment-pipeline":     {200, stubPipelineDevToProd()},
 		sk: sv,
 		"POST /orgs/acme/projects/triage/agents/order-bot/deployments": {202, stubDeployAccepted("img1")},
 	}
@@ -959,11 +965,11 @@ func TestDeploy_EnvSensitiveConflict_WithYes_JSONReportsKeyOnly(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"PINECONE_API_KEY=newval"},
-		Yes:       true,
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"PINECONE_API_KEY=newval"},
+		Yes:      true,
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)
@@ -999,10 +1005,10 @@ func TestDeploy_EnvSensitiveConflict_JSONWithoutYes_ErrorsKeyOnly(t *testing.T) 
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"PINECONE_API_KEY=newval"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"PINECONE_API_KEY=newval"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -1035,10 +1041,10 @@ func TestDeploy_EnvFlag_MalformedEmptyKey(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"=foo"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"=foo"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -1065,10 +1071,10 @@ func TestDeploy_EnvFlag_MalformedNoEquals(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
-		EnvFlags:  []string{"FOO"},
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
+		EnvFlags: []string{"FOO"},
 	})
 	if err == nil {
 		t.Fatal("expected error")
@@ -1103,9 +1109,9 @@ func TestDeploy_StatusCompleted_IsDeployable(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)
@@ -1131,9 +1137,9 @@ func TestDeploy_StatusSucceeded_IsDeployable(t *testing.T) {
 
 	err := runDeploy(context.Background(), &DeployOptions{
 		IO: io, Prompter: &fakeDeployPrompter{},
-		Client:    func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
-		Scope:     baseScope(),
-		Org:       "acme", Proj: "triage", AgentName: "order-bot",
+		Client: func(context.Context) (*gen.ClientWithResponses, error) { return client, nil },
+		Scope:  baseScope(),
+		Org:    "acme", Proj: "triage", AgentName: "order-bot",
 	})
 	if err != nil {
 		t.Fatalf("runDeploy: %v", err)

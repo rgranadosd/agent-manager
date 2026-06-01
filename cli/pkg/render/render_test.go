@@ -132,4 +132,3 @@ func TestIsRendered_Unwrap(t *testing.T) {
 		t.Errorf("code = %q, want %q", cli.Code, clierr.NoOrg)
 	}
 }
-
