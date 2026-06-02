@@ -92,7 +92,8 @@ func (s *AIApplicationService) EnsureAndBind(
 
 	s.broadcastToAllGateways(ctx, orgName, app, apiKeyUUID)
 
-	s.logger.Info("Ensured AI application and bound API key",
+	s.logger.Info(
+		"Ensured AI application and bound API key",
 		"applicationUUID", app.UUID,
 		"applicationHandle", appHandle,
 		"agentID", agentID,
@@ -122,7 +123,8 @@ func (s *AIApplicationService) Delete(ctx context.Context, orgName, projectName,
 
 	s.broadcastDeletionToAllGateways(ctx, orgName, app)
 
-	s.logger.Info("Deleted AI application",
+	s.logger.Info(
+		"Deleted AI application",
 		"applicationUUID", app.UUID,
 		"applicationHandle", app.Handle,
 		"agentID", agentID,

@@ -436,7 +436,8 @@ func (s *agentConfigurationService) Create(ctx context.Context, orgName, project
 
 		// Ensure one AI application exists per agent+env and bind the proxy API key.
 		agentAppHandle := agentAppIdentifier(config.ProjectName, config.AgentID, env.Name)
-		_, created, err := s.aiApplicationService.EnsureAndBind(ctx, orgName, config.ProjectName, config.AgentID, env.Name,
+		_, created, err := s.aiApplicationService.EnsureAndBind(
+			ctx, orgName, config.ProjectName, config.AgentID, env.Name,
 			agentAppHandle,
 			fmt.Sprintf("%s Application", config.AgentID),
 			proxyAPIKey.KeyID,
@@ -738,7 +739,8 @@ func (s *agentConfigurationService) processEnvProviderChange(
 
 	// Ensure one AI application exists per agent+env and bind the proxy API key.
 	agentAppHandle := agentAppIdentifier(config.ProjectName, config.AgentID, envName)
-	_, created, err := s.aiApplicationService.EnsureAndBind(ctx, orgName, config.ProjectName, config.AgentID, envName,
+	_, created, err := s.aiApplicationService.EnsureAndBind(
+		ctx, orgName, config.ProjectName, config.AgentID, envName,
 		agentAppHandle,
 		fmt.Sprintf("%s Application", config.AgentID),
 		proxyAPIKey.KeyID,
@@ -992,7 +994,8 @@ func (s *agentConfigurationService) processNewEnv(
 
 	// Ensure one AI application exists per agent+env and bind the proxy API key.
 	agentAppHandle := agentAppIdentifier(config.ProjectName, config.AgentID, envName)
-	_, created, err := s.aiApplicationService.EnsureAndBind(ctx, orgName, config.ProjectName, config.AgentID, envName,
+	_, created, err := s.aiApplicationService.EnsureAndBind(
+		ctx, orgName, config.ProjectName, config.AgentID, envName,
 		agentAppHandle,
 		fmt.Sprintf("%s Application", config.AgentID),
 		proxyAPIKey.KeyID,
