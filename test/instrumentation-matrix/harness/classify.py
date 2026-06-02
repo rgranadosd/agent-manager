@@ -78,3 +78,20 @@ def classify_span(span: dict[str, Any]) -> str:
         return "chain"
 
     return "unknown"
+
+
+# OTel GenAI semconv lets a tool call ride on the assistant LLM span as an
+# event (`gen_ai.tool.call`, or a choice event carrying gen_ai.tool.*) rather
+# than as a separate child span. F-009: the harness now captures `events`, so
+# the matrix can count that as tool-kind coverage instead of reporting a
+# missing tool span.
+_TOOL_EVENT_NAMES = {"gen_ai.tool.call", "gen_ai.execute_tool"}
+
+
+def span_has_tool_event(span: dict[str, Any]) -> bool:
+    for event in span.get("events", []) or []:
+        if event.get("name") in _TOOL_EVENT_NAMES:
+            return True
+        if any(k.startswith("gen_ai.tool.") for k in (event.get("attributes") or {})):
+            return True
+    return False
