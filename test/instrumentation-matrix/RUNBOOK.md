@@ -61,21 +61,21 @@ call — copy `cells/langchain_sample.py`) and record its cassette:
 OPENAI_API_KEY=sk-... python scripts/record_cassette.py haystack llm
 ```
 
-**Example — add a Traceloop version (`0.61.0`):**
+**Example — add a Traceloop version (`0.62.0`):**
 
 ```yaml
 # matrix.yaml → providers.traceloop:
-    versions: ["0.60.0", "0.61.0"]          # add the new one
+    versions: ["0.61.0", "0.62.0"]          # add the new one
     instrumentationVersions:
-      "0.60.0": "0.2.1"
-      "0.61.0": "0.3.0"                      # ← the init-container instr version
+      "0.61.0": "0.3.0"
+      "0.62.0": "0.4.0"                      # ← the init-container instr version
 ```
 
 After any edit, sanity-check locally:
 
 ```bash
 cd test/instrumentation-matrix
-nox -s emission -- --cell-id=traceloop-0.61.0-langchain-0.3.27-py3.11   # one cell
+nox -s emission -- --cell-id=traceloop-0.62.0-langchain-0.3.27-py3.11   # one cell
 nox -s emission -k haystack                                             # by framework
 ```
 
@@ -129,10 +129,10 @@ The `category` tells you whose problem it likely is (design §12.1):
 **Example — a red row + its diff.** The summary shows:
 
 ```text
-| ❌ traceloop-0.60.0-crewai-1.1.0-py3.11 | fail | missing-span-kind: missing ['tool'] |
+| ❌ traceloop-0.61.0-langgraph-0.2.74-py3.11 | fail | missing-span-kind: missing ['tool'] |
 ```
 
-and `reports/diffs/traceloop-0.60.0-crewai-1.1.0-py3.11.diff.md` shows which
+and `reports/diffs/traceloop-0.61.0-langgraph-0.2.74-py3.11.diff.md` shows which
 required keys were present vs missing:
 
 ```

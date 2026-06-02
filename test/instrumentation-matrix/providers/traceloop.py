@@ -13,7 +13,7 @@ class TraceloopProvider:
             f"traceloop-sdk=={version}",
             # Mirrors python-instrumentation-provider/requirements.txt: wrapt 2.x
             # removed the `module=` kwarg that opentelemetry-instrumentation-*
-            # 0.60.0 still calls.
+            # 0.61.0 still calls.
             "wrapt<2.0.0",
             "opentelemetry-sdk",
             "opentelemetry-api",

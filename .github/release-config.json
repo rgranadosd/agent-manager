@@ -28,8 +28,8 @@
 
   "python-instrumentation-provider": [
     {
-      "instrumentation_version": "0.2.1",
-      "traceloop_version": "0.60.0",
+      "instrumentation_version": "0.3.0",
+      "traceloop_version": "0.61.0",
       "python_versions": ["3.10", "3.11", "3.12", "3.13"]
     }
   ],

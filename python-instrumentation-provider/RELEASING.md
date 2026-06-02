@@ -47,13 +47,13 @@ stay on the version they were pinned to — bumping the default never moves them
 `workflow_dispatch`-only — they run when someone *manually* dispatches them:
 
 - **PyPI package** — `.github/workflows/amp_instrumentation_release.yaml`. Type the
-  `target_version` (e.g. `0.3.0`) and the chosen `branch` (usually `main`); the
+  `target_version` (e.g. `0.4.0`) and the chosen `branch` (usually `main`); the
   workflow `sed`s `pyproject.toml`'s `version`, builds, publishes to PyPI, and tags
   `amp-instrumentation/v<target_version>`. **Run this when** you've merged the
   `traceloop-sdk` pin update and want to publish a new PyPI version.
 - **Init-container images — standalone (primary path)**:
   `.github/workflows/python_instrumentation_image_release.yaml`. Inputs: `branch`
-  and `instrumentation_version` (a specific version like `0.3.0`, or `all`). It reads
+  and `instrumentation_version` (a specific version like `0.4.0`, or `all`). It reads
   `release-config.json`, filters to the requested version, and builds & pushes the
   matching `(instr × python)` matrix as
   `amp-python-instrumentation-provider:<instr_version>-python<X.Y>`. **Use this
@@ -122,23 +122,23 @@ a leftover closed test issue would suppress a future real notification).
 
 ## Scenario A — bump `traceloop-sdk` (new OpenLLMetry version)
 
-Example: `traceloop-sdk` `0.60.0` → `0.65.0`, cutting AMP-instr version `0.3.0`.
+Example: `traceloop-sdk` `0.61.0` → `0.65.0`, cutting AMP-instr version `0.4.0`.
 
 1. **Validate** `traceloop-sdk==0.65.0` against the frontier frameworks (existing
    validation process — out of scope here). Only cut a version for releases we've validated.
 2. **Pick the new AMP-instr semver.** Minor bump if there's a behaviour change (a new
-   OpenLLMetry usually is); patch for trivial fixes. Say `0.3.0`.
+   OpenLLMetry usually is); patch for trivial fixes. Say `0.4.0`.
 3. **PyPI package** (`libs/amp-instrumentation/`):
    - Edit `pyproject.toml` → `dependencies` → `"traceloop-sdk==0.65.0"`. (Leave `version = "0.0.0-dev"` alone.)
    - PR → review → merge to `main`.
    - Run the **`AMP Instrumentation Release`** workflow (`amp_instrumentation_release.yaml`,
-     `workflow_dispatch`) with `branch = main`, `target_version = 0.3.0`. It updates
-     `pyproject.toml`'s `version`, builds, publishes `amp-instrumentation==0.3.0` to PyPI,
-     and tags `amp-instrumentation/v0.3.0`.
+     `workflow_dispatch`) with `branch = main`, `target_version = 0.4.0`. It updates
+     `pyproject.toml`'s `version`, builds, publishes `amp-instrumentation==0.4.0` to PyPI,
+     and tags `amp-instrumentation/v0.4.0`.
 4. **Init-container images** (`.github/release-config.json`): **add a new entry** to the
    `python-instrumentation-provider` array (keep the old ones — see "Retention" below):
    ```json
-   { "instrumentation_version": "0.3.0", "traceloop_version": "0.65.0", "python_versions": ["3.10", "3.11", "3.12", "3.13"] }
+   { "instrumentation_version": "0.4.0", "traceloop_version": "0.65.0", "python_versions": ["3.10", "3.11", "3.12", "3.13"] }
    ```
    No Dockerfile change needed.
 5. **Regenerate the server's embedded catalog**. The `agent-manager-service` binary
@@ -153,22 +153,22 @@ Example: `traceloop-sdk` `0.60.0` → `0.65.0`, cutting AMP-instr version `0.3.0
    the chart's default from drifting. Merge the PR.
 6. **Publish the images** by dispatching the **`AMP Python Instrumentation Image Release`**
    workflow (`python_instrumentation_image_release.yaml`) with `branch = main`,
-   `instrumentation_version = 0.3.0`. It builds & pushes the `(0.3.0 × supported python)`
-   matrix to `amp-python-instrumentation-provider:0.3.0-python{X.Y}`. (You don't have to
+   `instrumentation_version = 0.4.0`. It builds & pushes the `(0.4.0 × supported python)`
+   matrix to `amp-python-instrumentation-provider:0.4.0-python{X.Y}`. (You don't have to
    wait for an AMP product release — that workflow is independent. The next product
    release will also rebuild this matrix, refreshing the base layers — that's fine.)
-7. **Make it the platform default** (when you want *new* agents to get `0.3.0`).
+7. **Make it the platform default** (when you want *new* agents to get `0.4.0`).
    In `deployments/helm-charts/wso2-agent-manager/values.yaml`:
    ```yaml
    agentManagerService:
      config:
        otel:
-         defaultInstrumentationVersion: "0.3.0"
+         defaultInstrumentationVersion: "0.4.0"
    ```
    The next AMP product release ships this default. Operators can still override it
    per install via the same chart value. Existing agents are unaffected — the default
    only applies to *new* agents created without an explicit pin.
-8. **Docs / mapping table**: add a `0.3.0 → traceloop-sdk 0.65.0 → python 3.10–3.13` row
+8. **Docs / mapping table**: add a `0.4.0 → traceloop-sdk 0.65.0 → python 3.10–3.13` row
    to the "Bundled baseline" table in `documentation/docs/components/amp-instrumentation.mdx`.
    (Console dropdowns are populated from the runtime catalog at the agent-build-options
    endpoint, so no Console-side edit is needed.)
@@ -209,7 +209,7 @@ Only prune a very old entry after confirming no agent pins it.
 
 ## Verifying a release
 
-- **PyPI:** `pip install amp-instrumentation==0.3.0 && pip show traceloop-sdk` (expect the pinned version) and `python -c "import amp_instrumentation; print(amp_instrumentation.__version__)"` (expect `0.3.0`).
-- **Image:** `docker run --rm ghcr.io/wso2/amp-python-instrumentation-provider:0.3.0-python3.11 sh -c 'cat /instrumentations/otel-tracing/traceloop_sdk-*.dist-info/METADATA | grep ^Version'` (or just `ls /instrumentations/otel-tracing/`).
+- **PyPI:** `pip install amp-instrumentation==0.4.0 && pip show traceloop-sdk` (expect the pinned version) and `python -c "import amp_instrumentation; print(amp_instrumentation.__version__)"` (expect `0.4.0`).
+- **Image:** `docker run --rm ghcr.io/wso2/amp-python-instrumentation-provider:0.4.0-python3.11 sh -c 'cat /instrumentations/otel-tracing/traceloop_sdk-*.dist-info/METADATA | grep ^Version'` (or just `ls /instrumentations/otel-tracing/`).
 - **agent-manager-service:** deploy a Python agent with auto-instrumentation on; confirm the init container in the pod is `…:<expected version>-python<agent's Python>`.
 
