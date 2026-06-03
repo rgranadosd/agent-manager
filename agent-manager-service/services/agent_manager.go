@@ -76,6 +76,7 @@ type agentManagerService struct {
 	agentKindService          AgentKindService
 	artifactRepo              repositories.ArtifactRepository
 	aiApplicationService      *AIApplicationService
+	gatewayRepo               repositories.GatewayRepository
 	logger                    *slog.Logger
 }
 
@@ -91,6 +92,7 @@ func NewAgentManagerService(
 	agentKindService AgentKindService,
 	artifactRepo repositories.ArtifactRepository,
 	aiApplicationService *AIApplicationService,
+	gatewayRepo repositories.GatewayRepository,
 	logger *slog.Logger,
 ) AgentManagerService {
 	return &agentManagerService{
@@ -105,6 +107,7 @@ func NewAgentManagerService(
 		agentKindService:          agentKindService,
 		artifactRepo:              artifactRepo,
 		aiApplicationService:      aiApplicationService,
+		gatewayRepo:               gatewayRepo,
 		logger:                    logger,
 	}
 }
@@ -321,22 +324,32 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 	// Determine instrumentation settings
 	autoInstrumentation := req.Configurations == nil || req.Configurations.EnableAutoInstrumentation == nil || *req.Configurations.EnableAutoInstrumentation
 	isAPIAgent := req.AgentType != nil && req.AgentType.Type == string(utils.AgentTypeAPI)
+
+	// Resolve gateway target for the lowest environment so the RestApi label is set at creation.
+	// This acts as the default; deploy/promote flows override it via traitEnvironmentConfigs.
+	createGatewayTarget := ""
+	if isAPIAgent && envName != "" {
+		if env, envErr := s.ocClient.GetEnvironment(ctx, orgName, envName); envErr == nil {
+			createGatewayTarget = resolveGatewayTarget(s.gatewayRepo, env.UUID, envName)
+		}
+	}
 	isPythonBuildpack := req.Build != nil && req.Build.BuildpackBuild != nil && req.Build.BuildpackBuild.Buildpack.Language == string(utils.LanguagePython)
 	isDocker := req.Build != nil && req.Build.DockerBuild != nil
 
-	// Attach instrumentation traits at creation. For Python buildpack agents, both OTEL and
-	// env-injection traits are attached with instrumentationEnabled/envInjectionEnabled controlling
-	// which is active. For Docker agents, only env-injection is attached.
-	// Per-environment overrides are set via traitEnvironmentConfigs on the release binding during deploy/promote.
+	// Attach instrumentation traits at creation.
+	// env-injection is always attached for all API agents — it is the sole injector of
+	// AMP_OTEL_ENDPOINT and AMP_AGENT_API_KEY (includeWhen on patches is not supported).
+	// python-otel-instrumentation-trait is only attached for Python buildpack agents with
+	// auto-instrumentation enabled; it handles the init container, SDK volume, and PYTHONPATH.
 	if isAPIAgent && isPythonBuildpack {
-		// Python buildpack: attach both traits, one of them is always active so API key is always needed
 		apiKey, err := s.generateAgentAPIKey(ctx, orgName, projectName, req.Name, envName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate agent API key: %w", err)
 		}
 
+		// Always attach OTEL trait; patches are gated by instrumentationEnabled via 'where' on target,
+		// enabling per-environment control through traitEnvironmentConfigs.
 		otelOpts := []client.TraitOption{
-			client.WithAgentApiKey(apiKey),
 			client.WithInstrumentationEnabled(autoInstrumentation),
 		}
 		lv := req.Build.BuildpackBuild.Buildpack.GetLanguageVersion()
@@ -357,11 +370,10 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 			TraitType: client.TraitEnvInjection,
 			Opts: []client.TraitOption{
 				client.WithAgentApiKey(apiKey),
-				client.WithEnvInjectionEnabled(!autoInstrumentation),
 			},
 		})
 	} else if isAPIAgent && isDocker {
-		// Docker: attach only env-injection trait
+		// Docker: attach only env-injection trait (no init container needed)
 		apiKey, err := s.generateAgentAPIKey(ctx, orgName, projectName, req.Name, envName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate agent API key: %w", err)
@@ -371,7 +383,6 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 			TraitType: client.TraitEnvInjection,
 			Opts: []client.TraitOption{
 				client.WithAgentApiKey(apiKey),
-				client.WithEnvInjectionEnabled(true),
 			},
 		})
 	}
@@ -397,15 +408,19 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 			),
 			client.APIKeyAuthPolicy(),
 		}
+		apiTraitOpts := []client.TraitOption{
+			client.WithArtifactID(artifactID),
+			client.WithUpstreamPort(port),
+			client.WithUpstreamBasePath(basePath),
+			client.WithPolicies(createPolicies),
+		}
+		if createGatewayTarget != "" {
+			apiTraitOpts = append(apiTraitOpts, client.WithGatewayTarget(createGatewayTarget))
+		}
 		traits = append(traits, client.TraitRequest{
 			TraitKind: client.TraitKindTrait,
 			TraitType: client.TraitAPIManagement,
-			Opts: []client.TraitOption{
-				client.WithArtifactID(artifactID),
-				client.WithUpstreamPort(port),
-				client.WithUpstreamBasePath(basePath),
-				client.WithPolicies(createPolicies),
-			},
+			Opts:      apiTraitOpts,
 		})
 	}
 
@@ -2266,9 +2281,15 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 
 	// Build trait environment configs for the release binding.
 	// Deploy sets the artifactId on the Component CR trait parameters (via AttachTraits),
-	// so no per-env override is needed here.
+	// so no per-env override is needed here. gatewayTarget is looked up from the
+	// gateway-environment mapping so the RestApi resource gets the correct label.
 	policies := buildPolicies(apiCfg)
-	deployTraitEnvConfigs := buildTraitEnvConfigs(agentName, tracingCfg, policies, "")
+	gatewayTarget := ""
+	if isAPIAgent && targetEnv != nil {
+		gatewayTarget = resolveGatewayTarget(s.gatewayRepo, targetEnv.UUID, lowestEnv)
+	}
+	isPythonBuildpack := agent.Build != nil && agent.Build.Buildpack != nil && agent.Build.Buildpack.Language == string(utils.LanguagePython)
+	deployTraitEnvConfigs := buildTraitEnvConfigs(agentName, policies, "", gatewayTarget, isPythonBuildpack, enableAutoInstrumentation)
 
 	// Replace Component CR workflow parameters with env vars and file mounts from deploy request
 	// This replaces all existing env vars to ensure the component CR matches the deploy request
@@ -2310,6 +2331,9 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			traitOpts = append(traitOpts, client.WithUpstreamBasePath(config.GetConfig().DefaultChatAPI.DefaultBasePath))
 		}
 		traitOpts = append(traitOpts, client.WithPolicies(policies))
+		if gatewayTarget != "" {
+			traitOpts = append(traitOpts, client.WithGatewayTarget(gatewayTarget))
+		}
 
 		componentDeployConfig.TraitsToAttach = append(componentDeployConfig.TraitsToAttach, client.TraitRequest{
 			TraitKind: client.TraitKindTrait,
@@ -2317,6 +2341,11 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			Opts:      traitOpts,
 		})
 		requiresComponentConfig = true
+
+		// OTEL trait is already attached from create. Per-environment instrumentationEnabled is
+		// controlled via deployTraitEnvConfigs (written to the ReleaseBinding) so patches are
+		// gated by the 'where' clause without touching the Component CR trait attachment.
+
 		s.logger.Info("Updated api-configuration trait", "agentName", agentName, "artifactID", artifactID, "enableApiKeySecurity", enableApiKeySecurity)
 	}
 
@@ -2476,7 +2505,11 @@ func buildPolicies(cfg resolvedCORSConfig) []map[string]interface{} {
 // OpenChoreo's rendering engine looks up traitEnvironmentConfigs by instance name.
 // artifactID, when non-empty, is injected as a per-environment override for the api-configuration
 // trait so that each environment gets a unique artifact UUID in its RestApi resource.
-func buildTraitEnvConfigs(agentName string, tracing resolvedTracingConfig, policies []map[string]interface{}, artifactID string) map[string]interface{} {
+// gatewayTarget, when non-empty, is the label value stamped on RestApi resources so the correct
+// gateway's apiSelector (scope: LabelSelector) picks them up.
+// For Python buildpack agents, instrumentationEnabled is set per-environment on the OTEL trait so
+// the 'where' clause on patches can enable/disable instrumentation independently per environment.
+func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, artifactID string, gatewayTarget string, isPythonBuildpack bool, autoInstrumentation bool) map[string]interface{} {
 	instanceName := func(traitType client.TraitType) string {
 		return agentName + "-" + string(traitType)
 	}
@@ -2486,16 +2519,40 @@ func buildTraitEnvConfigs(agentName string, tracing resolvedTracingConfig, polic
 	if artifactID != "" {
 		apiTraitCfg["artifactId"] = artifactID
 	}
+	if gatewayTarget != "" {
+		apiTraitCfg["gatewayTarget"] = gatewayTarget
+	}
 	traitEnvConfigs := map[string]interface{}{
 		instanceName(client.TraitAPIManagement): apiTraitCfg,
-		instanceName(client.TraitOTELInstrumentation): map[string]interface{}{
-			"instrumentationEnabled": tracing.EnableAutoInstrumentation,
-		},
-		instanceName(client.TraitEnvInjection): map[string]interface{}{
-			"envInjectionEnabled": !tracing.EnableAutoInstrumentation,
-		},
+	}
+	if isPythonBuildpack {
+		traitEnvConfigs[instanceName(client.TraitOTELInstrumentation)] = map[string]interface{}{
+			"instrumentationEnabled": autoInstrumentation,
+		}
 	}
 	return traitEnvConfigs
+}
+
+// resolveGatewayTarget looks up the gateway assigned to the given environment and returns
+// the label value used by the APIGateway CR's apiSelector (scope: LabelSelector).
+// The label is constructed as "<gatewayName>-<environmentName>", lowercased and truncated
+// to 63 characters (with trailing hyphens stripped) to match Kubernetes label value limits.
+// Returns an empty string if no gateway mapping is found (RestApi will still be created but
+// will not be targeted by any gateway's label selector until one is assigned).
+func resolveGatewayTarget(gatewayRepo repositories.GatewayRepository, environmentUUID, environmentName string) string {
+	mappings, err := gatewayRepo.GetEnvironmentMappingsByEnvironmentID(environmentUUID)
+	if err != nil || len(mappings) == 0 {
+		return ""
+	}
+	gateway, err := gatewayRepo.GetByUUID(mappings[0].GatewayUUID.String())
+	if err != nil || gateway == nil {
+		return ""
+	}
+	label := strings.ToLower(gateway.Name + "-" + environmentName)
+	if len(label) > 63 {
+		label = strings.TrimSuffix(label[:63], "-")
+	}
+	return label
 }
 
 func findLowestEnvironment(promotionPaths []models.PromotionPath) string {
@@ -2725,31 +2782,32 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			return fmt.Errorf("failed to ensure target env API artifact: %w", artifactErr)
 		}
 		targetArtifactID = artifact.UUID.String()
-		traitEnvConfigs = buildTraitEnvConfigs(agentName, tracingCfg, policies, targetArtifactID)
+		gatewayTarget := resolveGatewayTarget(s.gatewayRepo, targetEnv.UUID, req.TargetEnvironment)
+		promotePythonBuildpack := agent.Build != nil && agent.Build.Buildpack != nil && agent.Build.Buildpack.Language == string(utils.LanguagePython)
+		traitEnvConfigs = buildTraitEnvConfigs(agentName, policies, targetArtifactID, gatewayTarget, promotePythonBuildpack, tracingCfg.EnableAutoInstrumentation)
 
 		// Only generate API key and set otelEndpoint on first promotion to this environment.
 		// On subsequent promotions, these are already set on the release binding's traitEnvironmentConfigs.
 		_, targetConfigErr := s.agentConfigRepo.Get(orgName, projectName, agentName, req.TargetEnvironment)
 		isFirstPromotion := targetConfigErr != nil
 		if isFirstPromotion {
-			otelKey := agentName + "-" + string(client.TraitOTELInstrumentation)
 			envInjKey := agentName + "-" + string(client.TraitEnvInjection)
+			envInjCfg := map[string]interface{}{}
+
 			apiKey, apiKeyErr := s.generateAgentAPIKey(ctx, orgName, projectName, agentName, req.TargetEnvironment)
 			if apiKeyErr != nil {
 				s.logger.Warn("Failed to generate agent API key for promotion", "agentName", agentName, "error", apiKeyErr)
 			} else {
-				otelCfg := traitEnvConfigs[otelKey].(map[string]interface{})
-				envInjCfg := traitEnvConfigs[envInjKey].(map[string]interface{})
-				otelCfg["agentApiKey"] = apiKey
 				envInjCfg["agentApiKey"] = apiKey
 			}
 
 			otelEndpoint := config.GetConfig().OTEL.ExporterEndpoint
 			if otelEndpoint != "" {
-				otelCfg := traitEnvConfigs[otelKey].(map[string]interface{})
-				envInjCfg := traitEnvConfigs[envInjKey].(map[string]interface{})
-				otelCfg["otelEndpoint"] = otelEndpoint
 				envInjCfg["otelEndpoint"] = otelEndpoint
+			}
+
+			if len(envInjCfg) > 0 {
+				traitEnvConfigs[envInjKey] = envInjCfg
 			}
 		}
 

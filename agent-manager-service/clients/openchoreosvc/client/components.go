@@ -2140,6 +2140,14 @@ func WithArtifactID(artifactID string) TraitOption {
 	}
 }
 
+// WithGatewayTarget sets the gateway label value for the api-configuration trait parameter.
+// This acts as the default; per-environment environmentConfigs.gatewayTarget takes precedence when set.
+func WithGatewayTarget(gatewayTarget string) TraitOption {
+	return func(params map[string]interface{}) {
+		params["gatewayTarget"] = gatewayTarget
+	}
+}
+
 // APIKeyAuthPolicy returns the policy map for API key authentication.
 func APIKeyAuthPolicy() map[string]interface{} {
 	return map[string]interface{}{
@@ -2232,10 +2240,6 @@ func (c *openChoreoClient) buildOTELTraitParameters(ctx context.Context, namespa
 	for _, opt := range opts {
 		opt(params)
 	}
-	agentApiKey, _ := params["agentApiKey"].(string)
-	if agentApiKey == "" {
-		return nil, fmt.Errorf("agent API key is required for OTEL instrumentation trait")
-	}
 
 	// Use the language version passed via WithLanguageVersion if available;
 	// otherwise fall back to fetching the component (legacy path for direct callers).
@@ -2272,14 +2276,16 @@ func (c *openChoreoClient) buildOTELTraitParameters(ctx context.Context, namespa
 		return nil, fmt.Errorf("failed to build instrumentation image: %w", err)
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"instrumentationImage":  instrumentationImage,
 		"sdkVolumeName":         cfg.OTEL.SDKVolumeName,
 		"sdkMountPath":          cfg.OTEL.SDKMountPath,
-		"otelEndpoint":          cfg.OTEL.ExporterEndpoint,
 		"isTraceContentEnabled": utils.BoolAsString(cfg.OTEL.IsTraceContentEnabled),
-		"agentApiKey":           agentApiKey,
-	}, nil
+	}
+	if v, ok := params["instrumentationEnabled"]; ok {
+		result["instrumentationEnabled"] = v
+	}
+	return result, nil
 }
 
 // buildEnvInjectionTraitParameters builds parameters for the env injection trait
@@ -2295,10 +2301,14 @@ func (c *openChoreoClient) buildEnvInjectionTraitParameters(opts ...TraitOption)
 	}
 
 	cfg := config.GetConfig()
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"otelEndpoint": cfg.OTEL.ExporterEndpoint,
 		"agentApiKey":  agentApiKey,
-	}, nil
+	}
+	if v, ok := params["envInjectionEnabled"]; ok {
+		result["envInjectionEnabled"] = v
+	}
+	return result, nil
 }
 
 // getInstrumentationImage builds the pre-built init-container image reference for
