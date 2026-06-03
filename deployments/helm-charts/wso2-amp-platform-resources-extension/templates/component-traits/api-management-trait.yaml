@@ -60,6 +60,10 @@ spec:
           type: string
           description: "Artifact UUID injected as gateway.api-platform.wso2.com/artifact-id annotation on the RestApi"
           default: ""
+        gatewayTarget:
+          type: string
+          description: "Label value matching the target gateway's apiSelector matchLabels (gateway.api-platform.wso2.com/restapi-target). Used as a default; per-environment environmentConfigs.gatewayTarget takes precedence when set."
+          default: ""
       required:
         - apiName
 
@@ -77,6 +81,10 @@ spec:
         artifactId:
           type: string
           description: "Per-environment artifact UUID override. When set, takes precedence over parameters.artifactId."
+          default: ""
+        gatewayTarget:
+          type: string
+          description: "Label value matching the target gateway's apiSelector matchLabels (gateway.api-platform.wso2.com/restapi-target). Each environment should set this to the label value of its assigned gateway."
           default: ""
 
   creates:
@@ -97,13 +105,15 @@ spec:
               - host: {{ .Values.gateway.backendHost }}
                 port: {{ .Values.gateway.backendPort }}
 
-    # Create RestApi resource (auto-discovered by gateway via apiSelector scope: Cluster)
+    # Create RestApi resource (discovered by gateway via apiSelector scope: LabelSelector)
     - template:
         apiVersion: gateway.api-platform.wso2.com/v1alpha1
         kind: RestApi
         metadata:
           name: ${metadata.name}
           namespace: ${metadata.namespace}
+          labels:
+            gateway.api-platform.wso2.com/restapi-target: "${has(environmentConfigs.gatewayTarget) && environmentConfigs.gatewayTarget != '' ? environmentConfigs.gatewayTarget : parameters.gatewayTarget}"
           annotations:
             gateway.api-platform.wso2.com/artifact-id: "${has(environmentConfigs.artifactId) && environmentConfigs.artifactId != '' ? environmentConfigs.artifactId : parameters.artifactId}"
         spec:

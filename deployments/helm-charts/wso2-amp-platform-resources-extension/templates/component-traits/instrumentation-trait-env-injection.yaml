@@ -30,7 +30,6 @@ spec:
       properties:
         envInjectionEnabled:
           type: boolean
-          default: true
           description: "Enable or disable env injection instrumentation for this environment"
         otelEndpoint:
           type: string
@@ -39,11 +38,10 @@ spec:
           type: string
           description: "Environment-specific API key for authenticating with the agent service"
 
-  # Create Secret for the agent API key
+  # Always create the Secret — patches always run regardless of includeWhen,
+  # so the Secret must always exist to satisfy the AMP_AGENT_API_KEY secretKeyRef.
   creates:
-    - includeWhen: |
-        ${has(environmentConfigs.envInjectionEnabled) ? environmentConfigs.envInjectionEnabled : parameters.envInjectionEnabled}
-      template:
+    - template:
         apiVersion: v1
         kind: Secret
         metadata:
@@ -54,11 +52,12 @@ spec:
           api-key: |
              ${has(environmentConfigs.agentApiKey) ? environmentConfigs.agentApiKey : parameters.agentApiKey}
 
-  # Patches to modify the Deployment resource
+  # Patches to inject AMP_OTEL_ENDPOINT and AMP_AGENT_API_KEY.
+  # This is the sole injector for these vars across all agent types
+  # (Python buildpack and Docker). The python-otel-instrumentation-trait
+  # does NOT inject these to avoid duplicates.
   patches:
-    - includeWhen: |
-        ${has(environmentConfigs.envInjectionEnabled) ? environmentConfigs.envInjectionEnabled : parameters.envInjectionEnabled}
-      target:
+    - target:
         kind: Deployment
         group: apps
         version: v1
