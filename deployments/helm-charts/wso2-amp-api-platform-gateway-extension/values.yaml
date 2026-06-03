@@ -65,9 +65,6 @@ apiGateway:
   # Must be the same namespace where the gateway-operator is watching.
   namespace: "openchoreo-data-plane"
 
-  # API selector: which APIs this gateway handles
-  apiSelector:
-    scope: Cluster
 
   # Control plane connection: points to Agent Manager's gateway management port (9243)
   controlPlane:
