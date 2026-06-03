@@ -132,23 +132,87 @@ interface DonutMetricCardProps {
     isLoading?: boolean;
 }
 
-const DonutMetricCard: React.FC<DonutMetricCardProps> = ({ label, value, percent, color, isLoading }) => (
-    <Card variant="outlined" sx={{ width: "100%" }}>
-        <CardContent sx={{ py: 1, px: 1.5, "&:last-child": { pb: 1 }, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-            <Box>
+const DonutMetricCard: React.FC<DonutMetricCardProps> =
+    ({ label, value, percent, color, isLoading }) => (
+        <Card variant="outlined" sx={{ width: "100%" }}>
+            <CardContent sx={{ py: 1, px: 1.5, "&:last-child": { pb: 1 }, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                <Box>
+                    {isLoading
+                        ? <Skeleton variant="text" width={48} height={28} />
+                        : <Typography variant="h6" lineHeight={1.2}>{value}</Typography>
+                    }
+                    <Typography variant="caption" color="text.secondary">{label}</Typography>
+                </Box>
                 {isLoading
-                    ? <Skeleton variant="text" width={48} height={28} />
-                    : <Typography variant="h6" lineHeight={1.2}>{value}</Typography>
+                    ? <Skeleton variant="circular" width={48} height={48} />
+                    : <DonutIcon percent={percent} color={color} size={48} />
                 }
-                <Typography variant="caption" color="text.secondary">{label}</Typography>
-            </Box>
-            {isLoading
-                ? <Skeleton variant="circular" width={48} height={48} />
-                : <DonutIcon percent={percent} color={color} size={48} />
-            }
-        </CardContent>
-    </Card>
-);
+            </CardContent>
+        </Card>
+    );
+
+interface SimpleMetricCardProps {
+    label: string;
+    value: string;
+    limit: string | null;
+    percent: number | null;
+    isLoading?: boolean;
+}
+
+const SimpleMetricCard: React.FC<SimpleMetricCardProps> =
+    ({ label, value, limit, percent, isLoading }) => {
+        const theme = useTheme();
+        const pct = Math.min(percent ?? 0, 100);
+        const barColor = pct >= 85
+            ? theme.vars?.palette?.error?.main
+            : pct >= 60
+                ? theme.vars?.palette?.warning?.main
+                : theme.vars?.palette?.success?.main;
+
+        return (
+            <Card variant="outlined" sx={{ width: "100%" }}>
+                <CardContent sx={{ py: 0.75, px: 1.5, "&:last-child": { pb: 0.75 } }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="baseline" mb={0.5}>
+                        <Typography variant="caption" color="text.secondary">{label}</Typography>
+                        {isLoading
+                            ? <Skeleton variant="text" width={60} height={18} />
+                            : (
+                                <Box display="flex" alignItems="baseline" gap={0.5}>
+                                    <Typography variant="caption" fontWeight={600} color="text.primary">
+                                        {value}
+                                    </Typography>
+                                    {limit && (
+                                        <Typography variant="caption" color="text.disabled">
+                                            / {limit}
+                                        </Typography>
+                                    )}
+                                    {percent !== null && (
+                                        <Typography variant="caption" fontWeight={600} sx={{ color: barColor }}>
+                                            {Math.round(percent)}%
+                                        </Typography>
+                                    )}
+                                </Box>
+                            )
+                        }
+                    </Box>
+                    {isLoading
+                        ? <Skeleton variant="rounded" height={4} />
+                        : (
+                            <Box sx={{ height: 4, borderRadius: 2, bgcolor: "action.selected", overflow: "hidden" }}>
+                                <Box sx={{
+                                    height: "100%",
+                                    width: `${pct}%`,
+                                    bgcolor: barColor,
+                                    borderRadius: 2,
+                                    transition: "width 0.4s ease",
+                                }} />
+                            </Box>
+                        )
+                    }
+                </CardContent>
+            </Card>
+        );
+    };
 
 export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = ({
     orgId, projectId, agentId, envId, hideMetrics = false, external = false,
@@ -177,11 +241,19 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
 
     const cpuPts = metrics?.cpuUsage ?? [];
     const latestCpu = cpuPts.length ? cpuPts[cpuPts.length - 1].value : null;
+    const cpuLimitPts = metrics?.cpuLimits ?? [];
+    const latestCpuLimit = cpuLimitPts.length ? cpuLimitPts[cpuLimitPts.length - 1].value : null;
+    const cpuPercent = latestCpu !== null && latestCpuLimit ?
+        (latestCpu / latestCpuLimit) * 100 : null;
 
     const memPts = metrics?.memory ?? [];
     const latestMemory = memPts.length ? memPts[memPts.length - 1].value : null;
+    const memLimitPts = metrics?.memoryLimits ?? [];
+    const latestMemoryLimit = memLimitPts.length ? memLimitPts[memLimitPts.length - 1].value : null;
+    const memoryPercent = latestMemory !== null && latestMemoryLimit ?
+        (latestMemory / latestMemoryLimit) * 100 : null;
 
-    const traces = traceList?.traces ?? [];
+    const traces = useMemo(() => traceList?.traces ?? [], [traceList]);
 
     const latencyPoints = useMemo(() =>
         [...traces].reverse().map((t) => ({
@@ -208,7 +280,8 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
     const avgTokens = (() => {
         const withTokens = traces.filter((t) => t.tokenUsage?.totalTokens != null);
         return withTokens.length
-            ? Math.round(withTokens.reduce((sum, t) => sum + (t.tokenUsage?.totalTokens ?? 0), 0) / withTokens.length)
+            ? Math.round(withTokens.reduce((sum, t) => sum +
+                (t.tokenUsage?.totalTokens ?? 0), 0) / withTokens.length)
             : null;
     })();
 
@@ -234,8 +307,8 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
         : null;
     const successRateColor: DonutColor = successRate === null ? "primary"
         : successRate >= 70 ? "success"
-        : successRate >= 40 ? "warning"
-        : "error";
+            : successRate >= 40 ? "warning"
+                : "error";
 
     const tracesHref = generatePath(
         absoluteRouteMap.children.org.children.projects.children.agents
@@ -251,51 +324,7 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
 
     return (
         <>
-            {!hideMetrics && (isSuspended ? (
-                <NoDataFound
-                    iconElement={PauseCircle}
-                    message="Environment Suspended"
-                    subtitle="Metrics are unavailable while the environment is suspended."
-                    disableBackground
-                />
-            ) : (
-                <>
-                    <Divider sx={{ mt: 2, mb: 1.5 }} />
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}
-                            sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Metrics
-                        </Typography>
-                        <Button
-                            size="small"
-                            variant="text"
-                            endIcon={<ChevronRight size={14} />}
-                            component={Link}
-                            to={metricsHref}
-                            sx={{ minWidth: 0, fontSize: "0.75rem" }}
-                        >
-                            View all
-                        </Button>
-                    </Box>
-                    <Stack direction="row" spacing={1.5}>
-                        <MetricCard
-                            label="CPU Usage"
-                            value={latestCpu !== null ? formatCpu(latestCpu) : "—"}
-                            points={cpuPts}
-                            color={theme.vars?.palette?.info?.main}
-                            isLoading={isMetricsLoading}
-                        />
-                        <MetricCard
-                            label="Memory Usage"
-                            value={latestMemory !== null ? formatMemory(latestMemory) : "—"}
-                            points={memPts}
-                            color={theme.vars?.palette?.info?.main}
-                            isLoading={isMetricsLoading}
-                        />
-                    </Stack>
-                </>
-            ))}
-            <Divider sx={{ mt: 1.5, mb: 1 }} />
+            <Divider sx={{ mt: 2, mb: 1 }} />
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600}
                     sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -350,6 +379,51 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
                     />
                 </Grid>
             </Grid>
+            {!hideMetrics && (isSuspended ? (
+                <NoDataFound
+                    iconElement={PauseCircle}
+                    message="Environment Suspended"
+                    subtitle="Metrics are unavailable while the environment is suspended."
+                    disableBackground
+                />
+            ) : (
+                <>
+                    <Divider sx={{ mt: 1.5, mb: 1 }} />
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}
+                            sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Metrics
+                        </Typography>
+                        <Button
+                            size="small"
+                            variant="text"
+                            endIcon={<ChevronRight size={14} />}
+                            component={Link}
+                            to={metricsHref}
+                            sx={{ minWidth: 0, fontSize: "0.75rem" }}
+                        >
+                            View all
+                        </Button>
+                    </Box>
+                    <Stack direction="row" spacing={0.75} sx={{ maxWidth: 400 }}>
+                        <SimpleMetricCard
+                            label="CPU"
+                            value={latestCpu !== null ? formatCpu(latestCpu) : "—"}
+                            limit={latestCpuLimit !== null ? formatCpu(latestCpuLimit) : null}
+                            percent={cpuPercent}
+                            isLoading={isMetricsLoading}
+                        />
+                        <SimpleMetricCard
+                            label="Memory"
+                            value={latestMemory !== null ? formatMemory(latestMemory) : "—"}
+                            limit={latestMemoryLimit !== null ?
+                                formatMemory(latestMemoryLimit) : null}
+                            percent={memoryPercent}
+                            isLoading={isMetricsLoading}
+                        />
+                    </Stack>
+                </>
+            ))}
         </>
     );
 };

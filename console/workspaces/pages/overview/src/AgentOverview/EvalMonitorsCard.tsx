@@ -27,7 +27,7 @@ import {
     Skeleton,
     Typography,
 } from "@wso2/oxygen-ui";
-import { ChevronRight, ExternalLink, Monitor, Plus } from "@wso2/oxygen-ui-icons-react";
+import { ChevronRight, ExternalLink } from "@wso2/oxygen-ui-icons-react";
 import {
     useListMonitors,
     useMonitorScores,
@@ -40,7 +40,6 @@ import {
 } from "@agent-management-platform/types";
 import { generatePath, Link } from "react-router-dom";
 import { DonutIcon, type DonutColor } from "./DonutIcon";
-import { NoDataFound } from "@agent-management-platform/views";
 
 interface EvalMonitorsCardProps {
     orgId: string;
@@ -142,15 +141,13 @@ export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
 
     const monitors = monitorsList?.monitors ?? [];
 
+    if (!isLoading && monitors.length === 0) {
+        return null;
+    }
+
     const allMonitorsHref = generatePath(
         absoluteRouteMap.children.org.children.projects.children.agents
             .children.evaluation.children.monitor.path,
-        { orgId, projectId, agentId },
-    );
-
-    const createMonitorHref = generatePath(
-        absoluteRouteMap.children.org.children.projects.children.agents
-            .children.evaluation.children.monitor.children.create.path,
         { orgId, projectId, agentId },
     );
 
@@ -164,7 +161,7 @@ export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
         <Card variant="outlined">
             <CardContent>
                 <Box display="flex" justifyContent="space-between" alignItems="center" pb={1}>
-                    <Typography variant="h6">Monitors</Typography>
+                    <Typography variant="h6">Agent Performance</Typography>
                     <Button
                         size="small"
                         variant="text"
@@ -181,24 +178,6 @@ export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
                     <Box sx={gridSx}>
                         {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={96} />)}
                     </Box>
-                ) : monitors.length === 0 ? (
-                    <NoDataFound
-                        iconElement={Monitor}
-                        message="No monitors configured"
-                        subtitle="Set up an evaluation monitor to track your agent's performance over time."
-                        disableBackground
-                        action={
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<Plus size={14} />}
-                                component={Link}
-                                to={createMonitorHref}
-                            >
-                                Create Monitor
-                            </Button>
-                        }
-                    />
                 ) : (
                     <Box sx={gridSx}>
                         {monitors.map((monitor) => (
