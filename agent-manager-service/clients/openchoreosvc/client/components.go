@@ -2828,4 +2828,3 @@ func buildEndpointURLString(ep *gen.EndpointURL) string {
 	}
 	return fmt.Sprintf("%s://%s%s", scheme, host, path)
 }
-

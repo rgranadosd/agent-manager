@@ -44,6 +44,7 @@ type InfraResourceController interface {
 	DeleteProject(w http.ResponseWriter, r *http.Request)
 	ListOrgDeploymentPipelines(w http.ResponseWriter, r *http.Request)
 	UpdateProjectDeploymentPipeline(w http.ResponseWriter, r *http.Request)
+	DeleteProjectDeploymentPipeline(w http.ResponseWriter, r *http.Request)
 	GetDataplanes(w http.ResponseWriter, r *http.Request)
 }
 
@@ -446,6 +447,22 @@ func (c *infraResourceController) UpdateProjectDeploymentPipeline(w http.Respons
 
 	response := utils.ConvertToDeploymentPipelineResponse(updated)
 	utils.WriteSuccessResponse(w, http.StatusOK, response)
+}
+
+func (c *infraResourceController) DeleteProjectDeploymentPipeline(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
+
+	orgName := r.PathValue(utils.PathParamOrgName)
+	projectName := r.PathValue(utils.PathParamProjName)
+
+	if err := c.infraResourceManager.DeleteProjectDeploymentPipeline(ctx, orgName, projectName); err != nil {
+		log.Error("DeleteProjectDeploymentPipeline: failed to delete deployment pipeline", "error", err)
+		handleCommonErrors(w, err, "Failed to delete deployment pipeline")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *infraResourceController) GetDataplanes(w http.ResponseWriter, r *http.Request) {

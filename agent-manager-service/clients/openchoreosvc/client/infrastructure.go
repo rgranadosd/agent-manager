@@ -438,6 +438,40 @@ func (c *openChoreoClient) UpdateDeploymentPipeline(ctx context.Context, namespa
 	return convertDeploymentPipeline(resp.JSON200, namespaceName), nil
 }
 
+func (c *openChoreoClient) DeleteDeploymentPipeline(ctx context.Context, namespaceName, projectName string) error {
+	projectResp, err := c.ocClient.GetProjectWithResponse(ctx, namespaceName, projectName)
+	if err != nil {
+		return fmt.Errorf("failed to get project: %w", err)
+	}
+	if projectResp.StatusCode() != http.StatusOK {
+		return handleErrorResponse(projectResp.StatusCode(), ErrorResponses{
+			JSON401: projectResp.JSON401,
+			JSON403: projectResp.JSON403,
+			JSON404: projectResp.JSON404,
+			JSON500: projectResp.JSON500,
+		})
+	}
+	if projectResp.JSON200 == nil || projectResp.JSON200.Spec == nil || projectResp.JSON200.Spec.DeploymentPipelineRef == nil {
+		return fmt.Errorf("project does not have a deployment pipeline reference")
+	}
+
+	pipelineName := projectResp.JSON200.Spec.DeploymentPipelineRef.Name
+
+	resp, err := c.ocClient.DeleteDeploymentPipelineWithResponse(ctx, namespaceName, pipelineName)
+	if err != nil {
+		return fmt.Errorf("failed to delete deployment pipeline: %w", err)
+	}
+	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusNoContent {
+		return handleErrorResponse(resp.StatusCode(), ErrorResponses{
+			JSON401: resp.JSON401,
+			JSON403: resp.JSON403,
+			JSON404: resp.JSON404,
+			JSON500: resp.JSON500,
+		})
+	}
+	return nil
+}
+
 func (c *openChoreoClient) ListDeploymentPipelines(ctx context.Context, namespaceName string) ([]*models.DeploymentPipelineResponse, error) {
 	// OpenChoreo has no list-pipelines endpoint; derive the set from projects.
 	projects, err := c.ListProjects(ctx, namespaceName)

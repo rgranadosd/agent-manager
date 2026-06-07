@@ -1,25 +1,7 @@
 ---
-# Backend: kgateway static backend pointing to the API Platform gateway runtime.
-# kgateway forwards traffic to the platform gateway, which applies policies
-# (jwt-auth, CORS, etc.) via RestApi resources before forwarding to upstreams.
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
-metadata:
-  name: {{ include "wso2-amp-gateway-extension.apiGatewayName" . }}-gw-backend
-  namespace: {{ .Values.apiGateway.namespace }}
-  labels:
-    {{- include "wso2-amp-gateway-extension.labels" . | nindent 4 }}
-    app.kubernetes.io/component: gateway-route
-spec:
-  type: Static
-  static:
-    hosts:
-      - host: {{ include "wso2-amp-gateway-extension.apiGatewayName" . }}-gateway-gateway-runtime.{{ .Values.apiGateway.namespace }}
-        port: 22893
----
 # HTTPRoute: Catch-all route for this gateway's hostname on kgateway.
 # Routes all traffic matching the gateway hostname (e.g. default-default.gateway.localhost)
-# to the platform gateway runtime. This enables LLM proxy, OTEL, and any other
+# to the platform gateway runtime service. This enables LLM proxy, OTEL, and any other
 # platform gateway traffic to flow through kgateway without needing per-path routes.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -37,8 +19,7 @@ spec:
     - {{ include "wso2-amp-gateway-extension.gatewayHostname" . | quote }}
   rules:
     - backendRefs:
-        - group: gateway.kgateway.dev
-          kind: Backend
-          name: {{ include "wso2-amp-gateway-extension.apiGatewayName" . }}-gw-backend
+        - name: {{ include "wso2-amp-gateway-extension.apiGatewayName" . }}-gateway-gateway-runtime
+          port: 22893
       timeouts:
         request: 30s

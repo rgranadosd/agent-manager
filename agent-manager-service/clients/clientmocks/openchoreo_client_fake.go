@@ -48,6 +48,9 @@ import (
 //			DeleteComponentFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string) error {
 //				panic("mock out the DeleteComponent method")
 //			},
+//			DeleteDeploymentPipelineFunc: func(ctx context.Context, namespaceName string, projectName string) error {
+//				panic("mock out the DeleteDeploymentPipeline method")
+//			},
 //			DeleteGitSecretFunc: func(ctx context.Context, namespaceName string, secretName string) error {
 //				panic("mock out the DeleteGitSecret method")
 //			},
@@ -93,9 +96,6 @@ import (
 //			GetEnvironmentFunc: func(ctx context.Context, namespaceName string, environmentName string) (*models.EnvironmentResponse, error) {
 //				panic("mock out the GetEnvironment method")
 //			},
-//			GetSourceEnvWorkloadOverridesFunc: func(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error) {
-//				panic("mock out the GetSourceEnvWorkloadOverrides method")
-//			},
 //			GetOrganizationFunc: func(ctx context.Context, orgName string) (*models.OrganizationResponse, error) {
 //				panic("mock out the GetOrganization method")
 //			},
@@ -107,6 +107,9 @@ import (
 //			},
 //			GetSecretReferenceFunc: func(ctx context.Context, namespaceName string, secretRefName string) (*client.SecretReferenceInfo, error) {
 //				panic("mock out the GetSecretReference method")
+//			},
+//			GetSourceEnvWorkloadOverridesFunc: func(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error) {
+//				panic("mock out the GetSourceEnvWorkloadOverrides method")
 //			},
 //			GetWorkflowRunFunc: func(ctx context.Context, namespaceName string, runName string) (*client.WorkflowRunResponse, error) {
 //				panic("mock out the GetWorkflowRun method")
@@ -129,7 +132,7 @@ import (
 //			ListComponentsByKindFunc: func(ctx context.Context, namespaceName string, projectName string, kindName string) ([]*models.AgentResponse, error) {
 //				panic("mock out the ListComponentsByKind method")
 //			},
-//			ListDataPlanesFunc: func(ctx context.Context, namespaceName string) ([]*models.DataPlaneResponse, error) {
+//			ListDataPlanesFunc: func(ctx context.Context) ([]*models.DataPlaneResponse, error) {
 //				panic("mock out the ListDataPlanes method")
 //			},
 //			ListDeploymentPipelinesFunc: func(ctx context.Context, namespaceName string) ([]*models.DeploymentPipelineResponse, error) {
@@ -247,6 +250,9 @@ type OpenChoreoClientMock struct {
 	// DeleteComponentFunc mocks the DeleteComponent method.
 	DeleteComponentFunc func(ctx context.Context, namespaceName string, projectName string, componentName string) error
 
+	// DeleteDeploymentPipelineFunc mocks the DeleteDeploymentPipeline method.
+	DeleteDeploymentPipelineFunc func(ctx context.Context, namespaceName string, projectName string) error
+
 	// DeleteGitSecretFunc mocks the DeleteGitSecret method.
 	DeleteGitSecretFunc func(ctx context.Context, namespaceName string, secretName string) error
 
@@ -292,9 +298,6 @@ type OpenChoreoClientMock struct {
 	// GetEnvironmentFunc mocks the GetEnvironment method.
 	GetEnvironmentFunc func(ctx context.Context, namespaceName string, environmentName string) (*models.EnvironmentResponse, error)
 
-	// GetSourceEnvWorkloadOverridesFunc mocks the GetSourceEnvWorkloadOverrides method.
-	GetSourceEnvWorkloadOverridesFunc func(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error)
-
 	// GetOrganizationFunc mocks the GetOrganization method.
 	GetOrganizationFunc func(ctx context.Context, orgName string) (*models.OrganizationResponse, error)
 
@@ -306,6 +309,9 @@ type OpenChoreoClientMock struct {
 
 	// GetSecretReferenceFunc mocks the GetSecretReference method.
 	GetSecretReferenceFunc func(ctx context.Context, namespaceName string, secretRefName string) (*client.SecretReferenceInfo, error)
+
+	// GetSourceEnvWorkloadOverridesFunc mocks the GetSourceEnvWorkloadOverrides method.
+	GetSourceEnvWorkloadOverridesFunc func(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error)
 
 	// GetWorkflowRunFunc mocks the GetWorkflowRun method.
 	GetWorkflowRunFunc func(ctx context.Context, namespaceName string, runName string) (*client.WorkflowRunResponse, error)
@@ -517,6 +523,15 @@ type OpenChoreoClientMock struct {
 			// ComponentName is the componentName argument value.
 			ComponentName string
 		}
+		// DeleteDeploymentPipeline holds details about calls to the DeleteDeploymentPipeline method.
+		DeleteDeploymentPipeline []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// NamespaceName is the namespaceName argument value.
+			NamespaceName string
+			// ProjectName is the projectName argument value.
+			ProjectName string
+		}
 		// DeleteGitSecret holds details about calls to the DeleteGitSecret method.
 		DeleteGitSecret []struct {
 			// Ctx is the ctx argument value.
@@ -686,17 +701,6 @@ type OpenChoreoClientMock struct {
 			// EnvironmentName is the environmentName argument value.
 			EnvironmentName string
 		}
-		// GetSourceEnvWorkloadOverrides holds details about calls to the GetSourceEnvWorkloadOverrides method.
-		GetSourceEnvWorkloadOverrides []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// NamespaceName is the namespaceName argument value.
-			NamespaceName string
-			// ComponentName is the componentName argument value.
-			ComponentName string
-			// SourceEnvironment is the sourceEnvironment argument value.
-			SourceEnvironment string
-		}
 		// GetOrganization holds details about calls to the GetOrganization method.
 		GetOrganization []struct {
 			// Ctx is the ctx argument value.
@@ -730,6 +734,17 @@ type OpenChoreoClientMock struct {
 			NamespaceName string
 			// SecretRefName is the secretRefName argument value.
 			SecretRefName string
+		}
+		// GetSourceEnvWorkloadOverrides holds details about calls to the GetSourceEnvWorkloadOverrides method.
+		GetSourceEnvWorkloadOverrides []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// NamespaceName is the namespaceName argument value.
+			NamespaceName string
+			// ComponentName is the componentName argument value.
+			ComponentName string
+			// SourceEnvironment is the sourceEnvironment argument value.
+			SourceEnvironment string
 		}
 		// GetWorkflowRun holds details about calls to the GetWorkflowRun method.
 		GetWorkflowRun []struct {
@@ -1138,6 +1153,7 @@ type OpenChoreoClientMock struct {
 	lockCreateSecretReference               sync.RWMutex
 	lockCreateWorkflowRun                   sync.RWMutex
 	lockDeleteComponent                     sync.RWMutex
+	lockDeleteDeploymentPipeline            sync.RWMutex
 	lockDeleteGitSecret                     sync.RWMutex
 	lockDeleteProject                       sync.RWMutex
 	lockDeleteSecretReference               sync.RWMutex
@@ -1157,6 +1173,7 @@ type OpenChoreoClientMock struct {
 	lockGetProject                          sync.RWMutex
 	lockGetProjectDeploymentPipeline        sync.RWMutex
 	lockGetSecretReference                  sync.RWMutex
+	lockGetSourceEnvWorkloadOverrides       sync.RWMutex
 	lockGetWorkflowRun                      sync.RWMutex
 	lockGetWorkloadSecretRefNames           sync.RWMutex
 	lockHasTrait                            sync.RWMutex
@@ -1172,7 +1189,6 @@ type OpenChoreoClientMock struct {
 	lockListProjects                        sync.RWMutex
 	lockListSecretReferences                sync.RWMutex
 	lockPatchProject                        sync.RWMutex
-	lockGetSourceEnvWorkloadOverrides       sync.RWMutex
 	lockPromoteComponent                    sync.RWMutex
 	lockRemoveComponentEnvironmentVariables sync.RWMutex
 	lockRemoveReleaseBindingEnvVars         sync.RWMutex
@@ -1623,6 +1639,46 @@ func (mock *OpenChoreoClientMock) DeleteComponentCalls() []struct {
 	mock.lockDeleteComponent.RLock()
 	calls = mock.calls.DeleteComponent
 	mock.lockDeleteComponent.RUnlock()
+	return calls
+}
+
+// DeleteDeploymentPipeline calls DeleteDeploymentPipelineFunc.
+func (mock *OpenChoreoClientMock) DeleteDeploymentPipeline(ctx context.Context, namespaceName string, projectName string) error {
+	if mock.DeleteDeploymentPipelineFunc == nil {
+		panic("OpenChoreoClientMock.DeleteDeploymentPipelineFunc: method is nil but OpenChoreoClient.DeleteDeploymentPipeline was just called")
+	}
+	callInfo := struct {
+		Ctx           context.Context
+		NamespaceName string
+		ProjectName   string
+	}{
+		Ctx:           ctx,
+		NamespaceName: namespaceName,
+		ProjectName:   projectName,
+	}
+	mock.lockDeleteDeploymentPipeline.Lock()
+	mock.calls.DeleteDeploymentPipeline = append(mock.calls.DeleteDeploymentPipeline, callInfo)
+	mock.lockDeleteDeploymentPipeline.Unlock()
+	return mock.DeleteDeploymentPipelineFunc(ctx, namespaceName, projectName)
+}
+
+// DeleteDeploymentPipelineCalls gets all the calls that were made to DeleteDeploymentPipeline.
+// Check the length with:
+//
+//	len(mockedOpenChoreoClient.DeleteDeploymentPipelineCalls())
+func (mock *OpenChoreoClientMock) DeleteDeploymentPipelineCalls() []struct {
+	Ctx           context.Context
+	NamespaceName string
+	ProjectName   string
+} {
+	var calls []struct {
+		Ctx           context.Context
+		NamespaceName string
+		ProjectName   string
+	}
+	mock.lockDeleteDeploymentPipeline.RLock()
+	calls = mock.calls.DeleteDeploymentPipeline
+	mock.lockDeleteDeploymentPipeline.RUnlock()
 	return calls
 }
 
@@ -2450,6 +2506,50 @@ func (mock *OpenChoreoClientMock) GetSecretReferenceCalls() []struct {
 	return calls
 }
 
+// GetSourceEnvWorkloadOverrides calls GetSourceEnvWorkloadOverridesFunc.
+func (mock *OpenChoreoClientMock) GetSourceEnvWorkloadOverrides(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error) {
+	if mock.GetSourceEnvWorkloadOverridesFunc == nil {
+		panic("OpenChoreoClientMock.GetSourceEnvWorkloadOverridesFunc: method is nil but OpenChoreoClient.GetSourceEnvWorkloadOverrides was just called")
+	}
+	callInfo := struct {
+		Ctx               context.Context
+		NamespaceName     string
+		ComponentName     string
+		SourceEnvironment string
+	}{
+		Ctx:               ctx,
+		NamespaceName:     namespaceName,
+		ComponentName:     componentName,
+		SourceEnvironment: sourceEnvironment,
+	}
+	mock.lockGetSourceEnvWorkloadOverrides.Lock()
+	mock.calls.GetSourceEnvWorkloadOverrides = append(mock.calls.GetSourceEnvWorkloadOverrides, callInfo)
+	mock.lockGetSourceEnvWorkloadOverrides.Unlock()
+	return mock.GetSourceEnvWorkloadOverridesFunc(ctx, namespaceName, componentName, sourceEnvironment)
+}
+
+// GetSourceEnvWorkloadOverridesCalls gets all the calls that were made to GetSourceEnvWorkloadOverrides.
+// Check the length with:
+//
+//	len(mockedOpenChoreoClient.GetSourceEnvWorkloadOverridesCalls())
+func (mock *OpenChoreoClientMock) GetSourceEnvWorkloadOverridesCalls() []struct {
+	Ctx               context.Context
+	NamespaceName     string
+	ComponentName     string
+	SourceEnvironment string
+} {
+	var calls []struct {
+		Ctx               context.Context
+		NamespaceName     string
+		ComponentName     string
+		SourceEnvironment string
+	}
+	mock.lockGetSourceEnvWorkloadOverrides.RLock()
+	calls = mock.calls.GetSourceEnvWorkloadOverrides
+	mock.lockGetSourceEnvWorkloadOverrides.RUnlock()
+	return calls
+}
+
 // GetWorkflowRun calls GetWorkflowRunFunc.
 func (mock *OpenChoreoClientMock) GetWorkflowRun(ctx context.Context, namespaceName string, runName string) (*client.WorkflowRunResponse, error) {
 	if mock.GetWorkflowRunFunc == nil {
@@ -3043,50 +3143,6 @@ func (mock *OpenChoreoClientMock) PatchProjectCalls() []struct {
 	mock.lockPatchProject.RLock()
 	calls = mock.calls.PatchProject
 	mock.lockPatchProject.RUnlock()
-	return calls
-}
-
-// GetSourceEnvWorkloadOverrides calls GetSourceEnvWorkloadOverridesFunc.
-func (mock *OpenChoreoClientMock) GetSourceEnvWorkloadOverrides(ctx context.Context, namespaceName string, componentName string, sourceEnvironment string) ([]client.EnvVar, []client.FileVar, error) {
-	if mock.GetSourceEnvWorkloadOverridesFunc == nil {
-		panic("OpenChoreoClientMock.GetSourceEnvWorkloadOverridesFunc: method is nil but OpenChoreoClient.GetSourceEnvWorkloadOverrides was just called")
-	}
-	callInfo := struct {
-		Ctx               context.Context
-		NamespaceName     string
-		ComponentName     string
-		SourceEnvironment string
-	}{
-		Ctx:               ctx,
-		NamespaceName:     namespaceName,
-		ComponentName:     componentName,
-		SourceEnvironment: sourceEnvironment,
-	}
-	mock.lockGetSourceEnvWorkloadOverrides.Lock()
-	mock.calls.GetSourceEnvWorkloadOverrides = append(mock.calls.GetSourceEnvWorkloadOverrides, callInfo)
-	mock.lockGetSourceEnvWorkloadOverrides.Unlock()
-	return mock.GetSourceEnvWorkloadOverridesFunc(ctx, namespaceName, componentName, sourceEnvironment)
-}
-
-// GetSourceEnvWorkloadOverridesCalls gets all the calls that were made to GetSourceEnvWorkloadOverrides.
-// Check the length with:
-//
-//	len(mockedOpenChoreoClient.GetSourceEnvWorkloadOverridesCalls())
-func (mock *OpenChoreoClientMock) GetSourceEnvWorkloadOverridesCalls() []struct {
-	Ctx               context.Context
-	NamespaceName     string
-	ComponentName     string
-	SourceEnvironment string
-} {
-	var calls []struct {
-		Ctx               context.Context
-		NamespaceName     string
-		ComponentName     string
-		SourceEnvironment string
-	}
-	mock.lockGetSourceEnvWorkloadOverrides.RLock()
-	calls = mock.calls.GetSourceEnvWorkloadOverrides
-	mock.lockGetSourceEnvWorkloadOverrides.RUnlock()
 	return calls
 }
 

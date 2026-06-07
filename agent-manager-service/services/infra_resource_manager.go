@@ -40,6 +40,7 @@ type InfraResourceManager interface {
 	CreateProject(ctx context.Context, orgName string, payload spec.CreateProjectRequest) (*models.ProjectResponse, error)
 	UpdateProject(ctx context.Context, orgName string, projectName string, payload spec.UpdateProjectRequest) (*models.ProjectResponse, error)
 	DeleteProject(ctx context.Context, orgName string, projectName string) error
+	DeleteProjectDeploymentPipeline(ctx context.Context, orgName string, projectName string) error
 	ListOrgDeploymentPipelines(ctx context.Context, orgName string, limit int, offset int) ([]*models.DeploymentPipelineResponse, int, error)
 	GetDataplanes(ctx context.Context, orgName string) ([]*models.DataPlaneResponse, error)
 }
@@ -341,6 +342,18 @@ func (s *infraResourceManager) UpdateProjectDeploymentPipeline(ctx context.Conte
 
 	s.logger.Info("Deployment pipeline updated successfully", "orgName", orgName, "projectName", projectName)
 	return updated, nil
+}
+
+func (s *infraResourceManager) DeleteProjectDeploymentPipeline(ctx context.Context, orgName string, projectName string) error {
+	s.logger.Info("Deleting deployment pipeline", "orgName", orgName, "projectName", projectName)
+
+	if err := s.ocClient.DeleteDeploymentPipeline(ctx, orgName, projectName); err != nil {
+		s.logger.Error("Failed to delete deployment pipeline", "orgName", orgName, "projectName", projectName, "error", err)
+		return fmt.Errorf("failed to delete deployment pipeline: %w", err)
+	}
+
+	s.logger.Info("Deployment pipeline deleted successfully", "orgName", orgName, "projectName", projectName)
+	return nil
 }
 
 func (s *infraResourceManager) GetDataplanes(ctx context.Context, orgName string) ([]*models.DataPlaneResponse, error) {

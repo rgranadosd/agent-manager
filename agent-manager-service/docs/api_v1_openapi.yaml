@@ -2689,6 +2689,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+    delete:
+      summary: Delete deployment pipeline for a project
+      description: Deletes the deployment pipeline and all its promotion paths for the specified project.
+      operationId: deleteDeploymentPipeline
+      parameters:
+        - name: orgName
+          in: path
+          description: Organization name
+          required: true
+          schema:
+            type: string
+        - name: projName
+          in: path
+          description: Project name
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deployment pipeline deleted successfully
+        "404":
+          description: Project or pipeline not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /orgs/{orgName}/projects/{projName}/agents/{agentName}/token:
     post:
       summary: Generate authentication token for an agent
