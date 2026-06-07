@@ -5208,6 +5208,12 @@ paths:
           schema:
             type: string
           description: Agent name
+        - name: environment
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter monitors by environment name
       responses:
         "200":
           description: List of monitors

@@ -42,6 +42,11 @@ gateway:
   displayName: "Default API Platform Gateway"
   # Virtual host (FQDN or IP) that the gateway is reachable on
   vhost: "http://api-platform-gateway.amp.localhost:22893"
+  # Hostname for routing traffic to this gateway through kgateway.
+  # All traffic (LLM proxy, OTEL, etc.) matching this hostname on kgateway
+  # is forwarded to this gateway's runtime service.
+  # Defaults to "<environment>-<orgName>.gateway.localhost" if empty.
+  hostname: ""
   # Gateway type: REGULAR, AI, or EVENT (must match GatewayType enum in Agent Manager API)
   type: "REGULAR"
   # Environment name in Agent Manager to associate this gateway with.

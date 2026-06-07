@@ -2148,6 +2148,22 @@ func WithGatewayTarget(gatewayTarget string) TraitOption {
 	}
 }
 
+// WithBackendHost sets the backendHost for the api-configuration trait parameter.
+// This acts as the default; per-environment environmentConfigs.backendHost takes precedence when set.
+func WithBackendHost(host string) TraitOption {
+	return func(params map[string]interface{}) {
+		params["backendHost"] = host
+	}
+}
+
+// WithBackendPort sets the backendPort for the api-configuration trait parameter.
+// This acts as the default; per-environment environmentConfigs.backendPort takes precedence when set.
+func WithBackendPort(port int) TraitOption {
+	return func(params map[string]interface{}) {
+		params["backendPort"] = port
+	}
+}
+
 // APIKeyAuthPolicy returns the policy map for API key authentication.
 func APIKeyAuthPolicy() map[string]interface{} {
 	return map[string]interface{}{

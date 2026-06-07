@@ -36,6 +36,7 @@ type MonitorRepository interface {
 	GetMonitorByName(orgName, projectName, agentName, monitorName string) (*models.Monitor, error)
 	GetMonitorByID(monitorID uuid.UUID) (*models.Monitor, error)
 	ListMonitorsByAgent(orgName, projectName, agentName string) ([]models.Monitor, error)
+	ListMonitorsByAgentEnvironment(orgName, projectName, agentName, environmentName string) ([]models.Monitor, error)
 	UpdateMonitor(monitor *models.Monitor) error
 	DeleteMonitor(monitor *models.Monitor) error
 	UpdateNextRunTime(monitorID uuid.UUID, nextRunTime *time.Time) error
@@ -106,6 +107,15 @@ func (r *MonitorRepo) GetMonitorByID(monitorID uuid.UUID) (*models.Monitor, erro
 func (r *MonitorRepo) ListMonitorsByAgent(orgName, projectName, agentName string) ([]models.Monitor, error) {
 	var monitors []models.Monitor
 	err := r.db.Where("org_name = ? AND project_name = ? AND agent_name = ?", orgName, projectName, agentName).
+		Order("created_at DESC").
+		Find(&monitors).Error
+	return monitors, err
+}
+
+// ListMonitorsByAgentEnvironment lists all monitors for an org/project/agent/environment combination
+func (r *MonitorRepo) ListMonitorsByAgentEnvironment(orgName, projectName, agentName, environmentName string) ([]models.Monitor, error) {
+	var monitors []models.Monitor
+	err := r.db.Where("org_name = ? AND project_name = ? AND agent_name = ? AND environment_name = ?", orgName, projectName, agentName, environmentName).
 		Order("created_at DESC").
 		Find(&monitors).Error
 	return monitors, err

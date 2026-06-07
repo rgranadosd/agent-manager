@@ -132,7 +132,7 @@ data:
             {{- end }}
           {{- end }}
         service:
-          type: LoadBalancer
+          type: ClusterIP
           ports:
             http: 22893
             https: 22894

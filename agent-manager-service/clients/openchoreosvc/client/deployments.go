@@ -524,29 +524,61 @@ func (c *openChoreoClient) PromoteComponent(ctx context.Context, namespaceName, 
 
 	// Step 4: Create or update the release binding in the target environment
 	if getResp.StatusCode() == http.StatusOK && getResp.JSON200 != nil && getResp.JSON200.Spec != nil {
-		// Update existing release binding with the new release name
-		binding := getResp.JSON200
-		binding.Spec.ReleaseName = &sourceReleaseName
-		activeState := gen.ReleaseBindingSpecStateActive
-		binding.Spec.State = &activeState
-		if workloadOverrides != nil {
-			binding.Spec.WorkloadOverrides = workloadOverrides
-		}
-		if traitConfigs != nil {
-			binding.Spec.TraitEnvironmentConfigs = traitConfigs
-		}
+		// Retry Get/Update cycle to handle resource version conflicts from concurrent controller reconciliation.
+		const maxRetries = 3
+		var lastErr error
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			// Re-fetch the binding on each attempt to get the latest resourceVersion.
+			freshResp, freshErr := c.ocClient.GetReleaseBindingWithResponse(ctx, namespaceName, targetBindingName)
+			if freshErr != nil {
+				return fmt.Errorf("failed to get release binding %q: %w", targetBindingName, freshErr)
+			}
+			if freshResp.StatusCode() != http.StatusOK {
+				return handleErrorResponse(freshResp.StatusCode(), ErrorResponses{
+					JSON401: freshResp.JSON401,
+					JSON403: freshResp.JSON403,
+					JSON404: freshResp.JSON404,
+					JSON500: freshResp.JSON500,
+				})
+			}
+			if freshResp.JSON200 == nil || freshResp.JSON200.Spec == nil {
+				return fmt.Errorf("empty response from get release binding %q", targetBindingName)
+			}
 
-		updateResp, err := c.ocClient.UpdateReleaseBindingWithResponse(ctx, namespaceName, targetBindingName, *binding)
-		if err != nil {
-			return fmt.Errorf("failed to update release binding in target environment: %w", err)
-		}
-		if updateResp.StatusCode() != http.StatusOK {
+			binding := freshResp.JSON200
+			binding.Spec.ReleaseName = &sourceReleaseName
+			activeState := gen.ReleaseBindingSpecStateActive
+			binding.Spec.State = &activeState
+			if workloadOverrides != nil {
+				binding.Spec.WorkloadOverrides = workloadOverrides
+			}
+			if traitConfigs != nil {
+				binding.Spec.TraitEnvironmentConfigs = traitConfigs
+			}
+
+			updateResp, updateErr := c.ocClient.UpdateReleaseBindingWithResponse(ctx, namespaceName, targetBindingName, *binding)
+			if updateErr != nil {
+				return fmt.Errorf("failed to update release binding in target environment: %w", updateErr)
+			}
+			if updateResp.StatusCode() == http.StatusOK {
+				lastErr = nil
+				break
+			}
+			if updateResp.StatusCode() == http.StatusInternalServerError && attempt < maxRetries {
+				slog.Warn("release binding update conflict during promote, retrying with fresh version",
+					"binding", targetBindingName, "attempt", attempt, "maxRetries", maxRetries)
+				lastErr = fmt.Errorf("conflict on attempt %d", attempt)
+				continue
+			}
 			return handleErrorResponse(updateResp.StatusCode(), ErrorResponses{
 				JSON401: updateResp.JSON401,
 				JSON403: updateResp.JSON403,
 				JSON404: updateResp.JSON404,
 				JSON500: updateResp.JSON500,
 			})
+		}
+		if lastErr != nil {
+			return fmt.Errorf("failed to update release binding %s after %d retries: %w", targetBindingName, maxRetries, lastErr)
 		}
 	} else {
 		// Create new release binding in target environment

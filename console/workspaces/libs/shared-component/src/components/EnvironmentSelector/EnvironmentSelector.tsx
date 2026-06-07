@@ -17,7 +17,7 @@
  */
 
 import { useListEnvironments } from "@agent-management-platform/api-client";
-import { FormControl, InputLabel, MenuItem, Select } from "@wso2/oxygen-ui";
+import { FormControl, MenuItem, Select } from "@wso2/oxygen-ui";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 /**

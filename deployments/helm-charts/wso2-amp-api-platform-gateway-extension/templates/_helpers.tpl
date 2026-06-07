@@ -62,6 +62,18 @@ Defaults to "api-platform-<orgName>-<environment>" when gateway.name is not expl
 {{- end }}
 
 {{/*
+Hostname for routing traffic through kgateway to this gateway.
+Defaults to "<environment>-<orgName>.gateway.localhost" when not explicitly set.
+*/}}
+{{- define "wso2-amp-gateway-extension.gatewayHostname" -}}
+{{- if .Values.gateway.hostname }}
+{{- .Values.gateway.hostname }}
+{{- else }}
+{{- printf "%s-%s.gateway.localhost" .Values.gateway.environment .Values.agentManager.orgName | lower | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+
+{{/*
 Bootstrap resource name prefix. All bootstrap resources (ServiceAccount, Role,
 RoleBinding, Job) are derived from this to avoid collisions across releases.
 */}}

@@ -325,12 +325,13 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 	autoInstrumentation := req.Configurations == nil || req.Configurations.EnableAutoInstrumentation == nil || *req.Configurations.EnableAutoInstrumentation
 	isAPIAgent := req.AgentType != nil && req.AgentType.Type == string(utils.AgentTypeAPI)
 
-	// Resolve gateway target for the lowest environment so the RestApi label is set at creation.
-	// This acts as the default; deploy/promote flows override it via traitEnvironmentConfigs.
-	createGatewayTarget := ""
+	// Resolve gateway info for the lowest environment so the Backend host and RestApi label
+	// are set at creation time. This acts as the default; deploy/promote flows override
+	// via traitEnvironmentConfigs.
+	var createGW gatewayInfo
 	if isAPIAgent && envName != "" {
 		if env, envErr := s.ocClient.GetEnvironment(ctx, orgName, envName); envErr == nil {
-			createGatewayTarget = resolveGatewayTarget(s.gatewayRepo, env.UUID, envName)
+			createGW = resolveGatewayInfo(s.gatewayRepo, env.UUID, envName)
 		}
 	}
 	isPythonBuildpack := req.Build != nil && req.Build.BuildpackBuild != nil && req.Build.BuildpackBuild.Buildpack.Language == string(utils.LanguagePython)
@@ -414,8 +415,14 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 			client.WithUpstreamBasePath(basePath),
 			client.WithPolicies(createPolicies),
 		}
-		if createGatewayTarget != "" {
-			apiTraitOpts = append(apiTraitOpts, client.WithGatewayTarget(createGatewayTarget))
+		if createGW.target != "" {
+			apiTraitOpts = append(apiTraitOpts, client.WithGatewayTarget(createGW.target))
+		}
+		if createGW.backendHost != "" {
+			apiTraitOpts = append(apiTraitOpts, client.WithBackendHost(createGW.backendHost))
+		}
+		if createGW.backendPort > 0 {
+			apiTraitOpts = append(apiTraitOpts, client.WithBackendPort(createGW.backendPort))
 		}
 		traits = append(traits, client.TraitRequest{
 			TraitKind: client.TraitKindTrait,
@@ -2570,10 +2577,6 @@ func resolveGatewayInfo(gatewayRepo repositories.GatewayRepository, environmentU
 	return gatewayInfo{target: label, backendHost: backendHost, backendPort: gatewayRuntimeHTTPPort}
 }
 
-// resolveGatewayTarget is a convenience wrapper that returns only the apiSelector label value.
-func resolveGatewayTarget(gatewayRepo repositories.GatewayRepository, environmentUUID, environmentName string) string {
-	return resolveGatewayInfo(gatewayRepo, environmentUUID, environmentName).target
-}
 
 func findLowestEnvironment(promotionPaths []models.PromotionPath) string {
 	if len(promotionPaths) == 0 {
