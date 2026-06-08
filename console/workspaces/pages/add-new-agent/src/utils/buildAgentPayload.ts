@@ -26,26 +26,19 @@ import { AddAgentFormValues, CreateAgentFormValues, LLMProviderFormEntry } from 
 function buildOneModelConfig(
   entry: LLMProviderFormEntry,
 ): ModelConfigRequest | null {
-  const envMappings: ModelConfigRequest["envMappings"] = {};
+  // The create-side config applies to the component's lowest environment; pick the
+  // first selected provider. (On Add, all environments are seeded with the same provider.)
+  const provider = Object.values(entry.selectedProviderByEnv).find((p) => p != null);
+  if (!provider) return null;
 
-  for (const [envName, provider] of Object.entries(entry.selectedProviderByEnv)) {
-    if (!provider) continue;
-    envMappings[envName] = {
-      providerName: provider.handle,
-      configuration: {
-        policies:
-          entry.guardrails.length > 0
-            ? entry.guardrails.map((g) => ({
-              name: g.name,
-              version: g.version,
-              paths: [{ path: "/*", methods: ["*"], params: g.settings ?? {} }],
-            }))
-            : undefined,
-      },
-    };
-  }
-
-  if (Object.keys(envMappings).length === 0) return null;
+  const policies =
+    entry.guardrails.length > 0
+      ? entry.guardrails.map((g) => ({
+          name: g.name,
+          version: g.version,
+          paths: [{ path: "/*", methods: ["*"], params: g.settings ?? {} }],
+        }))
+      : undefined;
 
   const environmentVariables = [
     ...(entry.urlVarName ? [{ key: "url", name: entry.urlVarName }] : []),
@@ -53,12 +46,13 @@ function buildOneModelConfig(
   ];
 
   return {
-    envMappings,
+    providerName: provider.handle,
+    ...(policies ? { configuration: { policies } } : {}),
     ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
   };
 }
 
-function buildModelConfig(
+export function buildModelConfig(
   llmProviders: LLMProviderFormEntry[],
 ): ModelConfigRequest[] | undefined {
   if (!llmProviders.length) return undefined;
