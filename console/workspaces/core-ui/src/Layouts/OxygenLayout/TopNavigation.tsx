@@ -1,6 +1,5 @@
 import {
   useListAgents,
-  useListEnvironments,
   useListOrganizations,
   useListProjects,
 } from "@agent-management-platform/api-client";
@@ -24,17 +23,16 @@ import {
   X,
 } from "@wso2/oxygen-ui-icons-react";
 import { useMemo, useState } from "react";
-import { generatePath, useLocation, useNavigate, useParams } from "react-router-dom";
+import { generatePath, useNavigate, useParams } from "react-router-dom";
 import { useActiveAgentPage, useActiveOrgPage, useActiveProjectPage } from "./path-map";
 
 export function TopNavigation() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { orgId, projectId, agentId, envId } = useParams<{
+  const { orgId, projectId, agentId } = useParams<{
     orgId: string;
     projectId: string;
     agentId: string;
-    envId: string;
   }>();
 
   const commonOrgPages = useActiveOrgPage();
@@ -75,12 +73,6 @@ export function TopNavigation() {
   const selectedAgent = useMemo(() => {
     return agents?.agents?.find((agent) => agent.name === agentId);
   }, [agents, agentId]);
-
-  // Get all environments for the organisation (only needed when on an env-scoped page)
-  const { data: environments } = useListEnvironments({ orgName: orgId });
-  const selectedEnvironment = useMemo(() => {
-    return environments?.find((env) => env.name === envId);
-  }, [environments, envId]);
 
   return (
     <>

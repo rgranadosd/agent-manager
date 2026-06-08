@@ -23,6 +23,8 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useMemo, useState } from "react";
 import {
   useGetAgent,
+  useGetProject,
+  useListDeploymentPipelines,
   useListEnvironments,
 } from "@agent-management-platform/api-client";
 import { EnvironmentCard } from "@agent-management-platform/shared-component";

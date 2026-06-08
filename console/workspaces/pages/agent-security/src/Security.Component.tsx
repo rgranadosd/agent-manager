@@ -304,7 +304,7 @@ export const SecurityComponent: React.FC = () => {
 
   if (!isLoading && !hasActiveDeployment) {
     return (
-      <PageLayout title="API Keys" disableIcon>
+      <PageLayout title="API Keys" disableIcon actions={<EnvironmentSelector />}>
         <Box
           height="50vh"
           display="flex"

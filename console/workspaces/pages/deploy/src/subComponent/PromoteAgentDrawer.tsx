@@ -22,18 +22,15 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
   Collapse,
   Divider,
   Form,
   FormControl,
   FormControlLabel,
-  FormLabel,
   MenuItem,
   Select,
   Stack,
   Switch,
-  TextField,
   Typography,
 } from "@wso2/oxygen-ui";
 import { ArrowUpFromLine, Plus } from "@wso2/oxygen-ui-icons-react";
@@ -42,6 +39,7 @@ import {
   DrawerHeader,
   DrawerWrapper,
   EnvVariableEditor,
+  FileMountEditor,
 } from "@agent-management-platform/views";
 import {
   usePromoteAgent,
@@ -53,7 +51,6 @@ import type {
   Environment,
   EnvironmentVariable,
   FileMount,
-  CorsConfig,
 } from "@agent-management-platform/types";
 
 interface PromoteAgentDrawerProps {
@@ -70,27 +67,13 @@ interface PromoteFormState {
   useConfigFromSourceEnv: boolean;
   env: EnvironmentVariable[];
   files: FileMount[];
-  enableAutoInstrumentation: boolean;
-  enableApiKeySecurity: boolean;
-  corsEnabled: boolean;
-  corsAllowOrigin: string;
-  corsAllowMethods: string;
-  corsAllowHeaders: string;
-  corsAllowCredentials: boolean;
 }
 
 const DEFAULT_STATE: PromoteFormState = {
   targetEnvironment: "",
-  useConfigFromSourceEnv: true,
+  useConfigFromSourceEnv: false,
   env: [],
   files: [],
-  enableAutoInstrumentation: false,
-  enableApiKeySecurity: false,
-  corsEnabled: false,
-  corsAllowOrigin: "",
-  corsAllowMethods: "",
-  corsAllowHeaders: "",
-  corsAllowCredentials: false,
 };
 
 export function PromoteAgentDrawer({
@@ -129,32 +112,22 @@ export function PromoteAgentDrawer({
 
   useEffect(() => {
     if (open) {
+      const cfg = sourceConfigs?.configurations;
       setFormState({
         ...DEFAULT_STATE,
         targetEnvironment: targetEnvOptions[0]?.name ?? "",
+        env: cfg?.env?.map((e) => ({ key: e.key, value: e.value, isSensitive: e.isSensitive })) ?? [],
+        files: cfg?.files ?? [],
       });
       resetMutation();
     }
-  }, [open, resetMutation, targetEnvOptions]);
-
-  const populateFromSource = useCallback(() => {
-    if (!sourceConfigs) return;
-    const cfg = sourceConfigs.configurations;
-    setFormState((prev) => ({
-      ...prev,
-      env: cfg.env?.map((e) => ({ key: e.key, value: e.value, isSensitive: e.isSensitive })) ?? [],
-      files: cfg.files ?? [],
-    }));
-  }, [sourceConfigs]);
+  }, [open, resetMutation, targetEnvOptions, sourceConfigs]);
 
   const handleToggleUseSourceConfig = useCallback(
     (checked: boolean) => {
       setFormState((prev) => ({ ...prev, useConfigFromSourceEnv: checked }));
-      if (!checked) {
-        populateFromSource();
-      }
     },
-    [populateFromSource],
+    [],
   );
 
   const handleEnvChange = useCallback(
@@ -181,27 +154,34 @@ export function PromoteAgentDrawer({
     }));
   }, []);
 
+  const handleAddFile = useCallback(() => {
+    setFormState((prev) => ({
+      ...prev,
+      files: [...prev.files, { key: "", mountPath: "", value: "" }],
+    }));
+  }, []);
+
+  const handleFileChange = useCallback(
+    (index: number, field: "key" | "mountPath" | "value", value: string) => {
+      setFormState((prev) => ({
+        ...prev,
+        files: prev.files.map((f, i) => (i === index ? { ...f, [field]: value } : f)),
+      }));
+    },
+    [],
+  );
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setFormState((prev) => ({
+      ...prev,
+      files: prev.files.filter((_, i) => i !== index),
+    }));
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!formState.targetEnvironment) return;
-
-      const corsConfig: CorsConfig | undefined =
-        formState.corsEnabled
-          ? {
-              enabled: true,
-              allowOrigin: formState.corsAllowOrigin
-                ? formState.corsAllowOrigin.split(",").map((s) => s.trim()).filter(Boolean)
-                : undefined,
-              allowMethods: formState.corsAllowMethods
-                ? formState.corsAllowMethods.split(",").map((s) => s.trim()).filter(Boolean)
-                : undefined,
-              allowHeaders: formState.corsAllowHeaders
-                ? formState.corsAllowHeaders.split(",").map((s) => s.trim()).filter(Boolean)
-                : undefined,
-              allowCredentials: formState.corsAllowCredentials,
-            }
-          : undefined;
 
       try {
         await promoteAgent({
@@ -215,9 +195,6 @@ export function PromoteAgentDrawer({
               : {
                   env: formState.env.filter((e) => e.key),
                   files: formState.files,
-                  enableAutoInstrumentation: formState.enableAutoInstrumentation,
-                  enableApiKeySecurity: formState.enableApiKeySecurity,
-                  corsConfig,
                 }),
           },
         });
@@ -238,7 +215,7 @@ export function PromoteAgentDrawer({
     <DrawerWrapper open={open} onClose={onClose}>
       <DrawerHeader
         icon={<ArrowUpFromLine size={24} />}
-        title="Promote Agent"
+        title={`Promote from ${sourceEnvironment.displayName ?? sourceEnvironment.name} Environment`}
         onClose={onClose}
       />
       <DrawerContent>
@@ -250,48 +227,40 @@ export function PromoteAgentDrawer({
               </Alert>
             )}
 
-            <Form.Section>
-              <Form.Header>Promotion Details</Form.Header>
-              <Form.Stack spacing={2}>
-                <FormControl fullWidth>
-                  <FormLabel>Source Environment</FormLabel>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={sourceEnvironment.displayName ?? sourceEnvironment.name}
-                    slotProps={{ input: { readOnly: true } }}
-                    disabled
-                  />
-                </FormControl>
+            {targetEnvOptions.length > 1 && (
+              <>
+                <Form.Section>
+                  <Form.Header>Target Environment</Form.Header>
+                  <Form.Stack spacing={2}>
+                    <FormControl fullWidth required>
+                      <Select
+                        size="small"
+                        value={formState.targetEnvironment}
+                        onChange={(e) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            targetEnvironment: e.target.value as string,
+                          }))
+                        }
+                        displayEmpty
+                        disabled={isPending}
+                      >
+                        <MenuItem value="" disabled>
+                          <em>Select target environment</em>
+                        </MenuItem>
+                        {targetEnvOptions.map((t) => (
+                          <MenuItem key={t.name} value={t.name}>
+                            {envDisplayName(t.name)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Form.Stack>
+                </Form.Section>
 
-                <FormControl fullWidth required>
-                  <FormLabel required>Target Environment</FormLabel>
-                  <Select
-                    size="small"
-                    value={formState.targetEnvironment}
-                    onChange={(e) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        targetEnvironment: e.target.value as string,
-                      }))
-                    }
-                    displayEmpty
-                    disabled={isPending}
-                  >
-                    <MenuItem value="" disabled>
-                      <em>Select target environment</em>
-                    </MenuItem>
-                    {targetEnvOptions.map((t) => (
-                      <MenuItem key={t.name} value={t.name}>
-                        {envDisplayName(t.name)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Form.Stack>
-            </Form.Section>
-
-            <Divider />
+                <Divider />
+              </>
+            )}
 
             <Form.Section>
               <Form.Header>Configuration</Form.Header>
@@ -363,126 +332,50 @@ export function PromoteAgentDrawer({
                       </CardContent>
                     </Card>
 
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={formState.enableAutoInstrumentation}
-                          onChange={(e) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              enableAutoInstrumentation: e.target.checked,
-                            }))
-                          }
-                          disabled={isPending}
-                        />
-                      }
-                      label="Enable auto instrumentation"
-                    />
-
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={formState.enableApiKeySecurity}
-                          onChange={(e) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              enableApiKeySecurity: e.target.checked,
-                            }))
-                          }
-                          disabled={isPending}
-                        />
-                      }
-                      label="Enable API key security"
-                    />
-
                     <Card variant="outlined">
                       <CardContent>
                         <Stack spacing={1.5}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={formState.corsEnabled}
-                                onChange={(e) =>
-                                  setFormState((prev) => ({
-                                    ...prev,
-                                    corsEnabled: e.target.checked,
-                                  }))
-                                }
-                                disabled={isPending}
-                              />
-                            }
-                            label={<Typography variant="h6">CORS</Typography>}
-                          />
-                          <Collapse in={formState.corsEnabled} timeout="auto" unmountOnExit>
-                            <Stack spacing={1.5}>
-                              <FormControl fullWidth>
-                                <FormLabel>Allow Origins</FormLabel>
-                                <TextField
-                                  size="small"
-                                  value={formState.corsAllowOrigin}
-                                  onChange={(e) =>
-                                    setFormState((prev) => ({
-                                      ...prev,
-                                      corsAllowOrigin: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="e.g. https://example.com, https://app.example.com"
-                                  helperText="Comma-separated list of allowed origins"
-                                  disabled={isPending}
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                          >
+                            <Typography variant="h6">File Mounts</Typography>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<Plus size={14} />}
+                              onClick={handleAddFile}
+                              disabled={isPending}
+                            >
+                              Add
+                            </Button>
+                          </Stack>
+                          {formState.files.length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              No file mounts. Click Add to define them.
+                            </Typography>
+                          ) : (
+                            <Stack spacing={1}>
+                              {formState.files.map((file, index) => (
+                                <FileMountEditor
+                                  key={index}
+                                  index={index}
+                                  keyValue={file.key}
+                                  mountPathValue={file.mountPath}
+                                  contentValue={file.value}
+                                  onKeyChange={(v) => handleFileChange(index, "key", v)}
+                                  onMountPathChange={(v) => handleFileChange(index, "mountPath", v)}
+                                  onContentChange={(v) => handleFileChange(index, "value", v)}
+                                  onRemove={() => handleRemoveFile(index)}
                                 />
-                              </FormControl>
-                              <FormControl fullWidth>
-                                <FormLabel>Allow Methods</FormLabel>
-                                <TextField
-                                  size="small"
-                                  value={formState.corsAllowMethods}
-                                  onChange={(e) =>
-                                    setFormState((prev) => ({
-                                      ...prev,
-                                      corsAllowMethods: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="e.g. GET, POST, PUT"
-                                  helperText="Comma-separated list of allowed HTTP methods"
-                                  disabled={isPending}
-                                />
-                              </FormControl>
-                              <FormControl fullWidth>
-                                <FormLabel>Allow Headers</FormLabel>
-                                <TextField
-                                  size="small"
-                                  value={formState.corsAllowHeaders}
-                                  onChange={(e) =>
-                                    setFormState((prev) => ({
-                                      ...prev,
-                                      corsAllowHeaders: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="e.g. Content-Type, Authorization"
-                                  helperText="Comma-separated list of allowed headers"
-                                  disabled={isPending}
-                                />
-                              </FormControl>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={formState.corsAllowCredentials}
-                                    onChange={(e) =>
-                                      setFormState((prev) => ({
-                                        ...prev,
-                                        corsAllowCredentials: e.target.checked,
-                                      }))
-                                    }
-                                    disabled={isPending}
-                                  />
-                                }
-                                label="Allow credentials"
-                              />
+                              ))}
                             </Stack>
-                          </Collapse>
+                          )}
                         </Stack>
                       </CardContent>
                     </Card>
+
                   </Stack>
                 </Collapse>
               </Form.Stack>

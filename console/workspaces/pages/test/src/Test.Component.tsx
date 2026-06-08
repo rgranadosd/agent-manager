@@ -78,7 +78,7 @@ export const TestComponent: React.FC = () => {
 
   if (!isLoading && currentDeployment?.status !== "active") {
     return (
-      <PageLayout title="Try your agent" disableIcon>
+      <PageLayout title="Try your agent" disableIcon actions={<EnvironmentSelector />}>
         <Box
           height="50vh"
           display="flex"

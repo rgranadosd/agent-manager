@@ -40,8 +40,8 @@ import {
   Rocket,
   Tag,
 } from "@wso2/oxygen-ui-icons-react";
-import { DeploymentConfig } from "@agent-management-platform/shared-component";
-import { DrawerWrapper, NoDataFound } from "@agent-management-platform/views";
+import { NoDataFound } from "@agent-management-platform/views";
+import { EditDeployConfigDrawer } from "./EditDeployConfigDrawer";
 import { BuildSelectorDrawer } from "./BuildSelectorDrawer";
 import { KindVersionSelectorDrawer } from "./KindVersionSelectorDrawer";
 import { format } from "date-fns";
@@ -321,19 +321,18 @@ export function BuildCard(props: BuildCardProps) {
         />
 
         {/* Deployment Drawer */}
-        <DrawerWrapper open={isDrawerOpen} onClose={handleCloseDrawer}>
-          {currentKindVersion && (
-            <DeploymentConfig
-              onClose={handleCloseDrawer}
-              imageId={currentKindVersion.imageId}
-              to={initialEnvironment?.name || "development"}
-              orgName={orgId || ""}
-              projName={projectId || ""}
-              agentName={agentId || ""}
-              configSchema={currentKindVersion.configSchema}
-            />
-          )}
-        </DrawerWrapper>
+        {currentKindVersion && (
+          <EditDeployConfigDrawer
+            open={isDrawerOpen}
+            onClose={handleCloseDrawer}
+            imageId={currentKindVersion.imageId}
+            orgName={orgId || ""}
+            projName={projectId || ""}
+            agentName={agentId || ""}
+            environment={initialEnvironment?.name || "development"}
+            title={`Configure and Deploy to ${initialEnvironment?.displayName ?? initialEnvironment?.name ?? "Environment"} Environment`}
+          />
+        )}
       </>
     );
   }
@@ -446,18 +445,18 @@ export function BuildCard(props: BuildCardProps) {
       />
 
       {/* Deployment Drawer */}
-      <DrawerWrapper open={isDrawerOpen} onClose={handleCloseDrawer}>
-        {currentBuild && (
-          <DeploymentConfig
-            onClose={handleCloseDrawer}
-            imageId={currentBuild.imageId || "busybox"}
-            to={initialEnvironment?.name || "development"}
-            orgName={orgId || ""}
-            projName={projectId || ""}
-            agentName={agentId || ""}
-          />
-        )}
-      </DrawerWrapper>
+      {currentBuild && (
+        <EditDeployConfigDrawer
+          open={isDrawerOpen}
+          onClose={handleCloseDrawer}
+          imageId={currentBuild.imageId || "busybox"}
+          orgName={orgId || ""}
+          projName={projectId || ""}
+          agentName={agentId || ""}
+          environment={initialEnvironment?.name || "development"}
+          title={`Configure and Deploy to ${initialEnvironment?.displayName ?? initialEnvironment?.name ?? "Environment"} Environment`}
+        />
+      )}
     </>
   );
 }
