@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Creates a new environment and installs its API Platform Gateway.
 #
@@ -18,7 +18,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- Parse arguments ---
-if [ -z "$1" ]; then
+if [ $# -lt 1 ]; then
     echo "Usage: $0 <display-name> [--production]"
     echo "  Example: $0 \"Staging Environment\""
     echo "  Example: $0 \"Production\" --production"
@@ -27,7 +27,7 @@ fi
 
 DISPLAY_NAME="$1"
 IS_PRODUCTION=false
-if [ "$2" = "--production" ]; then
+if [ "${2:-}" = "--production" ]; then
     IS_PRODUCTION=true
 fi
 
@@ -39,6 +39,8 @@ if [ -z "$ENV_NAME" ]; then
     exit 1
 fi
 
+# Keep env name short enough that the derived helm release name
+# (api-platform-<org>-<env>) stays within Helm's 53-char limit.
 if [ ${#ENV_NAME} -gt 25 ]; then
     echo "❌ Environment name '${ENV_NAME}' is ${#ENV_NAME} characters (max 25)"
     echo "   Use a shorter display name."
@@ -54,6 +56,8 @@ IDP_TOKEN_URL="${IDP_TOKEN_URL:-http://thunder.amp.localhost:8080/oauth2/token}"
 IDP_CLIENT_ID="${IDP_CLIENT_ID:-amp-api-client}"
 IDP_CLIENT_SECRET="${IDP_CLIENT_SECRET:-amp-api-client-secret}"
 GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-openchoreo-data-plane}"
+# Port the gateway runtime is exposed on (matches values.yaml gateway.vhost default).
+GATEWAY_VHOST_PORT="${GATEWAY_VHOST_PORT:-19080}"
 
 # For helm: how the gateway controller reaches agent-manager
 AGENT_MANAGER_INTERNAL_API="${AGENT_MANAGER_INTERNAL_API:-http://host.docker.internal:9000/api/v1}"
@@ -80,16 +84,18 @@ echo "✅ Agent Manager is healthy"
 # --- Step 1: Get JWT from Thunder IDP ---
 echo ""
 echo "🔑 Obtaining JWT..."
-BASIC_AUTH=$(echo -n "${IDP_CLIENT_ID}:${IDP_CLIENT_SECRET}" | base64 | tr -d '\n')
+BASIC_AUTH=$(printf '%s:%s' "${IDP_CLIENT_ID}" "${IDP_CLIENT_SECRET}" | base64 | tr -d '\n')
 TOKEN_RESPONSE=$(curl -sf -X POST "${IDP_TOKEN_URL}" \
     -H "Authorization: Basic ${BASIC_AUTH}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=client_credentials&scope=openid")
+    -d "grant_type=client_credentials&scope=openid") || {
+    echo "❌ Failed to call ${IDP_TOKEN_URL}"
+    exit 1
+}
 
-JWT=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null)
-if [ -z "$JWT" ]; then
-    echo "❌ Failed to obtain JWT from ${IDP_TOKEN_URL}"
-    echo "   Response: ${TOKEN_RESPONSE}"
+JWT=$(printf '%s' "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) || true
+if [ -z "${JWT:-}" ]; then
+    echo "❌ Could not parse access_token from response: ${TOKEN_RESPONSE}"
     exit 1
 fi
 echo "✅ JWT obtained"
@@ -99,12 +105,14 @@ AUTH_HEADER="Authorization: Bearer ${JWT}"
 # --- Step 2: Create environment ---
 echo ""
 echo "🌍 Creating environment '${ENV_NAME}'..."
+# Escape backslashes and double quotes so the display name survives JSON embedding.
+DISPLAY_NAME_JSON=$(printf '%s' "${DISPLAY_NAME}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 ENV_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${AGENT_MANAGER_API_URL}/orgs/${ORG_NAME}/environments" \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/json" \
     -d "{
         \"name\": \"${ENV_NAME}\",
-        \"displayName\": \"${DISPLAY_NAME}\",
+        \"displayName\": \"${DISPLAY_NAME_JSON}\",
         \"dataplaneRef\": \"${DATAPLANE_REF}\",
         \"dnsPrefix\": \"${ENV_NAME}\",
         \"isProduction\": ${IS_PRODUCTION}
@@ -124,13 +132,16 @@ else
 fi
 
 # --- Step 3: Helm install the gateway ---
-
 echo ""
 echo "🌐 Installing API Platform Gateway for '${ENV_NAME}'..."
 
-RELEASE_NAME="api-platform-${ORG_NAME}-${ORG_NAME}-${ENV_NAME}"
-# Truncate to 53 chars to stay within Helm's 53-char release name limit
-RELEASE_NAME=$(echo "$RELEASE_NAME" | head -c 53 | sed 's/-$//')
+# Release name must match the gateway runtime service lookup expected by
+# the kgateway routes (api-platform-<org>-<env> derives from _helpers.tpl
+# apiGatewayName). DO NOT duplicate the org segment.
+RELEASE_NAME="api-platform-${ORG_NAME}-${ENV_NAME}"
+# Truncate to 53 chars to stay within Helm's release-name limit, stripping
+# any trailing hyphens left by truncation.
+RELEASE_NAME=$(echo "$RELEASE_NAME" | head -c 53 | sed 's/-*$//')
 
 helm upgrade --install "${RELEASE_NAME}" \
     "${SCRIPT_DIR}/../helm-charts/wso2-amp-api-platform-gateway-extension" \
@@ -138,7 +149,7 @@ helm upgrade --install "${RELEASE_NAME}" \
     --set agentManager.orgName="${ORG_NAME}" \
     --set gateway.environment="${ENV_NAME}" \
     --set gateway.displayName="${DISPLAY_NAME} API Platform Gateway" \
-    --set gateway.vhost="http://${ENV_NAME}-${ORG_NAME}.gateway.localhost:19080" \
+    --set gateway.vhost="http://${ENV_NAME}-${ORG_NAME}.gateway.localhost:${GATEWAY_VHOST_PORT}" \
     --set agentManager.apiUrl="${AGENT_MANAGER_INTERNAL_API}" \
     --set apiGateway.controlPlane.host="${AGENT_MANAGER_INTERNAL_CP}" \
     --set apiGateway.controlPlane.tls.insecureSkipVerify=true \
@@ -166,6 +177,6 @@ echo "=== Environment '${ENV_NAME}' setup complete ==="
 echo ""
 echo "  Environment:  ${ENV_NAME}"
 echo "  Display Name: ${DISPLAY_NAME}"
-echo "  Gateway Host: ${ENV_NAME}-${ORG_NAME}.gateway.localhost:19080"
+echo "  Gateway Host: ${ENV_NAME}-${ORG_NAME}.gateway.localhost:${GATEWAY_VHOST_PORT}"
 echo "  Promotion:    default → ${ENV_NAME}"
 echo ""

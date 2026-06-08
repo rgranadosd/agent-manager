@@ -1,17 +1,20 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Removes an environment and uninstalls its API Platform Gateway.
+# Removes an environment: uninstalls its API Platform Gateway helm release, then
+# deletes the Environment via the Agent Manager API (which in turn deletes it in
+# OpenChoreo and cleans up link tables).
 #
 # Usage:
 #   remove-environment.sh staging
 #
-# This script is idempotent — safe to run multiple times.
+# Safe to run multiple times. Will refuse if the environment still has agents
+# configured in it (you must delete those agents first).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- Parse arguments ---
-if [ -z "$1" ]; then
+if [ $# -lt 1 ]; then
     echo "Usage: $0 <environment-name>"
     echo "  Example: $0 staging"
     exit 1
@@ -33,8 +36,9 @@ IDP_CLIENT_ID="${IDP_CLIENT_ID:-amp-api-client}"
 IDP_CLIENT_SECRET="${IDP_CLIENT_SECRET:-amp-api-client-secret}"
 GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-openchoreo-data-plane}"
 
-RELEASE_NAME="api-platform-${ORG_NAME}-${ORG_NAME}-${ENV_NAME}"
-RELEASE_NAME=$(echo "$RELEASE_NAME" | head -c 53 | sed 's/-$//')
+# Release name MUST match what add-environment.sh installs. Single org segment.
+RELEASE_NAME="api-platform-${ORG_NAME}-${ENV_NAME}"
+RELEASE_NAME=$(echo "$RELEASE_NAME" | head -c 53 | sed 's/-*$//')
 
 echo "=== Removing Environment: ${ENV_NAME} ==="
 echo ""
@@ -48,14 +52,14 @@ else
     echo "ℹ️  Gateway helm release '${RELEASE_NAME}' not found, skipping..."
 fi
 
-# Wait for gateway operator to clean up resources
+# Wait for gateway operator to clean up the APIGateway CR
 GATEWAY_NAME="api-platform-${ORG_NAME}-${ENV_NAME}"
 echo ""
 echo "⏳ Waiting for gateway resources to be cleaned up..."
 kubectl wait --for=delete "apigateway/${GATEWAY_NAME}" -n "${GATEWAY_NAMESPACE}" --timeout=120s 2>/dev/null || true
 echo "✅ Gateway resources cleaned up"
 
-# --- Step 2: Delete the environment via API ---
+# --- Step 2: Delete the environment via Agent Manager API ---
 echo ""
 echo "⏳ Checking Agent Manager is healthy..."
 MAX_WAIT=30
@@ -70,31 +74,43 @@ until curl -sf "${AGENT_MANAGER_URL}/healthz" > /dev/null 2>&1; do
 done
 
 echo "🔑 Obtaining JWT..."
-BASIC_AUTH=$(echo -n "${IDP_CLIENT_ID}:${IDP_CLIENT_SECRET}" | base64 | tr -d '\n')
+BASIC_AUTH=$(printf '%s:%s' "${IDP_CLIENT_ID}" "${IDP_CLIENT_SECRET}" | base64 | tr -d '\n')
 TOKEN_RESPONSE=$(curl -sf -X POST "${IDP_TOKEN_URL}" \
     -H "Authorization: Basic ${BASIC_AUTH}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=client_credentials&scope=openid")
+    -d "grant_type=client_credentials&scope=openid") || {
+    echo "❌ Failed to call ${IDP_TOKEN_URL}"
+    exit 1
+}
 
-JWT=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null)
-if [ -z "$JWT" ]; then
-    echo "❌ Failed to obtain JWT from ${IDP_TOKEN_URL}"
+JWT=$(printf '%s' "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) || true
+if [ -z "${JWT:-}" ]; then
+    echo "❌ Could not parse access_token from response: ${TOKEN_RESPONSE}"
     exit 1
 fi
 
 echo ""
 echo "🌍 Deleting environment '${ENV_NAME}'..."
-DEL_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+DEL_HTTP_CODE=$(curl -s -o /tmp/amp-delete-env-response -w "%{http_code}" -X DELETE \
     "${AGENT_MANAGER_API_URL}/orgs/${ORG_NAME}/environments/${ENV_NAME}" \
     -H "Authorization: Bearer ${JWT}")
 
-if [ "$DEL_HTTP_CODE" = "204" ]; then
-    echo "✅ Environment '${ENV_NAME}' deleted"
-elif [ "$DEL_HTTP_CODE" = "404" ]; then
-    echo "ℹ️  Environment '${ENV_NAME}' not found, already deleted"
-else
-    echo "⚠️  Failed to delete environment (HTTP ${DEL_HTTP_CODE})"
-fi
+case "$DEL_HTTP_CODE" in
+    204)
+        echo "✅ Environment '${ENV_NAME}' deleted"
+        ;;
+    404)
+        echo "ℹ️  Environment '${ENV_NAME}' not found — already deleted"
+        ;;
+    *)
+        echo "⚠️  Failed to delete environment (HTTP ${DEL_HTTP_CODE})"
+        cat /tmp/amp-delete-env-response 2>/dev/null; echo
+        rm -f /tmp/amp-delete-env-response
+        exit 1
+        ;;
+esac
+rm -f /tmp/amp-delete-env-response
 
 echo ""
 echo "=== Environment '${ENV_NAME}' removed ==="
+echo ""

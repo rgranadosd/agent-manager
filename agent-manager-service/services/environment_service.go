@@ -208,9 +208,52 @@ func (s *environmentService) UpdateEnvironment(ctx context.Context, orgName stri
 	}, nil
 }
 
+// DeleteEnvironment removes an environment from OpenChoreo and cleans up local DB state.
+//
+// OpenChoreo is the source of truth for "is anything actually deployed here": it refuses
+// Environment deletion while ReleaseBindings or workloads still reference it, so we let
+// the OC API server enforce that and surface whatever it returns.
+//
+// On success: delete the OpenChoreo Environment CR, then delete any gateway↔env mapping rows
 func (s *environmentService) DeleteEnvironment(ctx context.Context, orgName string, envID string) error {
-	s.logger.Warn("DeleteEnvironment: Environments are managed by OpenChoreo and cannot be deleted via Agent Manager")
-	return fmt.Errorf("environments are managed by OpenChoreo platform and cannot be deleted directly")
+	s.logger.Info("Deleting environment", "envID", envID, "orgName", orgName)
+
+	// envID is the environment name (matching OpenChoreo's identifier); resolve the UUID via OC
+	// because the local DB doesn't have its own environments table.
+	env, err := s.ocClient.GetEnvironment(ctx, orgName, envID)
+	if err != nil {
+		s.logger.Error("Failed to look up environment", "orgName", orgName, "envID", envID, "error", err)
+		if errors.Is(err, utils.ErrNotFound) || errors.Is(err, utils.ErrEnvironmentNotFound) {
+			return utils.ErrEnvironmentNotFound
+		}
+		return fmt.Errorf("failed to look up environment: %w", err)
+	}
+
+	envUUID, parseErr := uuid.Parse(env.UUID)
+	if parseErr != nil {
+		s.logger.Error("Invalid env UUID from OpenChoreo", "uuid", env.UUID, "error", parseErr)
+		return fmt.Errorf("invalid environment UUID: %w", parseErr)
+	}
+
+	// Delete in OpenChoreo first. If OC refuses (release bindings still exist, etc.) we surface
+	// that error without having touched local state.
+	if err := s.ocClient.DeleteEnvironment(ctx, orgName, env.Name); err != nil {
+		s.logger.Error("Failed to delete environment in OpenChoreo", "orgName", orgName, "envID", envID, "error", err)
+		if errors.Is(err, utils.ErrNotFound) {
+			return utils.ErrEnvironmentNotFound
+		}
+		return fmt.Errorf("failed to delete environment in OpenChoreo: %w", err)
+	}
+
+	// Local cleanup: gateway↔env mapping rows. The gateway themselves are unaffected.
+	deleted, err := s.gatewayRepo.DeleteEnvironmentMappingsByEnvironmentID(envUUID.String())
+	if err != nil {
+		s.logger.Error("Environment deleted in OpenChoreo but local gateway-mapping cleanup failed",
+			"envUUID", envUUID, "error", err)
+		return fmt.Errorf("environment deleted but gateway mapping cleanup failed: %w", err)
+	}
+	s.logger.Info("Deleted environment", "envID", envID, "envUUID", envUUID, "gatewayMappingsDeleted", deleted)
+	return nil
 }
 
 func (s *environmentService) GetEnvironmentGateways(ctx context.Context, orgName string, envID string) ([]models.GatewayResponse, error) {

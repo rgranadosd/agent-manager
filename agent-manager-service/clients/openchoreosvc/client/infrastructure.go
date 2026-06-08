@@ -246,6 +246,30 @@ func (c *openChoreoClient) GetEnvironment(ctx context.Context, namespaceName, en
 	return convertEnvironmentToResponse(resp.JSON200), nil
 }
 
+// DeleteEnvironment removes the Environment CR from OpenChoreo. Returns utils.ErrNotFound when
+// the named environment does not exist. OpenChoreo refuses deletion while bindings/deployments
+// still reference the environment, so callers should ensure local-side cleanup of agents
+// (configs, monitors, applications) happens before this call.
+func (c *openChoreoClient) DeleteEnvironment(ctx context.Context, namespaceName, environmentName string) error {
+	resp, err := c.ocClient.DeleteEnvironmentWithResponse(ctx, namespaceName, environmentName)
+	if err != nil {
+		return fmt.Errorf("failed to delete environment: %w", err)
+	}
+
+	// OpenChoreo returns 204 No Content on success; tolerate 200 as well for forward compatibility.
+	switch resp.StatusCode() {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	}
+
+	return handleErrorResponse(resp.StatusCode(), ErrorResponses{
+		JSON401: resp.JSON401,
+		JSON403: resp.JSON403,
+		JSON404: resp.JSON404,
+		JSON500: resp.JSON500,
+	})
+}
+
 func (c *openChoreoClient) ListEnvironments(ctx context.Context, namespaceName string) ([]*models.EnvironmentResponse, error) {
 	resp, err := c.ocClient.ListEnvironmentsWithResponse(ctx, namespaceName, nil)
 	if err != nil {

@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "wso2-amp-gateway-extension.labels" . | nindent 4 }}
     app.kubernetes.io/component: otel-restapi
-    gateway.api-platform.wso2.com/restapi-target: {{ printf "%s-%s" (include "wso2-amp-gateway-extension.apiGatewayName" .) .Values.gateway.environment | lower | trunc 63 | trimSuffix "-" | quote }}
+    gateway.api-platform.wso2.com/restapi-target: {{ include "wso2-amp-gateway-extension.restApiTarget" . | quote }}
 spec:
   displayName: {{ include "wso2-amp-gateway-extension.apiGatewayName" . }}-otel-restapi
   version: v1.0

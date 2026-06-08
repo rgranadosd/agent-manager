@@ -702,35 +702,10 @@ func (c *openChoreoClient) GetEnvResourceConfigs(ctx context.Context, namespaceN
 	}
 
 	// Step 3: Check ReleaseBinding for environment-specific overrides
-	componentFilter := componentName
-	listResp, err := c.ocClient.ListReleaseBindingsWithResponse(ctx, namespaceName, &gen.ListReleaseBindingsParams{
-		Component: &componentFilter,
-		Limit:     &defaultListLimit,
-	})
+	binding, err := c.findReleaseBindingForEnv(ctx, namespaceName, componentName, environment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list release bindings: %w", err)
+		return nil, err
 	}
-	if listResp.StatusCode() != http.StatusOK {
-		return nil, handleErrorResponse(listResp.StatusCode(), ErrorResponses{
-			JSON401: listResp.JSON401,
-			JSON403: listResp.JSON403,
-			JSON404: listResp.JSON404,
-			JSON500: listResp.JSON500,
-		})
-	}
-
-	// Find the binding for the specified environment
-	var binding *gen.ReleaseBinding
-	if listResp.JSON200 != nil {
-		for i := range listResp.JSON200.Items {
-			b := &listResp.JSON200.Items[i]
-			if b.Spec != nil && b.Spec.Environment == environment {
-				binding = b
-				break
-			}
-		}
-	}
-
 	if binding == nil {
 		// No binding found - return ComponentType defaults
 		return response, nil
@@ -1095,7 +1070,7 @@ func (c *openChoreoClient) ListComponentsByKind(ctx context.Context, namespaceNa
 	return components, nil
 }
 
-func (c *openChoreoClient) ComponentExists(ctx context.Context, namespaceName, projectName, componentName string, verifyProject bool) (bool, error) {
+func (c *openChoreoClient) ComponentExists(ctx context.Context, namespaceName, projectName, componentName string) (bool, error) {
 	_, err := c.GetComponent(ctx, namespaceName, projectName, componentName)
 	if err != nil {
 		if errors.Is(err, utils.ErrNotFound) {
@@ -1598,39 +1573,15 @@ func (c *openChoreoClient) ReplaceComponentFileMounts(ctx context.Context, names
 // then sets restartedAt to trigger a pod rollout. If no binding exists for the component+environment yet
 // (agent not deployed), returns nil — the Component CR vars will be picked up on first deploy.
 func (c *openChoreoClient) UpdateReleaseBindingEnvVars(ctx context.Context, namespaceName, projectName, componentName, envName string, envVars []EnvVar) error {
-	componentFilter := componentName
-	listResp, err := c.ocClient.ListReleaseBindingsWithResponse(ctx, namespaceName, &gen.ListReleaseBindingsParams{
-		Component: &componentFilter,
-		Limit:     &defaultListLimit,
-	})
+	binding, err := c.findReleaseBindingForEnv(ctx, namespaceName, componentName, envName)
 	if err != nil {
-		return fmt.Errorf("failed to list release bindings: %w", err)
+		return err
 	}
-	if listResp.StatusCode() != http.StatusOK {
-		return handleErrorResponse(listResp.StatusCode(), ErrorResponses{
-			JSON401: listResp.JSON401,
-			JSON403: listResp.JSON403,
-			JSON404: listResp.JSON404,
-			JSON500: listResp.JSON500,
-		})
-	}
-	if listResp.JSON200 == nil || len(listResp.JSON200.Items) == 0 {
-		// No bindings yet — agent not deployed; skip silently.
-		return nil
-	}
-
-	// Find the binding for the specified environment (client-side filter since the API has no env param).
-	var bindingName string
-	for _, b := range listResp.JSON200.Items {
-		if b.Spec != nil && b.Spec.Environment == envName {
-			bindingName = b.Metadata.Name
-			break
-		}
-	}
-	if bindingName == "" {
+	if binding == nil {
 		// No binding for this environment yet — agent not deployed there; skip silently.
 		return nil
 	}
+	bindingName := binding.Metadata.Name
 
 	getResp, err := c.ocClient.GetReleaseBindingWithResponse(ctx, namespaceName, bindingName)
 	if err != nil {
@@ -1668,25 +1619,8 @@ func (c *openChoreoClient) UpdateReleaseBindingEnvVars(ctx context.Context, name
 			existing[ev.Key] = ev
 		}
 	}
-	for _, newEnv := range envVars {
-		genEnv := gen.EnvVar{Key: newEnv.Key}
-		if newEnv.ValueFrom != nil && newEnv.ValueFrom.SecretKeyRef != nil {
-			name := newEnv.ValueFrom.SecretKeyRef.Name
-			key := newEnv.ValueFrom.SecretKeyRef.Key
-			genEnv.ValueFrom = &gen.EnvVarValueFrom{
-				SecretKeyRef: &struct {
-					Key  *string `json:"key,omitempty"`
-					Name *string `json:"name,omitempty"`
-				}{
-					Name: &name,
-					Key:  &key,
-				},
-			}
-		} else {
-			v := newEnv.Value
-			genEnv.Value = &v
-		}
-		existing[newEnv.Key] = genEnv
+	for _, genEnv := range toGenEnvVars(envVars) {
+		existing[genEnv.Key] = genEnv
 	}
 
 	merged := make([]gen.EnvVar, 0, len(existing))
@@ -1975,25 +1909,8 @@ func (c *openChoreoClient) ReplaceReleaseBindingEnvVars(ctx context.Context, nam
 	}
 
 	// Step 2: Merge new env vars on top.
-	for _, newEnv := range envVarsToAdd {
-		genEnv := gen.EnvVar{Key: newEnv.Key}
-		if newEnv.ValueFrom != nil && newEnv.ValueFrom.SecretKeyRef != nil {
-			name := newEnv.ValueFrom.SecretKeyRef.Name
-			key := newEnv.ValueFrom.SecretKeyRef.Key
-			genEnv.ValueFrom = &gen.EnvVarValueFrom{
-				SecretKeyRef: &struct {
-					Key  *string `json:"key,omitempty"`
-					Name *string `json:"name,omitempty"`
-				}{
-					Name: &name,
-					Key:  &key,
-				},
-			}
-		} else {
-			v := newEnv.Value
-			genEnv.Value = &v
-		}
-		existing[newEnv.Key] = genEnv
+	for _, genEnv := range toGenEnvVars(envVarsToAdd) {
+		existing[genEnv.Key] = genEnv
 	}
 
 	merged := make([]gen.EnvVar, 0, len(existing))

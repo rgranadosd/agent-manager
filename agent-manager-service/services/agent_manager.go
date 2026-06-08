@@ -434,39 +434,6 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 	return traits, nil
 }
 
-// attachOTELInstrumentationTrait attaches OTEL instrumentation trait to the agent
-// The trait handles injection of OTEL configuration including the agent API key
-func (s *agentManagerService) attachOTELInstrumentationTrait(ctx context.Context, orgName, projectName, agentName string) error {
-	// Generate agent API key for the trait parameters
-	apiKey, err := s.generateAgentAPIKey(ctx, orgName, projectName, agentName, "")
-	if err != nil {
-		return fmt.Errorf("failed to generate agent API key: %w", err)
-	}
-
-	opts := []client.TraitOption{client.WithAgentApiKey(apiKey)}
-	// Honor the agent's pinned AMP instrumentation version if one is set;
-	// otherwise the trait builder falls back to the platform default. Surface
-	// real lookup errors so a transient DB hiccup doesn't silently break the pin.
-	v, err := s.lookupAgentInstrumentationVersion(ctx, orgName, projectName, agentName)
-	switch {
-	case errors.Is(err, ErrInstrumentationVersionNotPinned):
-		// no pin → fall through to the platform default in the trait builder
-	case err != nil:
-		return fmt.Errorf("looking up pinned instrumentation version: %w", err)
-	default:
-		opts = append(opts, client.WithInstrumentationVersion(v))
-	}
-
-	if err := s.ocClient.AttachTraits(ctx, orgName, projectName, agentName, []client.TraitRequest{
-		{TraitKind: client.TraitKindTrait, TraitType: client.TraitOTELInstrumentation, Opts: opts},
-	}); err != nil {
-		return fmt.Errorf("error attaching OTEL instrumentation trait: %w", err)
-	}
-
-	s.logger.Info("Enabled instrumentation for buildpack agent", "agentName", agentName)
-	return nil
-}
-
 // ErrInstrumentationVersionNotPinned indicates an agent has no pinned AMP
 // instrumentation version: no row in agent_configs yet, no project pipeline,
 // or the column is NULL. Callers should treat it as "fall back to the platform
@@ -531,46 +498,6 @@ func (s *agentManagerService) lookupAgentInstrumentationVersion(ctx context.Cont
 		return nil, ErrInstrumentationVersionNotPinned
 	}
 	return cfg.InstrumentationVersion, nil
-}
-
-// detachOTELInstrumentationTrait removes the OTEL instrumentation trait from the agent
-func (s *agentManagerService) detachOTELInstrumentationTrait(ctx context.Context, orgName, projectName, agentName string) error {
-	if err := s.ocClient.DetachTrait(ctx, orgName, projectName, agentName, client.TraitOTELInstrumentation); err != nil {
-		return fmt.Errorf("error detaching OTEL instrumentation trait: %w", err)
-	}
-
-	s.logger.Info("Disabled instrumentation for buildpack agent", "agentName", agentName)
-	return nil
-}
-
-// attachEnvInjectionTrait attaches the env injection trait to inject AMP_OTEL_ENDPOINT
-// and AMP_AGENT_API_KEY environment variables. Used for Docker builds and buildpack
-// builds when auto-instrumentation is disabled.
-func (s *agentManagerService) attachEnvInjectionTrait(ctx context.Context, orgName, projectName, agentName string) error {
-	// Generate agent API key for the trait parameters
-	apiKey, err := s.generateAgentAPIKey(ctx, orgName, projectName, agentName, "")
-	if err != nil {
-		return fmt.Errorf("failed to generate agent API key: %w", err)
-	}
-
-	if err := s.ocClient.AttachTraits(ctx, orgName, projectName, agentName, []client.TraitRequest{
-		{TraitKind: client.TraitKindTrait, TraitType: client.TraitEnvInjection, Opts: []client.TraitOption{client.WithAgentApiKey(apiKey)}},
-	}); err != nil {
-		return fmt.Errorf("error attaching env injection trait: %w", err)
-	}
-
-	s.logger.Info("Attached env injection trait", "agentName", agentName)
-	return nil
-}
-
-// detachEnvInjectionTrait removes the env injection trait from the agent
-func (s *agentManagerService) detachEnvInjectionTrait(ctx context.Context, orgName, projectName, agentName string) error {
-	if err := s.ocClient.DetachTrait(ctx, orgName, projectName, agentName, client.TraitEnvInjection); err != nil {
-		return fmt.Errorf("error detaching env injection trait: %w", err)
-	}
-
-	s.logger.Info("Detached env injection trait", "agentName", agentName)
-	return nil
 }
 
 // validateInstrumentationVersion checks the AMP instrumentation version against
@@ -738,80 +665,6 @@ func (s *agentManagerService) generateAgentAPIKey(ctx context.Context, orgName, 
 	return tokenResp.Token, nil
 }
 
-// generateTracingEnvVars generates tracing-related environment variables (OTEL endpoint and
-// agent API key) for the named agent. Returns the env vars without persisting them.
-func (s *agentManagerService) generateTracingEnvVars(ctx context.Context, orgName, projectName, agentName string) ([]client.EnvVar, error) {
-	s.logger.Debug("Generating tracing environment variables", "agentName", agentName)
-
-	// Generate agent API key
-	apiKey, err := s.generateAgentAPIKey(ctx, orgName, projectName, agentName, "")
-	if err != nil {
-		return nil, err
-	}
-
-	// Get OTEL exporter endpoint from config
-	cfg := config.GetConfig()
-	otelEndpoint := cfg.OTEL.ExporterEndpoint
-
-	// Prepare tracing environment variables
-	tracingEnvVars := []client.EnvVar{
-		{
-			Key:   client.EnvVarOTELEndpoint,
-			Value: otelEndpoint,
-		},
-		{
-			Key:   client.EnvVarAgentAPIKey,
-			Value: apiKey,
-		},
-	}
-
-	return tracingEnvVars, nil
-}
-
-// injectTracingEnvVarsByName injects tracing-related environment variables (OTEL endpoint and
-// agent API key) for the named agent into the Component CR. This is used during agent creation
-// for docker and Python buildpack agents (the latter when auto-instrumentation is disabled).
-func (s *agentManagerService) injectTracingEnvVarsByName(ctx context.Context, orgName, projectName, agentName string) error {
-	s.logger.Debug("Injecting tracing environment variables", "agentName", agentName)
-
-	tracingEnvVars, err := s.generateTracingEnvVars(ctx, orgName, projectName, agentName)
-	if err != nil {
-		return err
-	}
-
-	// Update component configurations with tracing environment variables (for persistence)
-	if err := s.updateComponentEnvVars(ctx, orgName, projectName, agentName, tracingEnvVars); err != nil {
-		s.logger.Error("Failed to update component with tracing env vars", "agentName", agentName, "error", err)
-		return fmt.Errorf("failed to update component env vars: %w", err)
-	}
-
-	s.logger.Info(
-		"Injected tracing environment variables",
-		"agentName", agentName,
-		"envVarCount", len(tracingEnvVars),
-	)
-
-	return nil
-}
-
-// updateComponentEnvVars updates the component's workflow parameters with new environment variables
-func (s *agentManagerService) updateComponentEnvVars(ctx context.Context, orgName, projectName, componentName string, newEnvVars []client.EnvVar) error {
-	s.logger.Debug("Updating component environment variables", "componentName", componentName, "newEnvCount", len(newEnvVars))
-
-	if err := s.ocClient.UpdateComponentEnvVars(ctx, orgName, projectName, componentName, newEnvVars); err != nil {
-		s.logger.Error("Failed to update component environment variables", "componentName", componentName, "error", err)
-		return fmt.Errorf("failed to update component environment variables: %w", err)
-	}
-
-	s.logger.Info(
-		"Successfully updated component environment variables",
-		"componentName", componentName,
-		"envVarCount", len(newEnvVars),
-	)
-
-	return nil
-}
-
 func (s *agentManagerService) GetAgent(ctx context.Context, orgName string, projectName string, agentName string) (*models.AgentResponse, error) {
 	s.logger.Info("Getting agent", "agentName", agentName, "orgName", orgName, "projectName", projectName)
 	// Validate organization exists
@@ -905,23 +758,30 @@ func (s *agentManagerService) ListAgents(ctx context.Context, orgName string, pr
 		return nil, 0, fmt.Errorf("failed to list agents: %w", err)
 	}
 
-	// Calculate total count
 	total := int32(len(agents))
-
-	// Apply pagination
-	var paginatedAgents []*models.AgentResponse
-	if offset >= total {
-		// If offset is beyond available data, return empty slice
-		paginatedAgents = []*models.AgentResponse{}
-	} else {
-		endIndex := offset + limit
-		if endIndex > total {
-			endIndex = total
-		}
-		paginatedAgents = agents[offset:endIndex]
-	}
+	paginatedAgents := paginateSlice(agents, offset, limit)
 	s.logger.Info("Listed agents successfully", "orgName", orgName, "projName", projName, "totalAgents", total, "returnedAgents", len(paginatedAgents))
 	return paginatedAgents, total, nil
+}
+
+// paginateSlice returns items[offset:offset+limit], clamping both bounds defensively so
+// negative values or out-of-range offsets never panic the slice expression.
+func paginateSlice[T any](items []T, offset, limit int32) []T {
+	total := int32(len(items))
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	if offset >= total {
+		return []T{}
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return items[offset:end]
 }
 
 func (s *agentManagerService) CreateAgent(ctx context.Context, orgName string, projectName string, req *spec.CreateAgentRequest) error {
@@ -1798,7 +1658,7 @@ func (s *agentManagerService) GenerateName(ctx context.Context, orgName string, 
 		}
 
 		// Check if candidate name is available
-		exists, err := s.ocClient.ComponentExists(ctx, org.Name, project.Name, candidateName, false)
+		exists, err := s.ocClient.ComponentExists(ctx, org.Name, project.Name, candidateName)
 		if err != nil {
 			return "", fmt.Errorf("failed to check agent existence: %w", err)
 		}
@@ -1870,7 +1730,7 @@ func (s *agentManagerService) generateUniqueProjectName(ctx context.Context, org
 func (s *agentManagerService) generateUniqueAgentName(ctx context.Context, orgName string, projectName string, baseName string) (string, error) {
 	// Create a name availability checker function that uses the agent repository
 	nameChecker := func(name string) (bool, error) {
-		exists, err := s.ocClient.ComponentExists(ctx, orgName, projectName, name, false)
+		exists, err := s.ocClient.ComponentExists(ctx, orgName, projectName, name)
 		if err != nil {
 			return false, fmt.Errorf("failed to check agent name availability: %w", err)
 		}
@@ -2392,7 +2252,7 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			ProjectName:               projectName,
 			AgentName:                 agentName,
 			EnvironmentName:           targetEnv.Name,
-			EnableAutoInstrumentation: tracingCfg.EnableAutoInstrumentation,
+			EnableAutoInstrumentation: enableAutoInstrumentation,
 			InstrumentationVersion:    existingInstrumentationVersion,
 			EnableApiKeySecurity:      apiCfg.EnableApiKeySecurity,
 			CORSEnabled:               apiCfg.CORSEnabled,
@@ -2692,43 +2552,48 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 		// Explicit flag: inherit from source environment's workload overrides,
 		// but strip source system-managed env vars (LLM config keys) and replace them
 		// with the target environment's own system-managed values (different per env).
-		srcSystemKeys, srcKeysErr := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.SourceEnvironment)
-		if srcKeysErr != nil {
-			s.logger.Warn("Failed to fetch system-managed env var keys for promotion", "agentName", agentName, "error", srcKeysErr)
-			srcSystemKeys = nil
+		// Fail closed: we MUST know which keys are system-managed to filter them out, otherwise
+		// the source env's LLM credentials would leak into the target env's workload.
+		srcSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.SourceEnvironment)
+		if err != nil {
+			s.logger.Error("Failed to fetch source env system-managed env var keys for promotion", "agentName", agentName, "error", err)
+			return fmt.Errorf("failed to fetch source env system-managed keys: %w", err)
 		}
 
-		srcEnvVars, srcFileVars, srcErr := s.ocClient.GetSourceEnvWorkloadOverrides(ctx, orgName, agentName, req.SourceEnvironment)
-		if srcErr != nil {
-			s.logger.Warn("Failed to fetch source env workload overrides for promotion", "agentName", agentName, "error", srcErr)
-		} else {
-			for _, ev := range srcEnvVars {
-				if !srcSystemKeys[ev.Key] {
-					envOverrides = append(envOverrides, ev)
-				}
-			}
-			fileOverrides = srcFileVars
+		srcEnvVars, srcFileVars, err := s.ocClient.GetSourceEnvWorkloadOverrides(ctx, orgName, agentName, req.SourceEnvironment)
+		if err != nil {
+			s.logger.Error("Failed to fetch source env workload overrides for promotion", "agentName", agentName, "error", err)
+			return fmt.Errorf("failed to fetch source env workload overrides: %w", err)
 		}
+		for _, ev := range srcEnvVars {
+			if !srcSystemKeys[ev.Key] {
+				envOverrides = append(envOverrides, ev)
+			}
+		}
+		fileOverrides = srcFileVars
 
 		// Inject target environment's own system-managed vars (e.g. different LLM proxy URL/key per env).
 		// These override any system vars that may leak from the workload CR base.
 		// If the source env has LLM config but the target does not, return an error — otherwise
 		// staging would silently inherit the source env's LLM credentials via the workload CR base.
-		tgtSystemKeys, tgtKeysErr := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.TargetEnvironment)
-		if tgtKeysErr != nil {
-			s.logger.Warn("Failed to fetch target env system-managed keys for promotion", "agentName", agentName, "error", tgtKeysErr)
-		} else if len(srcSystemKeys) > 0 && len(tgtSystemKeys) == 0 {
+		tgtSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.TargetEnvironment)
+		if err != nil {
+			s.logger.Error("Failed to fetch target env system-managed env var keys for promotion", "agentName", agentName, "error", err)
+			return fmt.Errorf("failed to fetch target env system-managed keys: %w", err)
+		}
+		if len(srcSystemKeys) > 0 && len(tgtSystemKeys) == 0 {
 			return fmt.Errorf("agent %q has LLM configuration in environment %q but none in target environment %q: configure LLM for the target environment before promoting",
 				agentName, req.SourceEnvironment, req.TargetEnvironment)
-		} else if len(tgtSystemKeys) > 0 {
+		}
+		if len(tgtSystemKeys) > 0 {
 			// Build system-managed env vars from the DB config rather than the ReleaseBinding,
 			// because on first promotion the target ReleaseBinding doesn't have them yet.
-			tgtEnvVars, tgtErr := s.agentConfigurationService.BuildSystemManagedEnvVarsFromConfig(ctx, agentName, orgName, req.TargetEnvironment)
-			if tgtErr != nil {
-				s.logger.Warn("Failed to build target env system-managed vars from config", "agentName", agentName, "error", tgtErr)
-			} else {
-				envOverrides = append(envOverrides, tgtEnvVars...)
+			tgtEnvVars, err := s.agentConfigurationService.BuildSystemManagedEnvVarsFromConfig(ctx, agentName, orgName, req.TargetEnvironment)
+			if err != nil {
+				s.logger.Error("Failed to build target env system-managed vars from config", "agentName", agentName, "error", err)
+				return fmt.Errorf("failed to build target env system-managed vars: %w", err)
 			}
+			envOverrides = append(envOverrides, tgtEnvVars...)
 		}
 	} else if len(req.Env) > 0 || len(req.Files) > 0 {
 		// User explicitly provided env vars — mirror the deploy flow:
@@ -3276,21 +3141,8 @@ func (s *agentManagerService) ListAgentBuilds(ctx context.Context, orgName strin
 		return nil, 0, err
 	}
 
-	// Calculate total count
 	total := int32(len(allBuilds))
-
-	// Apply pagination
-	var paginatedBuilds []*models.BuildResponse
-	if offset >= total {
-		// If offset is beyond available data, return empty slice
-		paginatedBuilds = []*models.BuildResponse{}
-	} else {
-		endIndex := offset + limit
-		if endIndex > total {
-			endIndex = total
-		}
-		paginatedBuilds = allBuilds[offset:endIndex]
-	}
+	paginatedBuilds := paginateSlice(allBuilds, offset, limit)
 
 	s.logger.Info("Listed builds successfully", "agentName", agentName, "orgName", orgName, "projectName", projectName, "totalBuilds", total, "returnedBuilds", len(paginatedBuilds))
 	return paginatedBuilds, total, nil

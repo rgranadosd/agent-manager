@@ -49,7 +49,7 @@ func TestDeployAgent(t *testing.T) {
 
 	t.Run("Deploying agent with valid imageId should return 202", func(t *testing.T) {
 		openChoreoClient := apitestutils.CreateMockOpenChoreoClient()
-		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 			return true, nil
 		}
 		testClients := wiring.TestClients{
@@ -105,7 +105,7 @@ func TestDeployAgent(t *testing.T) {
 
 	t.Run("Deploying agent with imageId and environment variables should return 202", func(t *testing.T) {
 		openChoreoClient := apitestutils.CreateMockOpenChoreoClient()
-		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 			return true, nil
 		}
 		testClients := wiring.TestClients{
@@ -211,7 +211,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "imageId is required",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				return mock
@@ -230,7 +230,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "imageId is required",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				return mock
@@ -249,7 +249,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "Organization not found",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.DeployFunc = func(ctx context.Context, namespaceName string, projectName string, componentName string, req client.DeployRequest) error {
@@ -271,7 +271,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "Project not found",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.DeployFunc = func(ctx context.Context, namespaceName string, projectName string, componentName string, req client.DeployRequest) error {
@@ -293,7 +293,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "Agent not found",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.DeployFunc = func(ctx context.Context, namespaceName string, projectName string, componentName string, req client.DeployRequest) error {
@@ -315,7 +315,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "Failed to deploy agent",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.DeployFunc = func(ctx context.Context, namespaceName string, projectName string, componentName string, req client.DeployRequest) error {
@@ -341,7 +341,7 @@ func TestDeployAgent(t *testing.T) {
 			wantErrMsg: "missing header: Authorization",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				return mock

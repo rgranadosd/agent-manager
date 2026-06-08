@@ -60,7 +60,7 @@ type OpenChoreoClient interface {
 	DeleteComponent(ctx context.Context, namespaceName, projectName, componentName string) error
 	ListComponents(ctx context.Context, namespaceName, projectName string) ([]*models.AgentResponse, error)
 	ListComponentsByKind(ctx context.Context, namespaceName, projectName, kindName string) ([]*models.AgentResponse, error)
-	ComponentExists(ctx context.Context, namespaceName, projectName, componentName string, verifyProject bool) (bool, error)
+	ComponentExists(ctx context.Context, namespaceName, projectName, componentName string) (bool, error)
 	AttachTraits(ctx context.Context, namespaceName, projectName, componentName string, traitRequests []TraitRequest) error
 	DetachTrait(ctx context.Context, namespaceName, projectName, componentName string, traitType TraitType) error
 	HasTrait(ctx context.Context, namespaceName, projectName, componentName string, traitType TraitType) (bool, error)
@@ -94,6 +94,7 @@ type OpenChoreoClient interface {
 	CreateEnvironment(ctx context.Context, namespaceName string, req CreateEnvironmentRequest) (*models.EnvironmentResponse, error)
 	GetEnvironment(ctx context.Context, namespaceName, environmentName string) (*models.EnvironmentResponse, error)
 	UpdateEnvironment(ctx context.Context, namespaceName, environmentName string, req UpdateEnvironmentRequest) (*models.EnvironmentResponse, error)
+	DeleteEnvironment(ctx context.Context, namespaceName, environmentName string) error
 	ListEnvironments(ctx context.Context, namespaceName string) ([]*models.EnvironmentResponse, error)
 
 	// Release Binding Operations
@@ -139,7 +140,6 @@ type OpenChoreoClient interface {
 }
 
 type openChoreoClient struct {
-	baseURL  string
 	ocClient *gen.ClientWithResponses
 }
 
@@ -193,7 +193,6 @@ func NewOpenChoreoClient(cfg *Config) (OpenChoreoClient, error) {
 	}
 
 	return &openChoreoClient{
-		baseURL:  cfg.BaseURL,
 		ocClient: ocClient,
 	}, nil
 }

@@ -21,7 +21,7 @@ import (
 //			AttachTraitsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string, traitRequests []client.TraitRequest) error {
 //				panic("mock out the AttachTraits method")
 //			},
-//			ComponentExistsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string, verifyProject bool) (bool, error) {
+//			ComponentExistsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string) (bool, error) {
 //				panic("mock out the ComponentExists method")
 //			},
 //			CreateComponentFunc: func(ctx context.Context, namespaceName string, projectName string, req client.CreateComponentRequest) error {
@@ -224,7 +224,7 @@ type OpenChoreoClientMock struct {
 	AttachTraitsFunc func(ctx context.Context, namespaceName string, projectName string, componentName string, traitRequests []client.TraitRequest) error
 
 	// ComponentExistsFunc mocks the ComponentExists method.
-	ComponentExistsFunc func(ctx context.Context, namespaceName string, projectName string, componentName string, verifyProject bool) (bool, error)
+	ComponentExistsFunc func(ctx context.Context, namespaceName string, projectName string, componentName string) (bool, error)
 
 	// CreateComponentFunc mocks the CreateComponent method.
 	CreateComponentFunc func(ctx context.Context, namespaceName string, projectName string, req client.CreateComponentRequest) error
@@ -255,6 +255,9 @@ type OpenChoreoClientMock struct {
 
 	// DeleteGitSecretFunc mocks the DeleteGitSecret method.
 	DeleteGitSecretFunc func(ctx context.Context, namespaceName string, secretName string) error
+
+	// DeleteEnvironmentFunc mocks the DeleteEnvironment method.
+	DeleteEnvironmentFunc func(ctx context.Context, namespaceName string, environmentName string) error
 
 	// DeleteProjectFunc mocks the DeleteProject method.
 	DeleteProjectFunc func(ctx context.Context, namespaceName string, projectName string) error
@@ -440,8 +443,6 @@ type OpenChoreoClientMock struct {
 			ProjectName string
 			// ComponentName is the componentName argument value.
 			ComponentName string
-			// VerifyProject is the verifyProject argument value.
-			VerifyProject bool
 		}
 		// CreateComponent holds details about calls to the CreateComponent method.
 		CreateComponent []struct {
@@ -540,6 +541,15 @@ type OpenChoreoClientMock struct {
 			NamespaceName string
 			// SecretName is the secretName argument value.
 			SecretName string
+		}
+		// DeleteEnvironment holds details about calls to the DeleteEnvironment method.
+		DeleteEnvironment []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// NamespaceName is the namespaceName argument value.
+			NamespaceName string
+			// EnvironmentName is the environmentName argument value.
+			EnvironmentName string
 		}
 		// DeleteProject holds details about calls to the DeleteProject method.
 		DeleteProject []struct {
@@ -1154,6 +1164,7 @@ type OpenChoreoClientMock struct {
 	lockCreateWorkflowRun                   sync.RWMutex
 	lockDeleteComponent                     sync.RWMutex
 	lockDeleteDeploymentPipeline            sync.RWMutex
+	lockDeleteEnvironment                   sync.RWMutex
 	lockDeleteGitSecret                     sync.RWMutex
 	lockDeleteProject                       sync.RWMutex
 	lockDeleteSecretReference               sync.RWMutex
@@ -1259,7 +1270,7 @@ func (mock *OpenChoreoClientMock) AttachTraitsCalls() []struct {
 }
 
 // ComponentExists calls ComponentExistsFunc.
-func (mock *OpenChoreoClientMock) ComponentExists(ctx context.Context, namespaceName string, projectName string, componentName string, verifyProject bool) (bool, error) {
+func (mock *OpenChoreoClientMock) ComponentExists(ctx context.Context, namespaceName string, projectName string, componentName string) (bool, error) {
 	if mock.ComponentExistsFunc == nil {
 		panic("OpenChoreoClientMock.ComponentExistsFunc: method is nil but OpenChoreoClient.ComponentExists was just called")
 	}
@@ -1268,18 +1279,16 @@ func (mock *OpenChoreoClientMock) ComponentExists(ctx context.Context, namespace
 		NamespaceName string
 		ProjectName   string
 		ComponentName string
-		VerifyProject bool
 	}{
 		Ctx:           ctx,
 		NamespaceName: namespaceName,
 		ProjectName:   projectName,
 		ComponentName: componentName,
-		VerifyProject: verifyProject,
 	}
 	mock.lockComponentExists.Lock()
 	mock.calls.ComponentExists = append(mock.calls.ComponentExists, callInfo)
 	mock.lockComponentExists.Unlock()
-	return mock.ComponentExistsFunc(ctx, namespaceName, projectName, componentName, verifyProject)
+	return mock.ComponentExistsFunc(ctx, namespaceName, projectName, componentName)
 }
 
 // ComponentExistsCalls gets all the calls that were made to ComponentExists.
@@ -1291,14 +1300,12 @@ func (mock *OpenChoreoClientMock) ComponentExistsCalls() []struct {
 	NamespaceName string
 	ProjectName   string
 	ComponentName string
-	VerifyProject bool
 } {
 	var calls []struct {
 		Ctx           context.Context
 		NamespaceName string
 		ProjectName   string
 		ComponentName string
-		VerifyProject bool
 	}
 	mock.lockComponentExists.RLock()
 	calls = mock.calls.ComponentExists
@@ -1719,6 +1726,46 @@ func (mock *OpenChoreoClientMock) DeleteGitSecretCalls() []struct {
 	mock.lockDeleteGitSecret.RLock()
 	calls = mock.calls.DeleteGitSecret
 	mock.lockDeleteGitSecret.RUnlock()
+	return calls
+}
+
+// DeleteEnvironment calls DeleteEnvironmentFunc.
+func (mock *OpenChoreoClientMock) DeleteEnvironment(ctx context.Context, namespaceName string, environmentName string) error {
+	if mock.DeleteEnvironmentFunc == nil {
+		panic("OpenChoreoClientMock.DeleteEnvironmentFunc: method is nil but OpenChoreoClient.DeleteEnvironment was just called")
+	}
+	callInfo := struct {
+		Ctx             context.Context
+		NamespaceName   string
+		EnvironmentName string
+	}{
+		Ctx:             ctx,
+		NamespaceName:   namespaceName,
+		EnvironmentName: environmentName,
+	}
+	mock.lockDeleteEnvironment.Lock()
+	mock.calls.DeleteEnvironment = append(mock.calls.DeleteEnvironment, callInfo)
+	mock.lockDeleteEnvironment.Unlock()
+	return mock.DeleteEnvironmentFunc(ctx, namespaceName, environmentName)
+}
+
+// DeleteEnvironmentCalls gets all the calls that were made to DeleteEnvironment.
+// Check the length with:
+//
+//	len(mockedOpenChoreoClient.DeleteEnvironmentCalls())
+func (mock *OpenChoreoClientMock) DeleteEnvironmentCalls() []struct {
+	Ctx             context.Context
+	NamespaceName   string
+	EnvironmentName string
+} {
+	var calls []struct {
+		Ctx             context.Context
+		NamespaceName   string
+		EnvironmentName string
+	}
+	mock.lockDeleteEnvironment.RLock()
+	calls = mock.calls.DeleteEnvironment
+	mock.lockDeleteEnvironment.RUnlock()
 	return calls
 }
 

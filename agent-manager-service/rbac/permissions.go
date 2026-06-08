@@ -64,10 +64,12 @@ const (
 	GatewayTokenManage Permission = "gateway:token-manage"
 )
 
-// Infrastructure (read-only) permissions
+// Infrastructure permissions
 const (
-	DataPlaneRead          Permission = "data-plane:read"
-	DeploymentPipelineRead Permission = "deployment-pipeline:read"
+	DataPlaneRead            Permission = "data-plane:read"
+	DeploymentPipelineRead   Permission = "deployment-pipeline:read"
+	DeploymentPipelineUpdate Permission = "deployment-pipeline:update"
+	DeploymentPipelineDelete Permission = "deployment-pipeline:delete"
 )
 
 // Git secret permissions

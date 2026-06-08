@@ -2310,25 +2310,6 @@ func (s *agentConfigurationService) buildLLMProxyUpdateConfig(
 	return proxyConfig, providerUUID, nil
 }
 
-func (s *agentConfigurationService) storeSecret(ctx context.Context, orgName, projectName, agentName, envName, configName, entityName, secretKey, secretValue string) (string, error) {
-	// Store provider API key in OpenBao KV
-	secretLoc := secretmanagersvc.SecretLocation{
-		OrgName:         orgName,
-		ProjectName:     projectName,
-		AgentName:       agentName,
-		EnvironmentName: envName,
-		EntityName:      entityName,
-		ConfigName:      configName,
-		SecretKey:       secretKey,
-	}
-	kvPath, err := s.secretClient.CreateSecret(ctx, secretLoc,
-		map[string]string{secretKey: secretValue})
-	if err != nil {
-		return "", fmt.Errorf("failed to store provider API key in KV: %w", err)
-	}
-	return kvPath, nil
-}
-
 // buildEnvironmentVariables generates environment variable templates from config name.
 // If overrides are provided, user-supplied names take precedence over auto-generated ones.
 // Validates all names using ValidateEnvironmentVariableName.

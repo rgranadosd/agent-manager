@@ -74,6 +74,16 @@ Defaults to "<environment>-<orgName>.gateway.localhost" when not explicitly set.
 {{- end }}
 
 {{/*
+Label value used to bind a RestApi to its APIGateway via the
+`gateway.api-platform.wso2.com/restapi-target` label/selector. The APIGateway
+name is already unique per environment (see apiGatewayName), so we reuse it
+verbatim rather than re-appending the environment.
+*/}}
+{{- define "wso2-amp-gateway-extension.restApiTarget" -}}
+{{- include "wso2-amp-gateway-extension.apiGatewayName" . }}
+{{- end }}
+
+{{/*
 Bootstrap resource name prefix. All bootstrap resources (ServiceAccount, Role,
 RoleBinding, Job) are derived from this to avoid collisions across releases.
 */}}

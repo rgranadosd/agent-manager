@@ -18,7 +18,7 @@ spec:
   apiSelector:
     scope: LabelSelector
     matchLabels:
-      gateway.api-platform.wso2.com/restapi-target: {{ printf "%s-%s" (include "wso2-amp-gateway-extension.apiGatewayName" .) .Values.gateway.environment | lower | trunc 63 | trimSuffix "-" | quote }}
+      gateway.api-platform.wso2.com/restapi-target: {{ include "wso2-amp-gateway-extension.restApiTarget" . | quote }}
 
   controlPlane:
     host: {{ .Values.apiGateway.controlPlane.host | quote }}
