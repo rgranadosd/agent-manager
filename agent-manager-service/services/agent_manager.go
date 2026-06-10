@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -2232,7 +2231,6 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 		s.logger.Warn("Failed to replace component workflow parameters with env vars", "agentName", agentName, "error", err)
 		// Continue with deploy even if this fails - env vars will still be applied to the workload
 	}
-	// Manage api-configuration trait for API agents (attach/update with artifact-id and policies)
 
 	if deployReq.Files != nil {
 		s.logger.Debug("Replacing component workflow parameters with file mounts", "agentName", agentName, "fileMountCount", len(deployReq.Files))
@@ -2473,15 +2471,11 @@ func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, a
 	return traitEnvConfigs
 }
 
-// gatewayRuntimeHTTPPort is the fixed HTTP listener port on every gateway runtime service.
-// All gateway deployments expose the router on this port regardless of the external vhost.
-const gatewayRuntimeHTTPPort = 22893
-
 // gatewayInfo holds resolved gateway label and backend connection details for an environment.
 type gatewayInfo struct {
 	target      string // apiSelector label value: gateway.Name (matches the chart's apiGatewayName helper)
-	backendHost string // in-cluster service: "<gatewayName>-gateway-gateway-runtime.openchoreo-data-plane"
-	backendPort int    // fixed HTTP listener port of the gateway runtime service
+	backendHost string // in-cluster service: "<gatewayName><GatewayRuntime.HostSuffix>"
+	backendPort int    // gateway runtime HTTP listener port (from config.GatewayRuntime.Port)
 }
 
 // resolveGatewayInfo looks up the gateway assigned to the given environment and returns
@@ -2503,8 +2497,9 @@ func resolveGatewayInfo(gatewayRepo repositories.GatewayRepository, environmentU
 	if len(label) > 63 {
 		label = strings.TrimSuffix(label[:63], "-")
 	}
-	backendHost := gateway.Name + "-gateway-gateway-runtime.openchoreo-data-plane"
-	return gatewayInfo{target: label, backendHost: backendHost, backendPort: gatewayRuntimeHTTPPort}
+	gwRuntime := config.GetConfig().GatewayRuntime
+	backendHost := gateway.Name + gwRuntime.HostSuffix
+	return gatewayInfo{target: label, backendHost: backendHost, backendPort: gwRuntime.Port}
 }
 
 func findLowestEnvironment(promotionPaths []models.PromotionPath) string {
@@ -2529,54 +2524,10 @@ func findLowestEnvironment(promotionPaths []models.PromotionPath) string {
 	return ""
 }
 
-// validatePromoteRequest validates the promote request body for consistency.
-// When useConfigFromSourceEnv is true, no other config fields may be set.
-// When useConfigFromSourceEnv is false or absent, all explicit config fields must be provided.
-func validatePromoteRequest(req *spec.PromoteAgentRequest) error {
-	if req.SourceEnvironment == req.TargetEnvironment {
-		return fmt.Errorf("source and target environments must be different")
-	}
-
-	useSource := req.UseConfigFromSourceEnv != nil && *req.UseConfigFromSourceEnv
-	if useSource {
-		if len(req.Env) > 0 || len(req.Files) > 0 ||
-			req.EnableAutoInstrumentation != nil || req.EnableApiKeySecurity != nil || req.CorsConfig != nil {
-			return fmt.Errorf("useConfigFromSourceEnv cannot be combined with env, files, enableAutoInstrumentation, enableApiKeySecurity, or corsConfig")
-		}
-		return nil
-	}
-
-	// useConfigFromSourceEnv is false or not set — all explicit fields must be provided
-	var missing []string
-	if req.Env == nil {
-		missing = append(missing, "env")
-	}
-	if req.Files == nil {
-		missing = append(missing, "files")
-	}
-	if req.EnableAutoInstrumentation == nil {
-		missing = append(missing, "enableAutoInstrumentation")
-	}
-	if req.EnableApiKeySecurity == nil {
-		missing = append(missing, "enableApiKeySecurity")
-	}
-	if req.CorsConfig == nil {
-		missing = append(missing, "corsConfig")
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("when useConfigFromSourceEnv is not set, the following fields are required: %s", strings.Join(missing, ", "))
-	}
-	return nil
-}
-
 // PromoteAgent promotes an agent from one environment to another.
 func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, projectName string, agentName string, req *spec.PromoteAgentRequest) error {
 	s.logger.Info("Promoting agent", "agentName", agentName, "orgName", orgName, "projectName", projectName,
 		"sourceEnvironment", req.SourceEnvironment, "targetEnvironment", req.TargetEnvironment)
-
-	if err := validatePromoteRequest(req); err != nil {
-		return err
-	}
 
 	// Validate organization exists
 	org, err := s.ocClient.GetOrganization(ctx, orgName)
@@ -2614,22 +2565,45 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 		return fmt.Errorf("%w for agent %s in environment %s", utils.ErrDeploymentInProgress, agentName, req.TargetEnvironment)
 	}
 
-	// Process environment-specific overrides
+	// System-managed env vars (LLM provider URL/key, MCP, etc.) live per-environment in
+	// agent_env_config_variables_mapping. Promotion must enforce this invariant: if the
+	// SOURCE environment has any system-managed vars, the TARGET environment must also
+	// have its own — otherwise the agent would silently lose its LLM. This check runs in
+	// both useConfigFromSourceEnv branches so the rule is uniform.
+	srcSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.SourceEnvironment)
+	if err != nil {
+		s.logger.Error("Failed to fetch source env system-managed env var keys for promotion", "agentName", agentName, "error", err)
+		return fmt.Errorf("failed to fetch source env system-managed keys: %w", err)
+	}
+	tgtSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.TargetEnvironment)
+	if err != nil {
+		s.logger.Error("Failed to fetch target env system-managed env var keys for promotion", "agentName", agentName, "error", err)
+		return fmt.Errorf("failed to fetch target env system-managed keys: %w", err)
+	}
+	if len(srcSystemKeys) > 0 && len(tgtSystemKeys) == 0 {
+		return fmt.Errorf("%w: agent %q has LLM/system configuration in source environment %q but none in target environment %q — configure system variables in the target environment before promoting",
+			utils.ErrInvalidInput, agentName, req.SourceEnvironment, req.TargetEnvironment)
+	}
+
+	// Build the target environment's system-managed env vars from the DB. We always
+	// inject these so the target binding has its OWN system credentials, regardless of
+	// whether we're cloning from source or taking user overrides.
+	var tgtSystemEnvVars []client.EnvVar
+	if len(tgtSystemKeys) > 0 {
+		tgtSystemEnvVars, err = s.agentConfigurationService.BuildSystemManagedEnvVarsFromConfig(ctx, agentName, orgName, req.TargetEnvironment)
+		if err != nil {
+			s.logger.Error("Failed to build target env system-managed vars from config", "agentName", agentName, "error", err)
+			return fmt.Errorf("failed to build target env system-managed vars: %w", err)
+		}
+	}
+
 	var envOverrides []client.EnvVar
 	var fileOverrides []client.FileVar
 
-	if req.UseConfigFromSourceEnv != nil && *req.UseConfigFromSourceEnv {
-		// Explicit flag: inherit from source environment's workload overrides,
-		// but strip source system-managed env vars (LLM config keys) and replace them
-		// with the target environment's own system-managed values (different per env).
-		// Fail closed: we MUST know which keys are system-managed to filter them out, otherwise
-		// the source env's LLM credentials would leak into the target env's workload.
-		srcSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.SourceEnvironment)
-		if err != nil {
-			s.logger.Error("Failed to fetch source env system-managed env var keys for promotion", "agentName", agentName, "error", err)
-			return fmt.Errorf("failed to fetch source env system-managed keys: %w", err)
-		}
-
+	useSource := req.UseConfigFromSourceEnv != nil && *req.UseConfigFromSourceEnv
+	if useSource {
+		// Clone the source env's workload overrides, but scrub source's system-managed
+		// keys — they're env-specific and must be replaced with the target's own.
 		srcEnvVars, srcFileVars, err := s.ocClient.GetSourceEnvWorkloadOverrides(ctx, orgName, agentName, req.SourceEnvironment)
 		if err != nil {
 			s.logger.Error("Failed to fetch source env workload overrides for promotion", "agentName", agentName, "error", err)
@@ -2641,64 +2615,28 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			}
 		}
 		fileOverrides = srcFileVars
-
-		// Inject target environment's own system-managed vars (e.g. different LLM proxy URL/key per env).
-		// These override any system vars that may leak from the workload CR base.
-		// If the source env has LLM config but the target does not, return an error — otherwise
-		// staging would silently inherit the source env's LLM credentials via the workload CR base.
-		tgtSystemKeys, err := s.agentConfigurationService.ListSystemManagedEnvVarKeys(ctx, agentName, orgName, req.TargetEnvironment)
-		if err != nil {
-			s.logger.Error("Failed to fetch target env system-managed env var keys for promotion", "agentName", agentName, "error", err)
-			return fmt.Errorf("failed to fetch target env system-managed keys: %w", err)
-		}
-		if len(srcSystemKeys) > 0 && len(tgtSystemKeys) == 0 {
-			return fmt.Errorf("agent %q has LLM configuration in environment %q but none in target environment %q: configure LLM for the target environment before promoting",
-				agentName, req.SourceEnvironment, req.TargetEnvironment)
-		}
-		if len(tgtSystemKeys) > 0 {
-			// Build system-managed env vars from the DB config rather than the ReleaseBinding,
-			// because on first promotion the target ReleaseBinding doesn't have them yet.
-			tgtEnvVars, err := s.agentConfigurationService.BuildSystemManagedEnvVarsFromConfig(ctx, agentName, orgName, req.TargetEnvironment)
-			if err != nil {
-				s.logger.Error("Failed to build target env system-managed vars from config", "agentName", agentName, "error", err)
-				return fmt.Errorf("failed to build target env system-managed vars: %w", err)
-			}
-			envOverrides = append(envOverrides, tgtEnvVars...)
-		}
-	} else if len(req.Env) > 0 || len(req.Files) > 0 {
-		// User explicitly provided env vars — mirror the deploy flow:
-		// fetch system-managed vars from the target env, filter them from req.Env before
-		// processEnvVars (to avoid mangling their SecretKeyRef.Key), then re-append them.
-		systemManagedEnvVars, systemManagedKeys, sysEnvErr := s.getSystemManagedEnvVars(ctx, orgName, projectName, req.TargetEnvironment, agentName)
-		if sysEnvErr != nil {
-			s.logger.Warn("Failed to fetch system-managed env vars for promotion", "agentName", agentName, "error", sysEnvErr)
-			systemManagedEnvVars = nil
-			systemManagedKeys = nil
-		}
-
-		if len(req.Env) > 0 {
-			userEnv := req.Env
-			if len(systemManagedKeys) > 0 {
-				userEnv = make([]spec.EnvironmentVariable, 0, len(req.Env))
-				for _, env := range req.Env {
-					if !systemManagedKeys[env.Key] {
-						userEnv = append(userEnv, env)
-					} else {
-						s.logger.Debug("Filtering system-managed env var from promote request", "key", env.Key)
-					}
+	} else {
+		// User-driven overrides: only what the request carries (plus target system vars
+		// appended below). Source env's user-managed env/files are NOT inherited.
+		userEnv := req.Env
+		if len(tgtSystemKeys) > 0 && len(req.Env) > 0 {
+			userEnv = make([]spec.EnvironmentVariable, 0, len(req.Env))
+			for _, env := range req.Env {
+				if tgtSystemKeys[env.Key] {
+					s.logger.Debug("Filtering system-managed env var from promote request", "key", env.Key)
+					continue
 				}
+				userEnv = append(userEnv, env)
 			}
-
+		}
+		if len(userEnv) > 0 {
 			processed, err := s.processEnvVars(ctx, orgName, projectName, req.TargetEnvironment, agentName, userEnv, req.Files)
 			if err != nil {
 				s.logger.Error("Failed to process environment variables for promotion", "agentName", agentName, "error", err)
 				return fmt.Errorf("failed to process environment variables: %w", err)
 			}
-			// Combine user-processed env vars with preserved system-managed env vars
-			envOverrides = append(processed, systemManagedEnvVars...)
+			envOverrides = append(envOverrides, processed...)
 		}
-
-		// Process file mounts
 		if len(req.Files) > 0 {
 			processed, err := s.processFileVars(ctx, orgName, projectName, req.TargetEnvironment, agentName, req.Files)
 			if err != nil {
@@ -2708,6 +2646,11 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			fileOverrides = processed
 		}
 	}
+
+	// Always inject the target env's system-managed vars. In the useSource branch this
+	// replaces the source vars we just stripped; in the user-driven branch it ensures
+	// the agent has its target-env wiring even if the user supplied no overrides.
+	envOverrides = append(envOverrides, tgtSystemEnvVars...)
 
 	// Build trait environment configs for per-environment trait overrides
 	var traitEnvConfigs map[string]interface{}
@@ -2720,6 +2663,12 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			existingConfig = cfg
 		}
 
+		// Deploy-settings precedence (CORS, API key security, auto instrumentation):
+		//   request fields → source env's saved AgentConfig → off.
+		// When useConfigFromSourceEnv=true, the validator guarantees the request fields
+		// are nil, so the resolved settings fall through to the source env's saved
+		// AgentConfig. When useConfigFromSourceEnv=false the request takes precedence
+		// where set; any unset field falls back to the source env's values.
 		tracingCfg := resolveTracingConfig(existingConfig, req.EnableAutoInstrumentation, false)
 		apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, false)
 		policies := buildPolicies(apiCfg)
@@ -2742,8 +2691,14 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 
 		// Only generate API key and set otelEndpoint on first promotion to this environment.
 		// On subsequent promotions, these are already set on the release binding's traitEnvironmentConfigs.
+		// Use the typed not-found sentinel so a transient DB error doesn't get misread as
+		// "first promotion" (which would needlessly mint a new API key and overwrite OTEL).
 		_, targetConfigErr := s.agentConfigRepo.Get(orgName, projectName, agentName, req.TargetEnvironment)
-		isFirstPromotion := targetConfigErr != nil
+		isFirstPromotion := errors.Is(targetConfigErr, repositories.ErrAgentConfigNotFound)
+		if targetConfigErr != nil && !isFirstPromotion {
+			s.logger.Warn("Failed to read target env agent config; skipping first-promotion bootstrap",
+				"agentName", agentName, "environment", req.TargetEnvironment, "error", targetConfigErr)
+		}
 		if isFirstPromotion {
 			envInjKey := agentName + "-" + string(client.TraitEnvInjection)
 			envInjCfg := map[string]interface{}{}
@@ -2884,6 +2839,9 @@ func (s *agentManagerService) UpdateAgentConfigurations(ctx context.Context, org
 
 	if req.EnvironmentName == "" {
 		return fmt.Errorf("%w: environmentName is required", utils.ErrInvalidInput)
+	}
+	if err := utils.ValidateFileMounts(req.Files); err != nil {
+		return fmt.Errorf("%w: %s", utils.ErrInvalidInput, err.Error())
 	}
 
 	// Validate org/agent/env exist.
@@ -3180,8 +3138,6 @@ func (s *agentManagerService) processEnvVars(
 	return result, nil
 }
 
-var validMountPathRe = regexp.MustCompile(`^/[A-Za-z0-9._\-/]*$`)
-
 // processFileVars converts spec.FileMount entries to client.FileVar entries.
 // Sensitive file mounts use secretKeyRef pointing to the K8s Secret (secrets are
 // already stored in KV by processEnvVars which handles both env and file secrets).
@@ -3192,19 +3148,6 @@ func (s *agentManagerService) processFileVars(
 ) ([]client.FileVar, error) {
 	if len(fileMounts) == 0 {
 		return make([]client.FileVar, 0), nil
-	}
-
-	for _, f := range fileMounts {
-		mp := f.MountPath
-		if !strings.HasPrefix(mp, "/") {
-			return nil, fmt.Errorf("mount path %q must be an absolute path", mp)
-		}
-		if strings.Contains(mp, "..") {
-			return nil, fmt.Errorf("mount path %q must not contain path traversal (..)", mp)
-		}
-		if !validMountPathRe.MatchString(mp) {
-			return nil, fmt.Errorf("mount path %q contains invalid characters", mp)
-		}
 	}
 
 	// Build secret location to derive the secretRefName
