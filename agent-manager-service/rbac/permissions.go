@@ -156,7 +156,7 @@ const (
 	MonitorUpdate       Permission = "monitor:update"
 	MonitorDelete       Permission = "monitor:delete"
 	MonitorExecute      Permission = "monitor:execute"
-	MonitorScoreRead    Permission = "monitor:score:read"
+	MonitorScoreRead    Permission = "monitor:score-read"
 	MonitorScorePublish Permission = "monitor:score-publish"
 )
 
