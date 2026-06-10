@@ -24,6 +24,9 @@ export interface PromotionPathInput {
 
 /** Converts an ordered chain of env names into promotion path objects for the API. */
 export function chainToPromotionPaths(chain: string[]): PromotionPathInput[] {
+    if (chain.length === 1 && chain[0]) {
+        return [{ sourceEnvironmentRef: chain[0], targetEnvironmentRefs: [] }];
+    }
     return chain.slice(0, -1).map((env, i) => ({
         sourceEnvironmentRef: env,
         targetEnvironmentRefs: [{ name: chain[i + 1] }],

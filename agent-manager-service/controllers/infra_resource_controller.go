@@ -389,6 +389,14 @@ func (c *infraResourceController) ListOrgEnvironments(w http.ResponseWriter, r *
 	utils.WriteSuccessResponse(w, http.StatusOK, environmentsListResponse)
 }
 
+func requirePromotionPaths(w http.ResponseWriter, paths []spec.PromotionPath) bool {
+	if len(paths) == 0 {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "promotionPaths must contain at least one entry")
+		return false
+	}
+	return true
+}
+
 func convertSpecPromotionPaths(specPaths []spec.PromotionPath) []models.PromotionPath {
 	modelPaths := make([]models.PromotionPath, len(specPaths))
 	for i, p := range specPaths {
@@ -422,8 +430,7 @@ func (c *infraResourceController) CreateOrgDeploymentPipeline(w http.ResponseWri
 		return
 	}
 
-	if len(payload.PromotionPaths) == 0 {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "promotionPaths is required and cannot be empty")
+	if !requirePromotionPaths(w, payload.PromotionPaths) {
 		return
 	}
 
@@ -452,8 +459,7 @@ func (c *infraResourceController) UpdateOrgDeploymentPipeline(w http.ResponseWri
 		return
 	}
 
-	if len(payload.PromotionPaths) == 0 {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "promotionPaths is required and cannot be empty")
+	if !requirePromotionPaths(w, payload.PromotionPaths) {
 		return
 	}
 
@@ -500,8 +506,7 @@ func (c *infraResourceController) UpdateProjectDeploymentPipeline(w http.Respons
 		return
 	}
 
-	if len(payload.PromotionPaths) == 0 {
-		utils.WriteErrorResponse(w, http.StatusBadRequest, "promotionPaths is required and cannot be empty")
+	if !requirePromotionPaths(w, payload.PromotionPaths) {
 		return
 	}
 

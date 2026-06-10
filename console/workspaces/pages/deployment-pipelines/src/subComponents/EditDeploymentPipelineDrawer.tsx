@@ -54,7 +54,7 @@ interface EditDeploymentPipelineDrawerProps {
 function pipelineToChain(pipeline: DeploymentPipelineResponse): string[] {
   if (pipeline.promotionPaths.length === 0) return [""];
   const validation = validatePromotionChain(pipeline.promotionPaths);
-  if (validation.valid && validation.chain && validation.chain.length >= 2) {
+  if (validation.valid && validation.chain && validation.chain.length >= 1) {
     return validation.chain;
   }
   // Fallback for invalid existing paths: collect sources + last target

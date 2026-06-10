@@ -17,27 +17,16 @@
 
 import { z } from "zod";
 
-export const createPipelineSchema = z.object({
+const pipelineSchema = z.object({
   displayName: z.string().min(1, "Display name is required").max(128, "Display name must be 128 characters or less"),
   description: z.string().optional(),
   chain: z
     .array(z.string().min(1, "Select an environment"))
-    .min(2, "Select at least two environments"),
+    .min(1, "Select at least one environment"),
 });
 
-export type CreatePipelineFormValues = z.infer<typeof createPipelineSchema>;
+export const createPipelineSchema = pipelineSchema;
+export type CreatePipelineFormValues = z.infer<typeof pipelineSchema>;
 
-export const editPipelineSchema = z.object({
-  displayName: z.string().min(1, "Display name is required").max(128, "Display name must be 128 characters or less"),
-  description: z.string().optional(),
-  /**
-   * Ordered list of environment names forming the promotion chain.
-   * Adjacent pairs become promotion paths: chain[i] → chain[i+1].
-   * Minimum 2 to define at least one step.
-   */
-  chain: z
-    .array(z.string().min(1, "Select an environment"))
-    .min(2, "Select at least two environments"),
-});
-
-export type EditPipelineFormValues = z.infer<typeof editPipelineSchema>;
+export const editPipelineSchema = pipelineSchema;
+export type EditPipelineFormValues = z.infer<typeof pipelineSchema>;

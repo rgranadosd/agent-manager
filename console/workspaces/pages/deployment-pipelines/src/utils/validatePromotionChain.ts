@@ -46,6 +46,11 @@ export function validatePromotionChain(paths: PromotionPath[]): PromotionChainVa
     targets.forEach((t) => allTargets.add(t));
   }
 
+  // Single-env pipeline: all paths have no real targets (OC dummy target stripped).
+  if (graph.size === 0) {
+    return { valid: true, chain: paths.map((p) => p.sourceEnvironmentRef).filter(Boolean) };
+  }
+
   const sources = new Set(graph.keys());
 
   // Roots are sources that never appear as a target — the entry points.
@@ -83,18 +88,10 @@ export function validatePromotionChain(paths: PromotionPath[]): PromotionChainVa
     return { valid: false, error: "Promotion paths contain a cycle" };
   }
 
-  // Verify all declared sources are reachable from the single root (connected graph).
-  const reachable = new Set<string>();
-  function collect(node: string) {
-    reachable.add(node);
-    for (const neighbor of graph.get(node) ?? []) {
-      if (!reachable.has(neighbor)) collect(neighbor);
-    }
-  }
-  collect(roots[0]);
-
-  const unreachable = [...sources].filter((s) => !reachable.has(s));
-  if (unreachable.length > 0) {
+  // hasCycle's DFS visits every node reachable from roots[0]; if visited doesn't
+  // cover all sources the graph is disconnected — no need for a second traversal.
+  if (visited.size !== sources.size) {
+    const unreachable = [...sources].filter((s) => !visited.has(s));
     return {
       valid: false,
       error: `Promotion paths are disconnected — environments not reachable from root: ${unreachable.join(", ")}`,
@@ -104,12 +101,12 @@ export function validatePromotionChain(paths: PromotionPath[]): PromotionChainVa
   // Build the linear chain representation (topological order).
   const chain: string[] = [];
   const inDegree = new Map<string, number>();
-  for (const node of reachable) inDegree.set(node, 0);
+  for (const node of visited) inDegree.set(node, 0);
   for (const [, targets] of graph) {
     for (const t of targets) inDegree.set(t, (inDegree.get(t) ?? 0) + 1);
   }
 
-  const queue = [...reachable].filter((n) => (inDegree.get(n) ?? 0) === 0);
+  const queue = [...visited].filter((n) => (inDegree.get(n) ?? 0) === 0);
   while (queue.length > 0) {
     const node = queue.shift()!;
     chain.push(node);

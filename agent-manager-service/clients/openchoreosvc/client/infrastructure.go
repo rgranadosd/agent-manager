@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	ocapi "github.com/wso2/agent-manager/agent-manager-service/clients/openchoreosvc/gen"
@@ -356,18 +357,20 @@ func convertDeploymentPipeline(p *ocapi.DeploymentPipeline, orgName string) *mod
 
 	var promotionPaths []models.PromotionPath
 	if p.Spec != nil && p.Spec.PromotionPaths != nil {
-		promotionPaths = make([]models.PromotionPath, len(*p.Spec.PromotionPaths))
-		for i, pp := range *p.Spec.PromotionPaths {
-			targetRefs := make([]models.TargetEnvironmentRef, len(pp.TargetEnvironmentRefs))
-			for j, tr := range pp.TargetEnvironmentRefs {
-				targetRefs[j] = models.TargetEnvironmentRef{
-					Name: tr.Name,
+		promotionPaths = make([]models.PromotionPath, 0, len(*p.Spec.PromotionPaths))
+		for _, pp := range *p.Spec.PromotionPaths {
+			// Strip dummy " " targets injected as an OC REST API workaround
+			// (OC requires at least one targetEnvironmentRef via the API).
+			targetRefs := make([]models.TargetEnvironmentRef, 0, len(pp.TargetEnvironmentRefs))
+			for _, tr := range pp.TargetEnvironmentRefs {
+				if name := strings.TrimSpace(tr.Name); name != "" {
+					targetRefs = append(targetRefs, models.TargetEnvironmentRef{Name: name})
 				}
 			}
-			promotionPaths[i] = models.PromotionPath{
+			promotionPaths = append(promotionPaths, models.PromotionPath{
 				SourceEnvironmentRef:  pp.SourceEnvironmentRef.Name,
 				TargetEnvironmentRefs: targetRefs,
-			}
+			})
 		}
 	}
 
@@ -381,20 +384,23 @@ func convertDeploymentPipeline(p *ocapi.DeploymentPipeline, orgName string) *mod
 	}
 }
 
-func (c *openChoreoClient) CreateDeploymentPipeline(ctx context.Context, namespaceName, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error) {
-	annotations := make(map[string]string)
-	if displayName != nil {
-		annotations[AnnotationKeyDisplayName] = *displayName
-	}
-	if description != nil {
-		annotations[AnnotationKeyDescription] = *description
-	}
+// ocDummyTarget is a single-element slice injected when a path has no real targets.
+// OC's REST API requires at least one targetEnvironmentRef per path; the space character
+// satisfies the 1-char minimum and is stripped by convertDeploymentPipeline on read.
+var ocDummyTarget = []ocapi.TargetEnvironmentRef{{Name: " "}}
 
+// toOCPromotionPaths converts model promotion paths to the OC API format.
+func toOCPromotionPaths(promotionPaths []models.PromotionPath) []ocapi.PromotionPath {
 	ocPaths := make([]ocapi.PromotionPath, len(promotionPaths))
 	for i, p := range promotionPaths {
-		targets := make([]ocapi.TargetEnvironmentRef, len(p.TargetEnvironmentRefs))
-		for j, t := range p.TargetEnvironmentRefs {
-			targets[j] = ocapi.TargetEnvironmentRef{Name: t.Name}
+		var targets []ocapi.TargetEnvironmentRef
+		if len(p.TargetEnvironmentRefs) == 0 {
+			targets = ocDummyTarget
+		} else {
+			targets = make([]ocapi.TargetEnvironmentRef, len(p.TargetEnvironmentRefs))
+			for j, t := range p.TargetEnvironmentRefs {
+				targets[j] = ocapi.TargetEnvironmentRef{Name: t.Name}
+			}
 		}
 		ocPaths[i] = ocapi.PromotionPath{
 			SourceEnvironmentRef: struct {
@@ -404,6 +410,19 @@ func (c *openChoreoClient) CreateDeploymentPipeline(ctx context.Context, namespa
 			TargetEnvironmentRefs: targets,
 		}
 	}
+	return ocPaths
+}
+
+func (c *openChoreoClient) CreateDeploymentPipeline(ctx context.Context, namespaceName, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error) {
+	annotations := make(map[string]string)
+	if displayName != nil {
+		annotations[AnnotationKeyDisplayName] = *displayName
+	}
+	if description != nil {
+		annotations[AnnotationKeyDescription] = *description
+	}
+
+	ocPaths := toOCPromotionPaths(promotionPaths)
 
 	pipeline := ocapi.DeploymentPipeline{
 		Metadata: ocapi.ObjectMeta{
@@ -473,24 +492,7 @@ func (c *openChoreoClient) UpdateDeploymentPipeline(ctx context.Context, namespa
 	}
 
 	// Convert model promotion paths to OC API format
-	ocPaths := make([]ocapi.PromotionPath, len(promotionPaths))
-	for i, p := range promotionPaths {
-		targets := make([]ocapi.TargetEnvironmentRef, len(p.TargetEnvironmentRefs))
-		for j, t := range p.TargetEnvironmentRefs {
-			targets[j] = ocapi.TargetEnvironmentRef{
-				Name: t.Name,
-			}
-		}
-		ocPaths[i] = ocapi.PromotionPath{
-			SourceEnvironmentRef: struct {
-				Kind *ocapi.PromotionPathSourceEnvironmentRefKind `json:"kind,omitempty"`
-				Name string                                       `json:"name"`
-			}{
-				Name: p.SourceEnvironmentRef,
-			},
-			TargetEnvironmentRefs: targets,
-		}
-	}
+	ocPaths := toOCPromotionPaths(promotionPaths)
 
 	if pipeline.Spec == nil {
 		pipeline.Spec = &ocapi.DeploymentPipelineSpec{}
