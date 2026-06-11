@@ -140,6 +140,7 @@ func NewCreateCmd(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.Flags().BoolVar(&opts.Template, "template", false, "Print an agent manifest template and exit (takes no other input)")
 	cmd.Flags().StringVarP(&opts.File, "file", "f", "", "Create the agent from a YAML manifest file")
+	_ = cmd.MarkFlagFilename("file", "yaml", "yml")
 
 	cmd.Flags().StringVar(&opts.DisplayName, "display-name", "", "Human-readable name (required)")
 	cmd.Flags().StringVar(&opts.Type, "type", "", "Agent type (auto-derived from --provisioning)")
