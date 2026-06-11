@@ -967,6 +967,80 @@ func ExtractRootSpanInputOutput(rootSpan *Span) (input interface{}, output inter
 	return extractSpanInputOutput(rootSpan.Attributes)
 }
 
+// ExtractTraceInputOutputWithFallback derives trace-level input/output from a
+// fully-fetched span set, following the same root → child → leaf cascade as
+// enrichTraceOverview:
+//  1. the root span's own entity input/output
+//  2. the earliest non-leaf direct child of the root (chain/agent wrapper,
+//     e.g. LangGraph.workflow under an invoke_agent root)
+//  3. first/last leaf-LLM (*.chat) span previews
+//
+// Unlike enrichTraceOverview, this runs entirely in memory (the export path
+// already holds every span) and applies no leaf cap: the overview throttles
+// leaf aggregation for trace-list latency, whereas export wants the true
+// first/last leaf, so on very large traces the two can pick different leaves.
+//
+// Used by ExportTraces so agent-rooted traces — whose root wrapper carries no
+// traceloop.entity.output — still export a usable response for downstream
+// evaluation, instead of handing the LLM judge a blank response.
+func ExtractTraceInputOutputWithFallback(rootSpan *Span, spans []Span) (input interface{}, output interface{}) {
+	if rootSpan == nil {
+		return nil, nil
+	}
+
+	// Step 1: the root span itself.
+	if IsCrewAISpan(rootSpan.Attributes) {
+		input, output = ExtractCrewAIRootSpanInputOutput(rootSpan)
+	} else {
+		input, output = ExtractRootSpanInputOutput(rootSpan)
+	}
+	if input != nil && output != nil {
+		return input, output
+	}
+
+	// Step 2: earliest non-leaf direct child of the root.
+	var child *Span
+	for i := range spans {
+		s := &spans[i]
+		if s.ParentSpanID != rootSpan.SpanID || IsLLMLeafSpan(s.Name) {
+			continue
+		}
+		if child == nil || s.StartTime.Before(child.StartTime) {
+			child = s
+		}
+	}
+	if child != nil {
+		ci, co := ExtractRootSpanInputOutput(child)
+		if input == nil {
+			input = ci
+		}
+		if output == nil {
+			output = co
+		}
+		if input != nil && output != nil {
+			return input, output
+		}
+	}
+
+	// Step 3: leaf-LLM spans — first leaf's input, last leaf's output.
+	var leaves []*Span
+	for i := range spans {
+		if IsLLMLeafSpan(spans[i].Name) {
+			leaves = append(leaves, &spans[i])
+		}
+	}
+	if len(leaves) > 0 {
+		slices.SortFunc(leaves, func(a, b *Span) int { return a.StartTime.Compare(b.StartTime) })
+		if input == nil {
+			input = ExtractInputPreviewFromLeaf(leaves[0])
+		}
+		if output == nil {
+			output = ExtractOutputPreviewFromLeaf(leaves[len(leaves)-1])
+		}
+	}
+	return input, output
+}
+
 // ExtractPromptMessages extracts and orders prompt messages from LLM span attributes
 // Handles two formats:
 // 1. OTEL format: gen_ai.input.messages (JSON array)

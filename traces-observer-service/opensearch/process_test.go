@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseSpans(t *testing.T) {
@@ -1793,6 +1794,94 @@ func TestTokenUsage_PartialSerialization(t *testing.T) {
 		got := string(buf)
 		if !strings.Contains(got, `"partial":true`) {
 			t.Errorf("partial=true should serialise, got %q", got)
+		}
+	})
+}
+
+func TestExtractTraceInputOutputWithFallback(t *testing.T) {
+	base := time.Date(2026, 2, 9, 17, 41, 15, 0, time.UTC)
+
+	t.Run("uses root span when it carries entity output", func(t *testing.T) {
+		root := Span{
+			SpanID:    "root",
+			Name:      "invoke_agent LangGraph",
+			StartTime: base,
+			Attributes: map[string]interface{}{
+				"traceloop.entity.input":  "hello",
+				"traceloop.entity.output": "root answer",
+			},
+		}
+		input, output := ExtractTraceInputOutputWithFallback(&root, []Span{root})
+		if output != "root answer" {
+			t.Errorf("expected root output, got %v", output)
+		}
+		if input != "hello" {
+			t.Errorf("expected root input, got %v", input)
+		}
+	})
+
+	t.Run("falls back to leaf LLM span when root agent wrapper has no output", func(t *testing.T) {
+		// Mirrors the reported trace: invoke_agent root + LangGraph.workflow
+		// chain, neither carrying traceloop.entity.output; only the leaf
+		// *.chat span has gen_ai messages.
+		root := Span{SpanID: "root", Name: "invoke_agent LangGraph", StartTime: base}
+		workflow := Span{SpanID: "wf", ParentSpanID: "root", Name: "LangGraph.workflow", StartTime: base.Add(time.Millisecond)}
+		leaf := Span{
+			SpanID:       "leaf",
+			ParentSpanID: "wf",
+			Name:         "ChatOpenAI.chat",
+			StartTime:    base.Add(2 * time.Millisecond),
+			Attributes: map[string]interface{}{
+				"gen_ai.input.messages":  `[{"role":"user","content":"find accommodations"}]`,
+				"gen_ai.output.messages": `[{"role":"assistant","content":"Here are some hotels."}]`,
+			},
+		}
+		spans := []Span{root, workflow, leaf}
+		input, output := ExtractTraceInputOutputWithFallback(&root, spans)
+		if output != "Here are some hotels." {
+			t.Errorf("expected leaf assistant output, got %v", output)
+		}
+		if input != "find accommodations" {
+			t.Errorf("expected leaf user input, got %v", input)
+		}
+	})
+
+	t.Run("falls back to non-leaf child chain span when root has no output", func(t *testing.T) {
+		// Root carries nothing; the direct LangGraph.workflow child carries the
+		// entity I/O. Step 2 (child chain) must supply it, before any leaf path.
+		root := Span{SpanID: "root", Name: "invoke_agent LangGraph", StartTime: base}
+		workflow := Span{
+			SpanID:       "wf",
+			ParentSpanID: "root",
+			Name:         "LangGraph.workflow",
+			StartTime:    base.Add(time.Millisecond),
+			Attributes: map[string]interface{}{
+				"traceloop.entity.input":  "child question",
+				"traceloop.entity.output": "child answer",
+			},
+		}
+		leaf := Span{
+			SpanID:       "leaf",
+			ParentSpanID: "wf",
+			Name:         "ChatOpenAI.chat",
+			StartTime:    base.Add(2 * time.Millisecond),
+			Attributes: map[string]interface{}{
+				"gen_ai.output.messages": `[{"role":"assistant","content":"leaf answer"}]`,
+			},
+		}
+		input, output := ExtractTraceInputOutputWithFallback(&root, []Span{root, workflow, leaf})
+		if output != "child answer" {
+			t.Errorf("expected child chain output, got %v", output)
+		}
+		if input != "child question" {
+			t.Errorf("expected child chain input, got %v", input)
+		}
+	})
+
+	t.Run("nil root returns nil", func(t *testing.T) {
+		input, output := ExtractTraceInputOutputWithFallback(nil, nil)
+		if input != nil || output != nil {
+			t.Errorf("expected nil,nil got %v,%v", input, output)
 		}
 	})
 }
