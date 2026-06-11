@@ -20,16 +20,16 @@ import { globalConfig, type Environment } from '@agent-management-platform/types
 import { Box, Button, Skeleton, Stack } from "@wso2/oxygen-ui";
 import { Settings } from "@wso2/oxygen-ui-icons-react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   useGetAgent,
   useListEnvironments,
   useListGateways,
 } from "@agent-management-platform/api-client";
-import { EnvironmentCard } from "@agent-management-platform/shared-component";
+import { EnvironmentCard, usePipelineEnvironments } from "@agent-management-platform/shared-component";
 import { InstrumentationDrawer } from "./InstrumentationDrawer";
 import { NoDataFound } from "@agent-management-platform/views";
-import { EvalMonitorsCard } from "./EvalMonitorsCard";
+import { EnvMonitorsSection } from "./EnvMonitorsSection";
 import { EnvObservabilitySection } from "./EnvObservabilitySection";
 
 export const ExternalAgentOverview = () => {
@@ -43,15 +43,11 @@ export const ExternalAgentOverview = () => {
     agentName: agentId,
   });
 
-  const { data: environmentList, isLoading: isEnvironmentsLoading } =
-    useListEnvironments({ orgName: orgId });
+  const { isLoading: isEnvironmentsLoading } = useListEnvironments({ orgName: orgId });
 
-  const sortedEnvironmentList = useMemo(() => {
-    return [...(environmentList ?? [])].sort((_a: Environment, b: Environment) => {
-      if (b.isProduction) return -1;
-      return 0;
-    });
-  }, [environmentList]);
+  // Show only the environments in the current project's deployment pipeline,
+  // ordered by the promotion chain.
+  const sortedEnvironmentList = usePipelineEnvironments(orgId, projectId);
 
   // Per-env OTEL endpoint. The gateway mapped to the selected environment carries
   // the externally-reachable vhost; the OTEL RestApi is published at `<vhost>/otel`.
@@ -74,13 +70,6 @@ export const ExternalAgentOverview = () => {
   return (
     <>
       <Box display="flex" flexDirection="column" gap={2}>
-        {orgId && projectId && agentId && (
-          <EvalMonitorsCard
-            orgId={orgId}
-            projectId={projectId}
-            agentId={agentId}
-          />
-        )}
         {isEnvironmentsLoading ? (
           <Box display="flex" flexDirection="column" gap={2}>
             <Skeleton variant="rounded" height={100} />
@@ -113,14 +102,22 @@ export const ExternalAgentOverview = () => {
                       </Button>
                     }
                     bottomContent={
-                      <EnvObservabilitySection
-                        orgId={orgId}
-                        projectId={projectId}
-                        agentId={agentId}
-                        envId={environment.name}
-                        hideMetrics
-                        external
-                      />
+                      <>
+                        <EnvObservabilitySection
+                          orgId={orgId}
+                          projectId={projectId}
+                          agentId={agentId}
+                          envId={environment.name}
+                          hideMetrics
+                          external
+                        />
+                        <EnvMonitorsSection
+                          orgId={orgId}
+                          projectId={projectId}
+                          agentId={agentId}
+                          envId={environment.name}
+                        />
+                      </>
                     }
                   />
                 )

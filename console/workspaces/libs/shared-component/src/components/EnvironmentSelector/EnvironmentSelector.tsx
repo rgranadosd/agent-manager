@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { useGetProject, useListDeploymentPipelines, useListEnvironments } from "@agent-management-platform/api-client";
 import { FormControl, MenuItem, Select, Typography } from "@wso2/oxygen-ui";
 import { useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+
+import { usePipelineEnvironments } from "../../utils/usePipelineEnvironments";
 
 /**
  * Self-contained environment selector for env-scoped pages.
@@ -35,57 +36,7 @@ export function EnvironmentSelector() {
     const { pathname } = useLocation();
     const navigate = useNavigate();
 
-    const { data: environments } = useListEnvironments({ orgName: orgId });
-    const { data: project } = useGetProject({ orgName: orgId, projName: projectId });
-    const { data: pipelinesData } = useListDeploymentPipelines({ orgName: orgId });
-
-    const pipelineEnvironments = useMemo(() => {
-        if (!environments) return [];
-
-        const paths = pipelinesData?.deploymentPipelines
-            ?.find((p) => p.name === project?.deploymentPipeline)
-            ?.promotionPaths ?? [];
-
-        if (!paths.length) return environments;
-
-        // Build adjacency and compute a topological order so branched promotion
-        // graphs (a → b, a → c, b → d, c → d) stay correctly ordered instead of
-        // following only the first outgoing edge of each node.
-        const adjacency = new Map<string, string[]>();
-        const allNodes = new Set<string>();
-        const inDegree = new Map<string, number>();
-
-        for (const p of paths) {
-            const targets = p.targetEnvironmentRefs.map((t) => t.name).filter(Boolean);
-            adjacency.set(p.sourceEnvironmentRef, targets);
-            allNodes.add(p.sourceEnvironmentRef);
-            inDegree.set(p.sourceEnvironmentRef, inDegree.get(p.sourceEnvironmentRef) ?? 0);
-            for (const t of targets) {
-                allNodes.add(t);
-                inDegree.set(t, (inDegree.get(t) ?? 0) + 1);
-            }
-        }
-
-        const chain: string[] = [];
-        const queue = [...allNodes].filter((n) => (inDegree.get(n) ?? 0) === 0);
-        while (queue.length > 0) {
-            const node = queue.shift()!;
-            chain.push(node);
-            for (const neighbor of adjacency.get(node) ?? []) {
-                const deg = (inDegree.get(neighbor) ?? 1) - 1;
-                inDegree.set(neighbor, deg);
-                if (deg === 0) queue.push(neighbor);
-            }
-        }
-
-        // Fallback for cycles/invalid graphs: keep any node that didn't make it
-        // into the topo order so we never silently drop environments.
-        allNodes.forEach((n) => { if (!chain.includes(n)) chain.push(n); });
-
-        return chain
-            .map((name) => environments.find((e) => e.name === name))
-            .filter(Boolean) as typeof environments;
-    }, [environments, pipelinesData, project?.deploymentPipeline]);
+    const pipelineEnvironments = usePipelineEnvironments(orgId, projectId);
 
     const selectedEnvironment = useMemo(
         () => pipelineEnvironments.find((env) => env.name === envId),

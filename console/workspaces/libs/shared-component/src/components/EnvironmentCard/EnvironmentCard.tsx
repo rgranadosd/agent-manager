@@ -45,7 +45,6 @@ import {
   Clock,
   Rocket as RocketLaunchOutlined,
   FlaskConical as TryOutlined,
-  Workflow,
   Link as LinkOutlined,
   PauseCircle,
   Tag,
@@ -169,11 +168,6 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
 
   const currentDeployment = deployments?.[environment?.name ?? ""];
   const envTitle = `${environment?.displayName ?? environment?.name ?? "Environment"} Environment`;
-  const tracesPath = generatePath(
-    absoluteRouteMap.children.org.children.projects.children.agents.children
-      .environment.children.observability.children.traces.path,
-    { orgId, projectId, agentId, envId: environment?.name ?? "" }
-  );
 
   const { data: buildsData } = useGetAgentBuilds({
     orgName: !isExternal ? orgId : "",
@@ -238,16 +232,6 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
             </Box>
             <Box display="flex" flexDirection="row" gap={1} alignItems="center">
               {actions}
-              <Button
-                startIcon={<Workflow size={16} />}
-                variant="text"
-                component={Link}
-                to={tracesPath}
-                color="primary"
-                size="small"
-              >
-                View Traces
-              </Button>
             </Box>
           </Box>
           {bottomContent}

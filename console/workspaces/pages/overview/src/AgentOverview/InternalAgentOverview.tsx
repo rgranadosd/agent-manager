@@ -19,18 +19,16 @@
 import {
     useGetAgent,
     useGetAgentBuilds,
-    useListEnvironments,
 } from "@agent-management-platform/api-client";
 import {
     Box,
     Stack,
 } from "@wso2/oxygen-ui";
 import { useParams } from "react-router-dom";
-import { useMemo } from "react";
 
-import { EnvironmentCard } from "@agent-management-platform/shared-component";
+import { EnvironmentCard, usePipelineEnvironments } from "@agent-management-platform/shared-component";
 import { KindInfoCard } from "./KindInfoCard";
-import { EvalMonitorsCard } from "./EvalMonitorsCard";
+import { EnvMonitorsSection } from "./EnvMonitorsSection";
 import { EnvObservabilitySection } from "./EnvObservabilitySection";
 import { AgentInfoCard } from "./AgentInfoCard";
 
@@ -46,16 +44,9 @@ export const InternalAgentOverview = () => {
         projName: projectId,
         agentName: agentId,
     });
-    const { data: environmentList } = useListEnvironments({
-        orgName: orgId,
-    });
-
-    const sortedEnvironmentList = useMemo(() => {
-        return [...(environmentList ?? [])].sort((_a, b) => {
-            if (b.isProduction) return -1;
-            return 0;
-        });
-    }, [environmentList]);
+    // Show only the environments in the current project's deployment pipeline,
+    // ordered by the promotion chain.
+    const sortedEnvironmentList = usePipelineEnvironments(orgId, projectId);
 
     const isKindAgent = !!agent?.kindName;
 
@@ -84,14 +75,6 @@ export const InternalAgentOverview = () => {
                 )
             )}
 
-            {orgId && projectId && agentId && (
-                <EvalMonitorsCard
-                    orgId={orgId}
-                    projectId={projectId}
-                    agentId={agentId}
-                />
-            )}
-
             <Stack spacing={2}>
                 {sortedEnvironmentList.map(
                     (environment) =>
@@ -103,12 +86,20 @@ export const InternalAgentOverview = () => {
                                 agentId={agentId}
                                 environment={environment}
                                 bottomContent={
-                                    <EnvObservabilitySection
-                                        orgId={orgId}
-                                        projectId={projectId}
-                                        agentId={agentId}
-                                        envId={environment.name}
-                                    />
+                                    <>
+                                        <EnvObservabilitySection
+                                            orgId={orgId}
+                                            projectId={projectId}
+                                            agentId={agentId}
+                                            envId={environment.name}
+                                        />
+                                        <EnvMonitorsSection
+                                            orgId={orgId}
+                                            projectId={projectId}
+                                            agentId={agentId}
+                                            envId={environment.name}
+                                        />
+                                    </>
                                 }
                             />
                         ),

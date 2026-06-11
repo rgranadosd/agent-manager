@@ -63,7 +63,7 @@ importers:
         version: 10.0.1(eslint@10.4.1)
       '@types/node':
         specifier: ^24.12.2
-        version: 24.13.1
+        version: 24.13.2
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
@@ -72,7 +72,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@vitejs/plugin-react':
         specifier: ^6.0.1
-        version: 6.0.2(vite@8.0.16(@types/node@24.13.1)(less@4.3.0))
+        version: 6.0.2(vite@8.0.16(@types/node@24.13.2)(less@4.3.0))
       eslint:
         specifier: ^10.2.1
         version: 10.4.1
@@ -93,7 +93,7 @@ importers:
         version: 8.61.0(eslint@10.4.1)(typescript@6.0.3)
       vite:
         specifier: ^8.0.10
-        version: 8.0.16(@types/node@24.13.1)(less@4.3.0)
+        version: 8.0.16(@types/node@24.13.2)(less@4.3.0)
 
   ../../workspaces/core-ui:
     dependencies:
@@ -703,7 +703,7 @@ importers:
         version: 9.36.0
       '@formatjs/cli':
         specifier: 6.7.2
-        version: 6.7.2(@vue/compiler-core@3.5.35)
+        version: 6.7.2(@vue/compiler-core@3.5.37)
       '@storybook/addon-essentials':
         specifier: 8.6.13
         version: 8.6.13(@types/react@19.2.14)(storybook@8.6.13(prettier@3.5.3))
@@ -5452,8 +5452,8 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@24.13.1':
-    resolution: {integrity: sha512-RSpUJGmvsJ1ZeBehQZFhIdpsz+bIpES0nIQXko4Ybq+N+kX6XvOq3Jo+iJ82FWLdblFq85AsMikd3m35jgezYg==}
+  '@types/node@24.13.2':
+    resolution: {integrity: sha512-fRa09kZTgu8o71KFcDjUFuc7F+dEbZYZmkI0mg5YBTRs0yMKjYHsq/c0urDKeDb+D5qVgXOdFcuu+DZPKOITwA==}
 
   '@types/node@24.6.0':
     resolution: {integrity: sha512-F1CBxgqwOMc4GKJ7eY22hWhBVQuMYTtqI8L0FcszYcpYX0fzfDGpez22Xau8Mgm7O9fI+zA/TYIdq3tGWfweBA==}
@@ -5886,11 +5886,11 @@ packages:
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
 
-  '@vue/compiler-core@3.5.35':
-    resolution: {integrity: sha512-BUmHaR1J+O+CKZ9uJucdVTEr1LHsdyvv7vG3eNRhK3CczEHeMd/LtsHAuD7PbrxvI2envCY2v7HI1vC1aBRzKw==}
+  '@vue/compiler-core@3.5.37':
+    resolution: {integrity: sha512-TfQz4bsBQTPoTeBWTUPJPq+4FCTTXg2pbp8TjjAyrGaLAu9nfrZTxKLf6mdAlclnwtyUToFaMQu7QRS63Qek1g==}
 
-  '@vue/compiler-dom@3.5.35':
-    resolution: {integrity: sha512-k+bprkXxuqhVajgTx5mUHuir7TwQzUKOWR40ng1ncAqQRPnrLngGGgqVEEhOnTMlc8btHYVKmrP8s5Qyg0hvYA==}
+  '@vue/compiler-dom@3.5.37':
+    resolution: {integrity: sha512-oqfl/QaCVEWxphALFEZ7m+q9z+Sghz9ZCcoJ/oplTGxsOgx2czVzSZxkMkzQrWIahywOeyGHdg9ml/WUz3DMzw==}
 
   '@vue/compiler-vue2@2.7.16':
     resolution: {integrity: sha512-qYC3Psj9S/mfu9uVi5WvNZIzq+xnXMhOwbTFKKDD7b1lhpnn71jXSFdTQ+WsIEk0ONCd7VV2IMm7ONl6tbQ86A==}
@@ -5903,8 +5903,8 @@ packages:
       typescript:
         optional: true
 
-  '@vue/shared@3.5.35':
-    resolution: {integrity: sha512-zSbjL7gRXwks2ZQLRGCajBtBXEOXW9Ddhn/HvSdrGkE2dqGnumzW8XtusRrxrE9LvqtiqDXQ+A60Hp6mvdYxfA==}
+  '@vue/shared@3.5.37':
+    resolution: {integrity: sha512-JzFx4aYGz+EtBl8zzw8XECNWSmNXTrU5jpub3T1lQ+2X5Ys9QzHWafxhE+E5qS2Ry/mVl8o2QqrwRGYYOFYguw==}
 
   '@wso2/oxygen-ui-charts-react@0.10.1':
     resolution: {integrity: sha512-GUTbHfEbH7ogZ7oijmEwUYT1PPCPAPsVuOnXqHtQ+XvSEWCXRxFvufEXc3pLPhNIeVTh9f4ik45xooaiiPVbsw==}
@@ -9812,9 +9812,9 @@ snapshots:
 
   '@fontsource/roboto@5.2.5': {}
 
-  '@formatjs/cli@6.7.2(@vue/compiler-core@3.5.35)':
+  '@formatjs/cli@6.7.2(@vue/compiler-core@3.5.37)':
     optionalDependencies:
-      '@vue/compiler-core': 3.5.35
+      '@vue/compiler-core': 3.5.37
 
   '@formatjs/ecma402-abstract@2.3.4':
     dependencies:
@@ -9890,7 +9890,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 24.13.1
+      '@types/node': 24.13.2
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -11420,7 +11420,7 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@24.13.1':
+  '@types/node@24.13.2':
     dependencies:
       undici-types: 7.18.2
 
@@ -11973,10 +11973,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitejs/plugin-react@6.0.2(vite@8.0.16(@types/node@24.13.1)(less@4.3.0))':
+  '@vitejs/plugin-react@6.0.2(vite@8.0.16(@types/node@24.13.2)(less@4.3.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.0.16(@types/node@24.13.1)(less@4.3.0)
+      vite: 8.0.16(@types/node@24.13.2)(less@4.3.0)
 
   '@vitest/expect@2.0.5':
     dependencies:
@@ -12066,18 +12066,18 @@ snapshots:
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
 
-  '@vue/compiler-core@3.5.35':
+  '@vue/compiler-core@3.5.37':
     dependencies:
       '@babel/parser': 7.29.7
-      '@vue/shared': 3.5.35
+      '@vue/shared': 3.5.37
       entities: 7.0.1
       estree-walker: 2.0.2
       source-map-js: 1.2.1
 
-  '@vue/compiler-dom@3.5.35':
+  '@vue/compiler-dom@3.5.37':
     dependencies:
-      '@vue/compiler-core': 3.5.35
-      '@vue/shared': 3.5.35
+      '@vue/compiler-core': 3.5.37
+      '@vue/shared': 3.5.37
 
   '@vue/compiler-vue2@2.7.16':
     dependencies:
@@ -12087,9 +12087,9 @@ snapshots:
   '@vue/language-core@2.2.0(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
-      '@vue/compiler-dom': 3.5.35
+      '@vue/compiler-dom': 3.5.37
       '@vue/compiler-vue2': 2.7.16
-      '@vue/shared': 3.5.35
+      '@vue/shared': 3.5.37
       alien-signals: 0.4.14
       minimatch: 9.0.9
       muggle-string: 0.4.1
@@ -12097,7 +12097,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@vue/shared@3.5.35': {}
+  '@vue/shared@3.5.37': {}
 
   '@wso2/oxygen-ui-charts-react@0.10.1(@types/react@19.2.14)(@wso2/oxygen-ui@0.10.1(@mui/system@7.3.11(@emotion/react@11.13.5(@types/react@19.2.14)(react@19.1.1))(@emotion/styled@11.13.5(@emotion/react@11.13.5(@types/react@19.2.14)(react@19.1.1))(@types/react@19.2.14)(react@19.1.1))(@types/react@19.2.14)(react@19.1.1))(@types/react@19.2.14)(@wso2/oxygen-ui-icons-react@0.10.1(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(react-dom@19.1.1(react@19.1.1))(react-is@19.2.7)(react@19.1.1)(redux@5.0.1)':
     dependencies:
@@ -13870,7 +13870,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 24.13.1
+      '@types/node': 24.13.2
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -15902,7 +15902,7 @@ snapshots:
       lightningcss: 1.32.0
       tsx: 4.7.0
 
-  vite@8.0.16(@types/node@24.13.1)(less@4.3.0):
+  vite@8.0.16(@types/node@24.13.2)(less@4.3.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -15910,7 +15910,7 @@ snapshots:
       rolldown: 1.0.3
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 24.13.1
+      '@types/node': 24.13.2
       fsevents: 2.3.3
       less: 4.3.0
 

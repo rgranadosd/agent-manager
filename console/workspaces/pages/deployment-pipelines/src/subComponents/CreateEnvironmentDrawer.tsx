@@ -112,7 +112,7 @@ export function CreateEnvironmentDrawer({ open, onClose, orgId }: CreateEnvironm
 
   const { getToken } = useAuthHooks();
   const { data: dataPlanes } = useListDataPlanes({ orgName: orgId });
-  const planes = useMemo(() => dataPlanes ?? [], [dataPlanes]);
+  const planes = dataPlanes ?? [];
 
   useEffect(() => {
     if (open) {

@@ -119,6 +119,10 @@ export interface UpdateMonitorRequest {
 }
 
 export type ListMonitorsPathParams = AgentPathParams;
+export interface ListMonitorsQueryParams {
+  /** When set, only monitors for this environment are returned (server `?environment=`). */
+  environmentName?: string;
+}
 export type CreateMonitorPathParams = AgentPathParams;
 
 export interface MonitorPathParams extends AgentPathParams {

@@ -659,7 +659,7 @@ export function DeployCard(props: DeployCardProps) {
             DeploymentStatus.ACTIVE, DeploymentStatus.ERROR, DeploymentStatus.FAILED,
           ].includes(currentDeployment?.status as DeploymentStatus)}>
             <Stack gap={2}>
-              <Card variant="outlined" sx={{ padding: 1.4, pt:0.5 }}>
+              <Card variant="outlined" sx={{ padding: 1.4, pt: 0.5 }}>
                 <Stack gap={1}>
                   <Stack direction="row" gap={1} alignItems="center" justifyContent="space-between">
                     <Typography variant="h6">Resource Usage</Typography>
@@ -810,7 +810,13 @@ export function DeployCard(props: DeployCardProps) {
           {agent?.provisioning?.type === "internal" && (
             <>
               <Divider />
-              <Stack direction="row" justifyContent="right" spacing={1} alignItems="center">
+              <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                <Tooltip title="More actions">
+                  <IconButton size="small" onClick={(e) => setActionsMenuAnchor(e.currentTarget)}>
+                    <MoreHorizontal size={18} />
+                  </IconButton>
+                </Tooltip>
+                <Stack direction="row" justifyContent="right" spacing={1} alignItems="center"> 
                 <Button
                   variant="text"
                   size="small"
@@ -867,11 +873,7 @@ export function DeployCard(props: DeployCardProps) {
                     </Button>
                   </>
                 )}
-                <Tooltip title="More actions">
-                  <IconButton size="small" onClick={(e) => setActionsMenuAnchor(e.currentTarget)}>
-                    <MoreHorizontal size={18} />
-                  </IconButton>
-                </Tooltip>
+                </Stack>
                 <Menu
                   anchorEl={actionsMenuAnchor}
                   open={Boolean(actionsMenuAnchor)}

@@ -16,6 +16,17 @@
  * under the License.
  */
 
-export * from './formatTraceWindow';
-export * from './provisionTypes';
-export * from './scoreColor';
+/**
+ * Formats a historical monitor's [start, end] trace window into a compact,
+ * locale-aware label, e.g. "Mar 1, 10:00 – Mar 3, 14:00".
+ */
+export function formatTraceWindow(start: string, end: string): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  return `${fmt(start)} – ${fmt(end)}`;
+}
