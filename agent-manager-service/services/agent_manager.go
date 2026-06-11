@@ -326,15 +326,6 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 	autoInstrumentation := req.Configurations == nil || req.Configurations.EnableAutoInstrumentation == nil || *req.Configurations.EnableAutoInstrumentation
 	isAPIAgent := req.AgentType != nil && req.AgentType.Type == string(utils.AgentTypeAPI)
 
-	// Resolve gateway info for the lowest environment so the Backend host and RestApi label
-	// are set at creation time. This acts as the default; deploy/promote flows override
-	// via traitEnvironmentConfigs.
-	var createGW gatewayInfo
-	if isAPIAgent && envName != "" {
-		if env, envErr := s.ocClient.GetEnvironment(ctx, orgName, envName); envErr == nil {
-			createGW = resolveGatewayInfo(s.gatewayRepo, env.UUID, envName)
-		}
-	}
 	isPythonBuildpack := req.Build != nil && req.Build.BuildpackBuild != nil && req.Build.BuildpackBuild.Buildpack.Language == string(utils.LanguagePython)
 	isDocker := req.Build != nil && req.Build.DockerBuild != nil
 
@@ -416,15 +407,9 @@ func (s *agentManagerService) buildCreateTraitRequests(ctx context.Context, orgN
 			client.WithUpstreamBasePath(basePath),
 			client.WithPolicies(createPolicies),
 		}
-		if createGW.target != "" {
-			apiTraitOpts = append(apiTraitOpts, client.WithGatewayTarget(createGW.target))
-		}
-		if createGW.backendHost != "" {
-			apiTraitOpts = append(apiTraitOpts, client.WithBackendHost(createGW.backendHost))
-		}
-		if createGW.backendPort > 0 {
-			apiTraitOpts = append(apiTraitOpts, client.WithBackendPort(createGW.backendPort))
-		}
+		// backendHost, backendPort, gatewayTarget were previously injected per-environment
+		// here; the api-management trait now derives them from the apiGatewayName convention
+		// ("api-platform-<org>-<env>") and platform-wide gateway runtime constants.
 		traits = append(traits, client.TraitRequest{
 			TraitKind: client.TraitKindTrait,
 			TraitType: client.TraitAPIManagement,
@@ -2214,15 +2199,12 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 
 	// Build trait environment configs for the release binding.
 	// Deploy sets the artifactId on the Component CR trait parameters (via AttachTraits),
-	// so no per-env override is needed here. gatewayTarget is looked up from the
-	// gateway-environment mapping so the RestApi resource gets the correct label.
+	// so no per-env override is needed here. The api-management trait now derives
+	// gatewayTarget/backendHost/backendPort itself from the apiGatewayName convention,
+	// so no per-env gateway lookup is needed for trait configs.
 	policies := buildPolicies(apiCfg)
-	var deployGW gatewayInfo
-	if isAPIAgent && targetEnv != nil {
-		deployGW = resolveGatewayInfo(s.gatewayRepo, targetEnv.UUID, lowestEnv)
-	}
 	isPythonBuildpack := agent.Build != nil && agent.Build.Buildpack != nil && agent.Build.Buildpack.Language == string(utils.LanguagePython)
-	deployTraitEnvConfigs := buildTraitEnvConfigs(agentName, policies, "", deployGW, isPythonBuildpack, enableAutoInstrumentation)
+	deployTraitEnvConfigs := buildTraitEnvConfigs(agentName, policies, "", isPythonBuildpack, enableAutoInstrumentation)
 
 	// Replace Component CR workflow parameters with env vars and file mounts from deploy request
 	// This replaces all existing env vars to ensure the component CR matches the deploy request
@@ -2263,9 +2245,6 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			traitOpts = append(traitOpts, client.WithUpstreamBasePath(config.GetConfig().DefaultChatAPI.DefaultBasePath))
 		}
 		traitOpts = append(traitOpts, client.WithPolicies(policies))
-		if deployGW.target != "" {
-			traitOpts = append(traitOpts, client.WithGatewayTarget(deployGW.target))
-		}
 
 		componentDeployConfig.TraitsToAttach = append(componentDeployConfig.TraitsToAttach, client.TraitRequest{
 			TraitKind: client.TraitKindTrait,
@@ -2437,11 +2416,12 @@ func buildPolicies(cfg resolvedCORSConfig) []map[string]interface{} {
 // OpenChoreo's rendering engine looks up traitEnvironmentConfigs by instance name.
 // artifactID, when non-empty, is injected as a per-environment override for the api-configuration
 // trait so that each environment gets a unique artifact UUID in its RestApi resource.
-// gatewayTarget, when non-empty, is the label value stamped on RestApi resources so the correct
-// gateway's apiSelector (scope: LabelSelector) picks them up.
+// backendHost / backendPort / gatewayTarget are no longer written here — the
+// api-management trait derives them from the apiGatewayName convention
+// ("api-platform-<org>-<env>") + platform-wide gateway runtime constants.
 // For Python buildpack agents, instrumentationEnabled is set per-environment on the OTEL trait so
 // the 'where' clause on patches can enable/disable instrumentation independently per environment.
-func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, artifactID string, gw gatewayInfo, isPythonBuildpack bool, autoInstrumentation bool) map[string]interface{} {
+func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, artifactID string, isPythonBuildpack bool, autoInstrumentation bool) map[string]interface{} {
 	instanceName := func(traitType client.TraitType) string {
 		return agentName + "-" + string(traitType)
 	}
@@ -2450,15 +2430,6 @@ func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, a
 	}
 	if artifactID != "" {
 		apiTraitCfg["artifactId"] = artifactID
-	}
-	if gw.target != "" {
-		apiTraitCfg["gatewayTarget"] = gw.target
-	}
-	if gw.backendHost != "" {
-		apiTraitCfg["backendHost"] = gw.backendHost
-	}
-	if gw.backendPort > 0 {
-		apiTraitCfg["backendPort"] = gw.backendPort
 	}
 	traitEnvConfigs := map[string]interface{}{
 		instanceName(client.TraitAPIManagement): apiTraitCfg,
@@ -2469,37 +2440,6 @@ func buildTraitEnvConfigs(agentName string, policies []map[string]interface{}, a
 		}
 	}
 	return traitEnvConfigs
-}
-
-// gatewayInfo holds resolved gateway label and backend connection details for an environment.
-type gatewayInfo struct {
-	target      string // apiSelector label value: gateway.Name (matches the chart's apiGatewayName helper)
-	backendHost string // in-cluster service: "<gatewayName><GatewayRuntime.HostSuffix>"
-	backendPort int    // gateway runtime HTTP listener port (from config.GatewayRuntime.Port)
-}
-
-// resolveGatewayInfo looks up the gateway assigned to the given environment and returns
-// the apiSelector label value, the in-cluster backend service hostname, and the HTTP port.
-// Returns a zero-value gatewayInfo if no gateway mapping is found.
-func resolveGatewayInfo(gatewayRepo repositories.GatewayRepository, environmentUUID, environmentName string) gatewayInfo {
-	mappings, err := gatewayRepo.GetEnvironmentMappingsByEnvironmentID(environmentUUID)
-	if err != nil || len(mappings) == 0 {
-		return gatewayInfo{}
-	}
-	gateway, err := gatewayRepo.GetByUUID(mappings[0].GatewayUUID.String())
-	if err != nil || gateway == nil {
-		return gatewayInfo{}
-	}
-	// gateway.Name already encodes the environment (chart's apiGatewayName helper:
-	// "api-platform-<org>-<env>"), and the APIGateway CR's apiSelector matchLabels
-	// uses exactly that value. Don't re-append environmentName here.
-	label := strings.ToLower(gateway.Name)
-	if len(label) > 63 {
-		label = strings.TrimSuffix(label[:63], "-")
-	}
-	gwRuntime := config.GetConfig().GatewayRuntime
-	backendHost := gateway.Name + gwRuntime.HostSuffix
-	return gatewayInfo{target: label, backendHost: backendHost, backendPort: gwRuntime.Port}
 }
 
 func findLowestEnvironment(promotionPaths []models.PromotionPath) string {
@@ -2685,14 +2625,15 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			return fmt.Errorf("failed to ensure target env API artifact: %w", artifactErr)
 		}
 		targetArtifactID := artifact.UUID.String()
-		promoteGW := resolveGatewayInfo(s.gatewayRepo, targetEnv.UUID, req.TargetEnvironment)
 		promotePythonBuildpack := agent.Build != nil && agent.Build.Buildpack != nil && agent.Build.Buildpack.Language == string(utils.LanguagePython)
-		traitEnvConfigs = buildTraitEnvConfigs(agentName, policies, targetArtifactID, promoteGW, promotePythonBuildpack, tracingCfg.EnableAutoInstrumentation)
+		traitEnvConfigs = buildTraitEnvConfigs(agentName, policies, targetArtifactID, promotePythonBuildpack, tracingCfg.EnableAutoInstrumentation)
 
-		// Only generate API key and set otelEndpoint on first promotion to this environment.
-		// On subsequent promotions, these are already set on the release binding's traitEnvironmentConfigs.
+		// Only generate API key on first promotion to this environment. On subsequent
+		// promotions the agentApiKey is already set on the release binding's
+		// traitEnvironmentConfigs. otelEndpoint is no longer written here — the
+		// env-injection trait derives it from the apiGatewayName convention.
 		// Use the typed not-found sentinel so a transient DB error doesn't get misread as
-		// "first promotion" (which would needlessly mint a new API key and overwrite OTEL).
+		// "first promotion" (which would needlessly mint a new API key).
 		_, targetConfigErr := s.agentConfigRepo.Get(orgName, projectName, agentName, req.TargetEnvironment)
 		isFirstPromotion := errors.Is(targetConfigErr, repositories.ErrAgentConfigNotFound)
 		if targetConfigErr != nil && !isFirstPromotion {
@@ -2708,10 +2649,6 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 				s.logger.Warn("Failed to generate agent API key for promotion", "agentName", agentName, "error", apiKeyErr)
 			} else {
 				envInjCfg["agentApiKey"] = apiKey
-			}
-
-			if promoteGW.backendHost != "" {
-				envInjCfg["otelEndpoint"] = fmt.Sprintf("http://%s:%d/otel", promoteGW.backendHost, promoteGW.backendPort)
 			}
 
 			if len(envInjCfg) > 0 {
@@ -2792,9 +2729,8 @@ func (s *agentManagerService) UpdateAgentDeploySettings(ctx context.Context, org
 	if artifactErr != nil {
 		return fmt.Errorf("failed to ensure agent env API artifact: %w", artifactErr)
 	}
-	gw := resolveGatewayInfo(s.gatewayRepo, targetEnv.UUID, req.EnvironmentName)
 	isPythonBuildpack := agent.Build != nil && agent.Build.Buildpack != nil && agent.Build.Buildpack.Language == string(utils.LanguagePython)
-	traitEnvConfigs := buildTraitEnvConfigs(agentName, policies, artifact.UUID.String(), gw, isPythonBuildpack, tracingCfg.EnableAutoInstrumentation)
+	traitEnvConfigs := buildTraitEnvConfigs(agentName, policies, artifact.UUID.String(), isPythonBuildpack, tracingCfg.EnableAutoInstrumentation)
 
 	// Apply to the release binding (atomic: trait configs + restartedAt in a single update).
 	if updateErr := s.ocClient.UpdateReleaseBindingTraitConfigs(ctx, orgName, agentName, req.EnvironmentName, traitEnvConfigs); updateErr != nil {

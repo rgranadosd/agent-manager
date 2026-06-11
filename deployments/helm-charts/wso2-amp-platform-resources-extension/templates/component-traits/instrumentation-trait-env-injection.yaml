@@ -10,9 +10,6 @@ spec:
     openAPIV3Schema:
       type: object
       properties:
-        otelEndpoint:
-          type: string
-          description: "OpenTelemetry collector endpoint URL"
         agentApiKey:
           type: string
           description: "API key for authenticating with the agent service"
@@ -21,7 +18,6 @@ spec:
           default: true
           description: "Enable or disable env injection instrumentation"
       required:
-        - otelEndpoint
         - agentApiKey
 
   environmentConfigs:
@@ -31,9 +27,6 @@ spec:
         envInjectionEnabled:
           type: boolean
           description: "Enable or disable env injection instrumentation for this environment"
-        otelEndpoint:
-          type: string
-          description: "Environment-specific OpenTelemetry collector endpoint URL"
         agentApiKey:
           type: string
           description: "Environment-specific API key for authenticating with the agent service"
@@ -66,7 +59,9 @@ spec:
           path: /spec/template/spec/containers/0/env/-
           value:
             name: AMP_OTEL_ENDPOINT
-            value: "${has(environmentConfigs.otelEndpoint) ? environmentConfigs.otelEndpoint : parameters.otelEndpoint}"
+            # Derived from the apiGatewayName helper convention ("api-platform-<org>-<env>")
+            # + the gateway runtime in-cluster Service.
+            value: "http://api-platform-${metadata.componentNamespace}-${metadata.environmentName}-gateway-gateway-runtime.openchoreo-data-plane:22893/otel"
         - op: add
           path: /spec/template/spec/containers/0/env/-
           value:

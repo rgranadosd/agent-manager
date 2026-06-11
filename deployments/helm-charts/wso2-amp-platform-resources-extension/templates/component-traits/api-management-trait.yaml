@@ -60,18 +60,6 @@ spec:
           type: string
           description: "Artifact UUID injected as gateway.api-platform.wso2.com/artifact-id annotation on the RestApi"
           default: ""
-        gatewayTarget:
-          type: string
-          description: "Label value matching the target gateway's apiSelector matchLabels (gateway.api-platform.wso2.com/restapi-target). Used as a default; per-environment environmentConfigs.gatewayTarget takes precedence when set."
-          default: ""
-        backendHost:
-          type: string
-          description: "In-cluster hostname of the API platform gateway runtime service. Always injected per-environment by the agent-manager-service via environmentConfigs."
-          default: ""
-        backendPort:
-          type: integer
-          description: "Port of the API platform gateway runtime service. Always injected per-environment by the agent-manager-service via environmentConfigs."
-          default: 80
       required:
         - apiName
 
@@ -89,23 +77,17 @@ spec:
           type: string
           description: "Per-environment artifact UUID override. When set, takes precedence over parameters.artifactId."
           default: ""
-        gatewayTarget:
-          type: string
-          description: "Label value matching the target gateway's apiSelector matchLabels (gateway.api-platform.wso2.com/restapi-target). Each environment should set this to the label value of its assigned gateway."
-          default: ""
-        backendHost:
-          type: string
-          description: "Per-environment in-cluster hostname of the API platform gateway runtime service."
-          default: ""
-        backendPort:
-          type: integer
-          description: "Per-environment port of the API platform gateway runtime service."
 
   creates:
     # --- Backend: kgateway static backend pointing to WSO2 API Platform router ---
     # This Backend resource tells kgateway to forward traffic to the WSO2 API Platform
     # router instead of directly to the component's Service. The HTTPRoute's backendRef
     # is patched (below) to reference this Backend.
+    #
+    # backendHost is derived from the chart's apiGatewayName helper convention
+    # ("api-platform-<org>-<env>") + the in-cluster Service suffix, and backendPort
+    # is the gateway runtime listener port. Both are platform-wide constants —
+    # the agent-manager-service no longer injects them per-environment.
     - template:
         apiVersion: gateway.kgateway.dev/v1alpha1
         kind: Backend
@@ -116,10 +98,12 @@ spec:
           type: Static
           static:
             hosts:
-              - host: "${has(environmentConfigs.backendHost) && environmentConfigs.backendHost != '' ? environmentConfigs.backendHost : parameters.backendHost}"
-                port: "${has(environmentConfigs.backendPort) ? environmentConfigs.backendPort : parameters.backendPort}"
+              - host: "api-platform-${metadata.componentNamespace}-${metadata.environmentName}-gateway-gateway-runtime.openchoreo-data-plane"
+                port: 22893
 
-    # Create RestApi resource (discovered by gateway via apiSelector scope: LabelSelector)
+    # Create RestApi resource (discovered by gateway via apiSelector scope: LabelSelector).
+    # The restapi-target label matches the gateway's apiSelector matchLabels (which the chart
+    # sets to the same "api-platform-<org>-<env>" string via the apiGatewayName helper).
     - template:
         apiVersion: gateway.api-platform.wso2.com/v1alpha1
         kind: RestApi
@@ -127,7 +111,7 @@ spec:
           name: ${metadata.name}
           namespace: ${metadata.namespace}
           labels:
-            gateway.api-platform.wso2.com/restapi-target: "${has(environmentConfigs.gatewayTarget) && environmentConfigs.gatewayTarget != '' ? environmentConfigs.gatewayTarget : parameters.gatewayTarget}"
+            gateway.api-platform.wso2.com/restapi-target: "api-platform-${metadata.componentNamespace}-${metadata.environmentName}"
           annotations:
             gateway.api-platform.wso2.com/artifact-id: "${has(environmentConfigs.artifactId) && environmentConfigs.artifactId != '' ? environmentConfigs.artifactId : parameters.artifactId}"
         spec:

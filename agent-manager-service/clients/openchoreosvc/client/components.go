@@ -2066,30 +2066,6 @@ func WithArtifactID(artifactID string) TraitOption {
 	}
 }
 
-// WithGatewayTarget sets the gateway label value for the api-configuration trait parameter.
-// This acts as the default; per-environment environmentConfigs.gatewayTarget takes precedence when set.
-func WithGatewayTarget(gatewayTarget string) TraitOption {
-	return func(params map[string]interface{}) {
-		params["gatewayTarget"] = gatewayTarget
-	}
-}
-
-// WithBackendHost sets the backendHost for the api-configuration trait parameter.
-// This acts as the default; per-environment environmentConfigs.backendHost takes precedence when set.
-func WithBackendHost(host string) TraitOption {
-	return func(params map[string]interface{}) {
-		params["backendHost"] = host
-	}
-}
-
-// WithBackendPort sets the backendPort for the api-configuration trait parameter.
-// This acts as the default; per-environment environmentConfigs.backendPort takes precedence when set.
-func WithBackendPort(port int) TraitOption {
-	return func(params map[string]interface{}) {
-		params["backendPort"] = port
-	}
-}
-
 // APIKeyAuthPolicy returns the policy map for API key authentication.
 func APIKeyAuthPolicy() map[string]interface{} {
 	return map[string]interface{}{
@@ -2242,10 +2218,12 @@ func (c *openChoreoClient) buildEnvInjectionTraitParameters(opts ...TraitOption)
 		return nil, fmt.Errorf("agent API key is required for env injection trait")
 	}
 
-	cfg := config.GetConfig()
+	// otelEndpoint is no longer set here — the env-injection trait derives it from the
+	// apiGatewayName convention ("api-platform-<org>-<env>") + the gateway runtime
+	// in-cluster Service. The trait still honours an explicit override via
+	// environmentConfigs.otelEndpoint / parameters.otelEndpoint when set.
 	result := map[string]interface{}{
-		"otelEndpoint": cfg.OTEL.ExporterEndpoint,
-		"agentApiKey":  agentApiKey,
+		"agentApiKey": agentApiKey,
 	}
 	if v, ok := params["envInjectionEnabled"]; ok {
 		result["envInjectionEnabled"] = v
