@@ -95,11 +95,17 @@ func parseAndValidateTimeRange(w http.ResponseWriter, r *http.Request) (startTim
 
 // GetMonitorScores handles GET .../monitors/{monitorName}/scores
 // Returns scores and aggregations for a monitor within a time range
+
 func (c *monitorScoresController) GetMonitorScores(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -150,10 +156,15 @@ func (c *monitorScoresController) GetMonitorScores(w http.ResponseWriter, r *htt
 // GetMonitorRunScores handles GET .../monitors/{monitorName}/runs/{runId}/scores
 // Returns per-run aggregated scores from the MonitorRunEvaluator records
 func (c *monitorScoresController) GetMonitorRunScores(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -199,10 +210,15 @@ func (c *monitorScoresController) GetMonitorRunScores(w http.ResponseWriter, r *
 // Returns time-bucketed scores for multiple evaluators in a single response.
 // Query param: evaluators (comma-separated list of evaluator display names, required)
 func (c *monitorScoresController) GetScoresTimeSeries(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -284,9 +300,14 @@ func parseEvaluatorsList(param string) []string {
 // GetGroupedScores handles GET .../monitors/{monitorName}/scores/breakdown
 // Returns scores grouped by span label (agent name or model) for breakdown tables
 func (c *monitorScoresController) GetGroupedScores(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -330,10 +351,15 @@ func (c *monitorScoresController) GetGroupedScores(w http.ResponseWriter, r *htt
 // GetTraceScores handles GET .../traces/{traceId}/scores
 // Returns all evaluation scores for a trace across ALL monitors in an agent
 func (c *monitorScoresController) GetTraceScores(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	traceID := r.PathValue(utils.PathParamTraceId)
@@ -360,9 +386,14 @@ func (c *monitorScoresController) GetTraceScores(w http.ResponseWriter, r *http.
 // GetAgentTraceScores handles GET .../agents/{agentName}/scores
 // Returns aggregated scores per trace across all monitors for an agent within a time range
 func (c *monitorScoresController) GetAgentTraceScores(w http.ResponseWriter, r *http.Request) {
-	log := logger.GetLogger(r.Context())
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 

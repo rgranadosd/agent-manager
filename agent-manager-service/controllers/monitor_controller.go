@@ -61,6 +61,10 @@ func (c *monitorController) CreateMonitor(w http.ResponseWriter, r *http.Request
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -140,6 +144,10 @@ func (c *monitorController) GetMonitor(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -170,6 +178,10 @@ func (c *monitorController) ListMonitors(w http.ResponseWriter, r *http.Request)
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -195,6 +207,10 @@ func (c *monitorController) DeleteMonitor(w http.ResponseWriter, r *http.Request
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -219,6 +235,10 @@ func (c *monitorController) UpdateMonitor(w http.ResponseWriter, r *http.Request
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -269,6 +289,10 @@ func (c *monitorController) ListMonitorRuns(w http.ResponseWriter, r *http.Reque
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -318,6 +342,10 @@ func (c *monitorController) RerunMonitor(w http.ResponseWriter, r *http.Request)
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -358,6 +386,10 @@ func (c *monitorController) GetMonitorRunLogs(w http.ResponseWriter, r *http.Req
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -388,6 +420,10 @@ func (c *monitorController) StopMonitor(w http.ResponseWriter, r *http.Request) 
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)
@@ -426,6 +462,10 @@ func (c *monitorController) StartMonitor(w http.ResponseWriter, r *http.Request)
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	monitorName := r.PathValue(utils.PathParamMonitorName)

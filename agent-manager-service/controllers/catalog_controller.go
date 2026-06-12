@@ -54,6 +54,10 @@ func (c *catalogController) ListCatalog(w http.ResponseWriter, r *http.Request) 
 
 	orgName := r.PathValue(utils.PathParamOrgName)
 
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
+
 	// Parse query parameters
 	kind := r.URL.Query().Get("kind")
 	name := r.URL.Query().Get("name")

@@ -54,6 +54,10 @@ func (c *llmProxyDeploymentController) DeployLLMProxy(w http.ResponseWriter, r *
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 
 	log.Info("DeployLLMProxy: starting", "orgName", orgName, "proxyID", proxyID)
@@ -148,6 +152,10 @@ func (c *llmProxyDeploymentController) UndeployLLMProxyDeployment(w http.Respons
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 
 	// Parse query parameters
@@ -218,6 +226,10 @@ func (c *llmProxyDeploymentController) RestoreLLMProxyDeployment(w http.Response
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 
 	// Parse query parameters
@@ -287,6 +299,10 @@ func (c *llmProxyDeploymentController) DeleteLLMProxyDeployment(w http.ResponseW
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 	deploymentID := r.PathValue("deploymentId")
 
@@ -338,6 +354,10 @@ func (c *llmProxyDeploymentController) GetLLMProxyDeployment(w http.ResponseWrit
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 	deploymentID := r.PathValue("deploymentId")
 
@@ -385,6 +405,10 @@ func (c *llmProxyDeploymentController) GetLLMProxyDeployments(w http.ResponseWri
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	proxyID := r.PathValue("id")
 
 	// Parse optional query parameters

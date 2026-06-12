@@ -68,6 +68,10 @@ func (c *agentAPIKeyController) CreateAPIKey(w http.ResponseWriter, r *http.Requ
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
 
+    if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
+
 	log.Info("CreateAgentAPIKey: starting", "orgName", orgName, "projName", projName, "agentName", agentName, "envID", envID)
 
 	var specReq spec.CreateLLMAPIKeyRequest
@@ -142,6 +146,10 @@ func (c *agentAPIKeyController) ListAPIKeys(w http.ResponseWriter, r *http.Reque
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
 
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
+
 	log.Info("ListAgentAPIKeys: starting", "orgName", orgName, "projName", projName, "agentName", agentName, "envID", envID)
 
 	keys, err := c.apiKeyService.ListAPIKeys(ctx, orgName, projName, agentName, envID)
@@ -178,6 +186,10 @@ func (c *agentAPIKeyController) RevokeAPIKey(w http.ResponseWriter, r *http.Requ
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
 	keyName := r.PathValue("keyName")
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 
 	log.Info("RevokeAgentAPIKey: starting", "orgName", orgName, "agentName", agentName, "envID", envID, "keyName", keyName)
 
@@ -216,6 +228,10 @@ func (c *agentAPIKeyController) RotateAPIKey(w http.ResponseWriter, r *http.Requ
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
 	keyName := r.PathValue("keyName")
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 
 	log.Info("RotateAgentAPIKey: starting", "orgName", orgName, "agentName", agentName, "envID", envID, "keyName", keyName)
 
@@ -271,6 +287,10 @@ func (c *agentAPIKeyController) IssueTestAPIKey(w http.ResponseWriter, r *http.R
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 
 	log.Info("IssueTestAPIKey: starting", "orgName", orgName, "projName", projName, "agentName", agentName, "envID", envID)
 

@@ -58,7 +58,7 @@ func RequireOrgMatch(resolver OrgResolver) func(http.HandlerFunc) http.HandlerFu
 				utils.WriteErrorResponse(w, http.StatusForbidden, "missing token claims")
 				return
 			}
-			if claims.OuId == "" {
+			if claims.OuId == "" || claims.OuHandle == "" {
 				utils.WriteErrorResponse(w, http.StatusForbidden, "missing ou identity in token")
 				return
 			}

@@ -54,6 +54,10 @@ func (c *llmProviderAPIKeyController) CreateAPIKey(w http.ResponseWriter, r *htt
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	providerID := r.PathValue("id")
 
 	log.Info("CreateLLMProviderAPIKey: starting", "orgName", orgName, "providerID", providerID)
@@ -117,6 +121,10 @@ func (c *llmProviderAPIKeyController) RevokeAPIKey(w http.ResponseWriter, r *htt
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	providerID := r.PathValue("id")
 	keyName := r.PathValue("keyName")
 
@@ -150,6 +158,10 @@ func (c *llmProviderAPIKeyController) RotateAPIKey(w http.ResponseWriter, r *htt
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
+
+	if !validateOrgFromPath(w, ctx, orgName) {
+		return
+	}
 	providerID := r.PathValue("id")
 	keyName := r.PathValue("keyName")
 
