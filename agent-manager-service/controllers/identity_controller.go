@@ -433,7 +433,15 @@ func (c *identityController) ListGroups(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"groups": groups, "total": total, "offset": offset, "limit": limit})
+	// Filter out the Administrators group from public visibility
+	filteredGroups := make([]thundersvc.ThunderGroup, 0, len(groups))
+	for _, group := range groups {
+		if group.Name != "Administrators" {
+			filteredGroups = append(filteredGroups, group)
+		}
+	}
+
+	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"groups": filteredGroups, "total": total - (len(groups) - len(filteredGroups)), "offset": offset, "limit": limit})
 }
 
 func (c *identityController) GetGroup(w http.ResponseWriter, r *http.Request) {
@@ -459,6 +467,10 @@ func (c *identityController) GetGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !validateGroupOwnership(w, ctx, group, resolvedOrg.OUID) {
+		return
+	}
+
+	if !validateSystemGroup(w, group.Name) {
 		return
 	}
 
@@ -521,6 +533,10 @@ func (c *identityController) UpdateGroup(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if !validateSystemGroup(w, group.Name) {
+		return
+	}
+
 	var req thundersvc.UpdateGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
@@ -566,6 +582,10 @@ func (c *identityController) DeleteGroup(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if !validateSystemGroup(w, group.Name) {
+		return
+	}
+
 	if err := c.client.DeleteGroup(ctx, groupID); err != nil {
 		if thundersvc.IsNotFound(err) {
 			utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
@@ -601,6 +621,10 @@ func (c *identityController) AddGroupMembers(w http.ResponseWriter, r *http.Requ
 	}
 
 	if !validateGroupOwnership(w, ctx, group, resolvedOrg.OUID) {
+		return
+	}
+
+	if !validateSystemGroup(w, group.Name) {
 		return
 	}
 
@@ -650,6 +674,10 @@ func (c *identityController) RemoveGroupMembers(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if !validateSystemGroup(w, group.Name) {
+		return
+	}
+
 	var req struct {
 		UserIDs []string `json:"userIds"`
 	}
@@ -696,6 +724,10 @@ func (c *identityController) GetGroupMembers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !validateSystemGroup(w, group.Name) {
+		return
+	}
+
 	offset := getIntQueryParam(r, "offset", 0)
 	limit := getIntQueryParam(r, "limit", 20)
 	if limit <= 0 || limit > 100 {
@@ -734,6 +766,10 @@ func (c *identityController) GetGroupRoles(w http.ResponseWriter, r *http.Reques
 	}
 
 	if !validateGroupOwnership(w, ctx, group, resolvedOrg.OUID) {
+		return
+	}
+
+	if !validateSystemGroup(w, group.Name) {
 		return
 	}
 
@@ -1208,6 +1244,15 @@ func isPredefinedRole(roleName string) bool {
 func validatePredefinedRole(w http.ResponseWriter, roleName string) bool {
 	if isPredefinedRole(roleName) {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Predefined roles cannot be edited or deleted")
+		return false
+	}
+	return true
+}
+
+// validateSystemGroup checks if a group is a system group and blocks access if so
+func validateSystemGroup(w http.ResponseWriter, groupName string) bool {
+	if groupName == "Administrators" {
+		utils.WriteErrorResponse(w, http.StatusNotFound, "Group not found")
 		return false
 	}
 	return true
