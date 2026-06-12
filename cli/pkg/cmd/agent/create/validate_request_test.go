@@ -217,6 +217,19 @@ func TestValidateRequest_BallerinaNeedsNoVersionOrRunCommand(t *testing.T) {
 	assertNoViolations(t, validateRequest(req))
 }
 
+func TestValidateRequest_BallerinaNeedsNoVersionOrRunCommand_CaseInsensitive(t *testing.T) {
+	req := validInternalReq(t)
+	var b amsvc.Build
+	if err := b.FromBuildpackBuild(amsvc.BuildpackBuild{
+		Type:      amsvc.Buildpack,
+		Buildpack: amsvc.BuildpackConfig{Language: "Ballerina"},
+	}); err != nil {
+		t.Fatalf("build union: %v", err)
+	}
+	req.Build = &b
+	assertNoViolations(t, validateRequest(req))
+}
+
 func TestValidateRequest_BuildpackRequiresVersionAndRunCommand(t *testing.T) {
 	req := validInternalReq(t)
 	var b amsvc.Build

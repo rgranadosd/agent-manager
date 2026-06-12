@@ -251,7 +251,7 @@ func buildViolations(b *amsvc.Build) []string {
 		// Ballerina is the only language the server exempts from
 		// languageVersion and runCommand.
 		var v []string
-		if cfg.Language != langBallerina {
+		if !strings.EqualFold(cfg.Language, langBallerina) {
 			if cfg.LanguageVersion == nil || *cfg.LanguageVersion == "" {
 				v = append(v, fmt.Sprintf("spec.build.buildpack.languageVersion is required for language %q", cfg.Language))
 			}
