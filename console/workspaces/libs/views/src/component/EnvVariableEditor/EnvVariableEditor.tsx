@@ -16,9 +16,9 @@
  * under the License.
  */
 
+import { Box, Checkbox, FormControlLabel, IconButton, Stack, Tooltip } from '@wso2/oxygen-ui';
+import { Edit, Trash2 as DeleteOutline } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { Alert, Box, Checkbox, Chip, FormControlLabel, IconButton, Stack } from '@wso2/oxygen-ui';
-import { Trash2 as DeleteOutline, Edit as EditIcon, X as CancelIcon } from '@wso2/oxygen-ui-icons-react';
 import { TextInput } from '../FormElements';
 
 export interface EnvVariableEditorProps {
@@ -102,22 +102,10 @@ export function EnvVariableEditor({
   keyDisabled = false,
   isExistingSecret = false,
 }: EnvVariableEditorProps) {
-  const [isEditingSecret, setIsEditingSecret] = useState(false);
-
-  // For existing secrets, value is locked unless user explicitly enables editing
-  const isSecretLocked = isExistingSecret && isSensitive && !isEditingSecret;
-
-  const handleEnableEditing = () => {
-    setIsEditingSecret(true);
-    // Clear the value when enabling editing since the existing value is masked
-    onValueChange('');
-  };
-
-  const handleCancelEditing = () => {
-    setIsEditingSecret(false);
-    // Clear the value since we're canceling the edit
-    onValueChange('');
-  };
+  // Existing secrets start locked: the stored value is never returned, so the
+  // field is masked until the user explicitly clicks Edit to enter a new value.
+  const [isEditing, setIsEditing] = useState(false);
+  const isSecretLocked = isExistingSecret && isSensitive && !isEditing;
 
   return (
     <Stack key={index} direction="column" gap={1}>
@@ -148,38 +136,7 @@ export function EnvVariableEditor({
             placeholder={isSecretLocked ? '••••••••' : undefined}
           />
         </Box>
-        {/* Show Secret chip and edit/cancel button for existing secrets */}
-        {isExistingSecret && isSensitive && (
-          <Box display="flex" alignItems="center" gap={1} pb={1}>
-            <Chip
-              label="Secret"
-              size="small"
-              color="warning"
-              variant="outlined"
-            />
-            {!isEditingSecret ? (
-              <IconButton
-                size="small"
-                color="primary"
-                onClick={handleEnableEditing}
-                title="Edit secret value"
-              >
-                <EditIcon size={16} />
-              </IconButton>
-            ) : (
-              <IconButton
-                size="small"
-                color="default"
-                onClick={handleCancelEditing}
-                title="Cancel editing"
-              >
-                <CancelIcon size={16} />
-              </IconButton>
-            )}
-          </Box>
-        )}
-        {/* Show checkbox for new env variables (not existing secrets) */}
-        {onSensitiveChange && !isExistingSecret && (
+        {onSensitiveChange && (
           <Box mr={4}>
             <FormControlLabel
               control={
@@ -194,18 +151,27 @@ export function EnvVariableEditor({
             />
           </Box>
         )}
-        <Box pb={1}>
+        <Box pb={1} display="flex" alignItems="center">
+          {/* Always reserve the edit slot so the delete buttons stay aligned across
+              rows; only locked secrets show an interactive Edit affordance. */}
+          <Tooltip title="Edit value">
+            <IconButton
+              size="small"
+              aria-label="Edit value"
+              onClick={() => setIsEditing(true)}
+              sx={{
+                visibility: isSecretLocked ? 'visible' : 'hidden',
+                pointerEvents: isSecretLocked ? 'auto' : 'none',
+              }}
+            >
+              <Edit size={16} />
+            </IconButton>
+          </Tooltip>
           <IconButton size="small" color="error" onClick={onRemove}>
             <DeleteOutline size={16} />
           </IconButton>
         </Box>
       </Stack>
-      {/* Warning message when editing an existing secret */}
-      {isEditingSecret && (
-        <Alert severity="warning" sx={{ py: 0.5 }}>
-          Updating a Secret value removes the previous value permanently and cannot be restored.
-        </Alert>
-      )}
     </Stack>
   );
 }

@@ -259,43 +259,43 @@ export const rootRouteMap: AppRoute = {
                                         },
                                     },
                                 },
-                                evaluation: {
-                                    path: 'evaluation',
-                                    index: true,
-                                    children: {
-                                        monitor: {
-                                            path: 'monitor',
-                                            index: true,
-                                            children: {
-                                                create: {
-                                                    path: 'create',
-                                                    index: true,
-                                                    children: {},
-                                                },
-                                                view: {
-                                                    path: 'view/:monitorId',
-                                                    index: true,
-                                                    children: {
-                                                        runs: {
-                                                            path: 'runs',
-                                                            index: true,
-                                                            children: {},
-                                                        },
-                                                    },
-                                                },
-                                                edit: {
-                                                    path: 'edit/:monitorId',
-                                                    index: true,
-                                                    children: {},
-                                                }
-                                            },
-                                        }
-                                    },
-                                },
                                 environment: {
                                     path: "environment/:envId",
                                     index: false,
                                     children: {
+                                        evaluation: {
+                                            path: 'evaluation',
+                                            index: true,
+                                            children: {
+                                                monitor: {
+                                                    path: 'monitor',
+                                                    index: true,
+                                                    children: {
+                                                        create: {
+                                                            path: 'create',
+                                                            index: true,
+                                                            children: {},
+                                                        },
+                                                        view: {
+                                                            path: 'view/:monitorId',
+                                                            index: true,
+                                                            children: {
+                                                                runs: {
+                                                                    path: 'runs',
+                                                                    index: true,
+                                                                    children: {},
+                                                                },
+                                                            },
+                                                        },
+                                                        edit: {
+                                                            path: 'edit/:monitorId',
+                                                            index: true,
+                                                            children: {},
+                                                        }
+                                                    },
+                                                }
+                                            },
+                                        },
                                         deploy: {
                                             path: 'deploy',
                                             index: true,

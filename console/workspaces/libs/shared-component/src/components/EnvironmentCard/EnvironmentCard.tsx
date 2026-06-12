@@ -45,7 +45,6 @@ import {
   Clock,
   Rocket as RocketLaunchOutlined,
   FlaskConical as TryOutlined,
-  Workflow,
   Link as LinkOutlined,
   PauseCircle,
   Tag,
@@ -71,6 +70,13 @@ export interface EnvironmentCardProps {
   agentId: string;
   actions?: React.ReactNode;
   bottomContent?: React.ReactNode;
+  /**
+   * Whether this is the first (root) environment of the deployment pipeline.
+   * The root env is reached by deploying a build directly; downstream envs are
+   * reached by promoting from the previous environment. Defaults to true so
+   * callers without pipeline context keep the deploy-oriented wording.
+   */
+  isFirstEnvironment?: boolean;
 }
 
 export const EnvStatus = ({ status }: { status?: DeploymentStatus, }) => {
@@ -145,7 +151,7 @@ const formatRelativeTime = (value?: string | number | Date) => {
 };
 
 export const EnvironmentCard = (props: EnvironmentCardProps) => {
-  const { environment, orgId, projectId, agentId, actions, bottomContent } = props;
+  const { environment, orgId, projectId, agentId, actions, bottomContent, isFirstEnvironment = true } = props;
   const theme = useTheme();
   const { data: agent, isLoading: isAgentLoading } = useGetAgent({
     orgName: orgId,
@@ -169,11 +175,6 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
 
   const currentDeployment = deployments?.[environment?.name ?? ""];
   const envTitle = `${environment?.displayName ?? environment?.name ?? "Environment"} Environment`;
-  const tracesPath = generatePath(
-    absoluteRouteMap.children.org.children.projects.children.agents.children
-      .environment.children.observability.children.traces.path,
-    { orgId, projectId, agentId, envId: environment?.name ?? "" }
-  );
 
   const { data: buildsData } = useGetAgentBuilds({
     orgName: !isExternal ? orgId : "",
@@ -238,16 +239,6 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
             </Box>
             <Box display="flex" flexDirection="row" gap={1} alignItems="center">
               {actions}
-              <Button
-                startIcon={<Workflow size={16} />}
-                variant="text"
-                component={Link}
-                to={tracesPath}
-                color="primary"
-                size="small"
-              >
-                View Traces
-              </Button>
             </Box>
           </Box>
           {bottomContent}
@@ -357,7 +348,9 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
               icon={<RocketLaunchOutlined size={32} />}
               subtitle={
                 hasSuccessfulBuild
-                  ? "A successful build is available. Deploy it to get started."
+                  ? isFirstEnvironment
+                    ? "A successful build is available. Deploy it to get started."
+                    : "Promote a deployment from the previous environment to get started."
                   : "No successful build found. Build the agent before deploying."
               }
               action={
@@ -373,7 +366,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
                     )}
                     size="small"
                   >
-                    Go to Deployment
+                    {isFirstEnvironment ? "Go to Deployment" : "Promote"}
                   </Button>
                 ) : (
                   <Button

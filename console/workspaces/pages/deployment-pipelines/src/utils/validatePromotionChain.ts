@@ -88,34 +88,23 @@ export function validatePromotionChain(paths: PromotionPath[]): PromotionChainVa
     return { valid: false, error: "Promotion paths contain a cycle" };
   }
 
-  // hasCycle's DFS visits every node reachable from roots[0]; if visited doesn't
-  // cover all sources the graph is disconnected — no need for a second traversal.
-  if (visited.size !== sources.size) {
-    const unreachable = [...sources].filter((s) => !visited.has(s));
+  // hasCycle's DFS visits every node reachable from roots[0]; any source not
+  // visited is disconnected from the root — no need for a second traversal.
+  // NOTE: visited also includes target-only nodes, so comparing sizes is wrong.
+  const unreachable = [...sources].filter((s) => !visited.has(s));
+  if (unreachable.length > 0) {
     return {
       valid: false,
       error: `Promotion paths are disconnected — environments not reachable from root: ${unreachable.join(", ")}`,
     };
   }
 
-  // Build the linear chain representation (topological order).
+  // Walk from root following the single outgoing edge — the checks above guarantee a linear chain.
   const chain: string[] = [];
-  const inDegree = new Map<string, number>();
-  for (const node of visited) inDegree.set(node, 0);
-  for (const [, targets] of graph) {
-    for (const t of targets) inDegree.set(t, (inDegree.get(t) ?? 0) + 1);
+  let current: string | undefined = roots[0];
+  while (current) {
+    chain.push(current);
+    current = (graph.get(current) ?? [])[0];
   }
-
-  const queue = [...visited].filter((n) => (inDegree.get(n) ?? 0) === 0);
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    chain.push(node);
-    for (const neighbor of graph.get(node) ?? []) {
-      const deg = (inDegree.get(neighbor) ?? 1) - 1;
-      inDegree.set(neighbor, deg);
-      if (deg === 0) queue.push(neighbor);
-    }
-  }
-
   return { valid: true, chain };
 }

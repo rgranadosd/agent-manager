@@ -89,6 +89,17 @@ export function RootRouter() {
     componentPageModules: [] as ExternalPageModule[]
   });
 
+  // Monitor pages live under environment/:envId/evaluation/monitor; build the
+  // shared prefix once instead of repeating the deep route chain per route.
+  const monitorRoutes =
+    relativeRouteMap.children.org.children.projects.children.agents.children
+      .environment.children.evaluation.children.monitor;
+  const monitorBase =
+    relativeRouteMap.children.org.children.projects.children.agents.children
+      .environment.children.evaluation.path +
+    "/" +
+    monitorRoutes.path;
+
   return (
     <BrowserRouter>
       <Routes>
@@ -359,63 +370,6 @@ export function RootRouter() {
                 <Route
                   path={
                     relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.path
-                  }
-                  element={<LazyEvalMonitorsComponent />}
-                />
-                <Route
-                  path={
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.children.create.path
-                  }
-                  element={<LazyCreateMonitorComponent />}
-                />
-                <Route
-                  path={
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.children.edit.path
-                  }
-                  element={<LazyEditMonitorComponent />}
-                />
-                <Route
-                  path={
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.path +
-                    "/" +
-                    relativeRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation
-                      .children.monitor.children.view.path +
-                    "/*"
-                  }
-                  element={<LazyViewMonitorComponent />}
-                />
-                <Route
-                  path={
-                    relativeRouteMap.children.org.children.projects.children
                       .agents.children.environment.path
                   }
                 >
@@ -458,6 +412,22 @@ export function RootRouter() {
                         .children.metrics.path
                     }
                     element={<LazyMetricsComponent />}
+                  />
+                  <Route
+                    path={monitorBase}
+                    element={<LazyEvalMonitorsComponent />}
+                  />
+                  <Route
+                    path={monitorBase + "/" + monitorRoutes.children.create.path}
+                    element={<LazyCreateMonitorComponent />}
+                  />
+                  <Route
+                    path={monitorBase + "/" + monitorRoutes.children.edit.path}
+                    element={<LazyEditMonitorComponent />}
+                  />
+                  <Route
+                    path={monitorBase + "/" + monitorRoutes.children.view.path + "/*"}
+                    element={<LazyViewMonitorComponent />}
                   />
                   <Route path="*" element={<ErrorPages.NotFound />} />
                 </Route>

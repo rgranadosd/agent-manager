@@ -30,6 +30,7 @@ import  {
   type ListMonitorRunsPathParams,
   type ListMonitorRunsQueryParams,
   type ListMonitorsPathParams,
+  type ListMonitorsQueryParams,
   type LogsResponse,
   type MonitorListResponse,
   type MonitorResponse,
@@ -75,11 +76,14 @@ import {
   updateMonitor,
 } from "../apis";
 
-export function useListMonitors(params: ListMonitorsPathParams) {
+export function useListMonitors(
+  params: ListMonitorsPathParams,
+  queryParams?: ListMonitorsQueryParams
+) {
   const { getToken } = useAuthHooks();
   return useApiQuery<MonitorListResponse>({
-    queryKey: ["monitors", params],
-    queryFn: () => listMonitors(params, getToken),
+    queryKey: ["monitors", params, queryParams],
+    queryFn: () => listMonitors(params, queryParams, getToken),
     enabled: !!params.orgName && !!params.projName && !!params.agentName,
   });
 }

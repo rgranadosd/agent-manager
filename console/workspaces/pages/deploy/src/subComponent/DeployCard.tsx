@@ -338,8 +338,13 @@ export function DeployCard(props: DeployCardProps) {
 
   const hasPromotionTarget = useMemo(() => {
     if (!pipeline) return false;
+    // Only show Promote when this environment has at least one downstream
+    // target. The last environment in a pipeline has no outgoing promotion
+    // path (or an empty target list), so the button is hidden for it.
     return pipeline.promotionPaths.some(
-      (p) => p.sourceEnvironmentRef === currentEnvironment.name,
+      (p) =>
+        p.sourceEnvironmentRef === currentEnvironment.name &&
+        (p.targetEnvironmentRefs?.length ?? 0) > 0,
     );
   }, [pipeline, currentEnvironment.name]);
   const { mutate: updateDeploymentState, isPending: isUpdating } =
@@ -659,7 +664,7 @@ export function DeployCard(props: DeployCardProps) {
             DeploymentStatus.ACTIVE, DeploymentStatus.ERROR, DeploymentStatus.FAILED,
           ].includes(currentDeployment?.status as DeploymentStatus)}>
             <Stack gap={2}>
-              <Card variant="outlined" sx={{ padding: 1.4, pt:0.5 }}>
+              <Card variant="outlined" sx={{ padding: 1.4, pt: 0.5 }}>
                 <Stack gap={1}>
                   <Stack direction="row" gap={1} alignItems="center" justifyContent="space-between">
                     <Typography variant="h6">Resource Usage</Typography>
@@ -810,7 +815,13 @@ export function DeployCard(props: DeployCardProps) {
           {agent?.provisioning?.type === "internal" && (
             <>
               <Divider />
-              <Stack direction="row" justifyContent="right" spacing={1} alignItems="center">
+              <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                <Tooltip title="More actions">
+                  <IconButton size="small" onClick={(e) => setActionsMenuAnchor(e.currentTarget)}>
+                    <MoreHorizontal size={18} />
+                  </IconButton>
+                </Tooltip>
+                <Stack direction="row" justifyContent="right" spacing={1} alignItems="center"> 
                 <Button
                   variant="text"
                   size="small"
@@ -867,11 +878,7 @@ export function DeployCard(props: DeployCardProps) {
                     </Button>
                   </>
                 )}
-                <Tooltip title="More actions">
-                  <IconButton size="small" onClick={(e) => setActionsMenuAnchor(e.currentTarget)}>
-                    <MoreHorizontal size={18} />
-                  </IconButton>
-                </Tooltip>
+                </Stack>
                 <Menu
                   anchorEl={actionsMenuAnchor}
                   open={Boolean(actionsMenuAnchor)}

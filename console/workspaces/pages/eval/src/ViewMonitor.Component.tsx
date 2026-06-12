@@ -17,7 +17,7 @@
  */
 
 import React, { useCallback, useMemo } from "react";
-import { PageLayout } from "@agent-management-platform/views";
+import { formatTraceWindow, PageLayout } from "@agent-management-platform/views";
 import {
   Chip,
   CircularProgress,
@@ -192,14 +192,7 @@ export const ViewMonitorComponent: React.FC = () => {
   const traceWindowLabel = useMemo(() => {
     if (!isPastMonitor || !monitorData?.traceStart || !monitorData?.traceEnd)
       return null;
-    const fmt = (iso: string) =>
-      new Date(iso).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    return `${fmt(monitorData.traceStart)} – ${fmt(monitorData.traceEnd)}`;
+    return formatTraceWindow(monitorData.traceStart, monitorData.traceEnd);
   }, [isPastMonitor, monitorData?.traceStart, monitorData?.traceEnd]);
 
   // ── AgentPerformanceCard (radar) ─────────────────────────────────────────
@@ -331,8 +324,8 @@ export const ViewMonitorComponent: React.FC = () => {
       <Route
         path={
           relativeRouteMap.children.org.children.projects.children.agents
-            .children.evaluation.children.monitor.children.view.children.runs
-            .path
+            .children.environment.children.evaluation.children.monitor.children
+            .view.children.runs.path
         }
         element={
           <PageLayout
@@ -341,7 +334,8 @@ export const ViewMonitorComponent: React.FC = () => {
             backLabel={`Back to ${monitorData?.displayName ?? "Monitor"}`}
             backHref={generatePath(
               absoluteRouteMap.children.org.children.projects.children.agents
-                .children.evaluation.children.monitor.children.view.path,
+                .children.environment.children.evaluation.children.monitor
+                .children.view.path,
               {
                 orgId: orgId,
                 projectId: projectId,
@@ -383,7 +377,7 @@ export const ViewMonitorComponent: React.FC = () => {
             backLabel="Back to Monitors"
             backHref={generatePath(
               absoluteRouteMap.children.org.children.projects.children.agents
-                .children.evaluation.children.monitor.path,
+                .children.environment.children.evaluation.children.monitor.path,
               {
                 orgId: orgId,
                 projectId: projectId,
