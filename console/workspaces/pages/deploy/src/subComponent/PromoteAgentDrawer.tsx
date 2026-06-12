@@ -140,24 +140,16 @@ export function PromoteAgentDrawer({
     [],
   );
 
+  // secretRef is intentionally preserved while editing so cancelling an edit can
+  // restore the original masked secret. Submit decides whether to send the new
+  // value or fall back to secretRef (see handleSubmit).
   const handleEnvChange = useCallback(
     (index: number, field: "key" | "value" | "isSensitive", value: string | boolean) => {
       setFormState((prev) => ({
         ...prev,
-        env: prev.env.map((item, i) => {
-          if (i !== index) return item;
-          const updated = { ...item, [field]: value };
-          // Clear the secret reference once the user enters a new value or
-          // unmarks the variable as secret, so the new value is sent instead.
-          if (item.secretRef) {
-            if (field === "value" && typeof value === "string" && value.length > 0) {
-              delete updated.secretRef;
-            } else if (field === "isSensitive" && value === false) {
-              delete updated.secretRef;
-            }
-          }
-          return updated;
-        }),
+        env: prev.env.map((item, i) =>
+          i === index ? { ...item, [field]: value } : item,
+        ),
       }));
     },
     [],

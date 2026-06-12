@@ -16,8 +16,16 @@
  * under the License.
  */
 
-import { Box, Checkbox, FormControlLabel, IconButton, Stack, Tooltip } from '@wso2/oxygen-ui';
-import { Edit, Trash2 as DeleteOutline } from '@wso2/oxygen-ui-icons-react';
+import {
+  Box,
+  Checkbox,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
+  Stack,
+  Tooltip,
+} from '@wso2/oxygen-ui';
+import { Edit, Eye, EyeOff, Trash2 as DeleteOutline, X } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { TextInput } from '../FormElements';
 
@@ -105,7 +113,44 @@ export function EnvVariableEditor({
   // Existing secrets start locked: the stored value is never returned, so the
   // field is masked until the user explicitly clicks Edit to enter a new value.
   const [isEditing, setIsEditing] = useState(false);
+  // Snapshot of the value when editing started, so Cancel can restore it even
+  // after the user has typed a new value.
+  const [valueBeforeEdit, setValueBeforeEdit] = useState('');
+  // Toggles plaintext reveal of a secret value while the user is typing it.
+  const [showValue, setShowValue] = useState(false);
+
+  const isSecretField = isValueSecret || isSensitive;
   const isSecretLocked = isExistingSecret && isSensitive && !isEditing;
+
+  const handleStartEdit = () => {
+    setValueBeforeEdit(valueValue);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    // Restore the previous value and re-lock the field, discarding any edits.
+    onValueChange(valueBeforeEdit);
+    setIsEditing(false);
+    setShowValue(false);
+  };
+
+  // Reveal toggle for secret values; hidden while the field is locked since
+  // there is nothing entered to reveal.
+  const valueEndAdornment =
+    isSecretField && !isSecretLocked ? (
+      <InputAdornment position="end">
+        <Tooltip title={showValue ? 'Hide value' : 'Show value'}>
+          <IconButton
+            size="small"
+            edge="end"
+            aria-label={showValue ? 'Hide value' : 'Show value'}
+            onClick={() => setShowValue((prev) => !prev)}
+          >
+            {showValue ? <EyeOff size={16} /> : <Eye size={16} />}
+          </IconButton>
+        </Tooltip>
+      </InputAdornment>
+    ) : undefined;
 
   return (
     <Stack key={index} direction="column" gap={1}>
@@ -125,7 +170,7 @@ export function EnvVariableEditor({
         <Box flex={1} minWidth={0}>
           <TextInput
             label={valueLabel}
-            type={isValueSecret || isSensitive ? 'password' : 'text'}
+            type={isSecretField && !showValue ? 'password' : 'text'}
             fullWidth
             size="small"
             value={valueValue}
@@ -134,6 +179,7 @@ export function EnvVariableEditor({
             helperText={valueError}
             disabled={isSecretLocked}
             placeholder={isSecretLocked ? '••••••••' : undefined}
+            slotProps={{ input: { endAdornment: valueEndAdornment } }}
           />
         </Box>
         {onSensitiveChange && (
@@ -152,19 +198,26 @@ export function EnvVariableEditor({
           </Box>
         )}
         <Box pb={1} display="flex" alignItems="center">
-          {/* Always reserve the edit slot so the delete buttons stay aligned across
-              rows; only locked secrets show an interactive Edit affordance. */}
-          <Tooltip title="Edit value">
+          {/* Always reserve this slot so the delete buttons stay aligned across
+              rows. Existing secrets toggle between Edit (locked) and Cancel
+              (editing); other fields keep the slot hidden. Cancel stays visible
+              for the whole edit session even after typing clears the stored
+              secret flag upstream. */}
+          <Tooltip title={isEditing ? 'Cancel edit' : 'Edit value'}>
             <IconButton
               size="small"
-              aria-label="Edit value"
-              onClick={() => setIsEditing(true)}
-              sx={{
-                visibility: isSecretLocked ? 'visible' : 'hidden',
-                pointerEvents: isSecretLocked ? 'auto' : 'none',
-              }}
+              aria-label={isEditing ? 'Cancel edit' : 'Edit value'}
+              onClick={isEditing ? handleCancelEdit : handleStartEdit}
+              sx={
+                isEditing
+                  ? undefined
+                  : {
+                      visibility: isSecretLocked ? 'visible' : 'hidden',
+                      pointerEvents: isSecretLocked ? 'auto' : 'none',
+                    }
+              }
             >
-              <Edit size={16} />
+              {isEditing ? <X size={16} /> : <Edit size={16} />}
             </IconButton>
           </Tooltip>
           <IconButton size="small" color="error" onClick={onRemove}>
