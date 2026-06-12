@@ -1660,3 +1660,104 @@ data:
     fi
 
     log_info "Default role assignments complete."
+
+  62-amp-default-groups.sh: |
+    #!/bin/bash
+    set -e
+
+    SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
+    source "${SCRIPT_DIR}/common.sh"
+
+    log_info "Creating AMP default groups..."
+
+    # ---------------------------------------------------------------------------
+    # Fetch default OU ID
+    # ---------------------------------------------------------------------------
+    RESPONSE=$(thunder_api_call GET "/organization-units/tree/default")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+    if [[ "$HTTP_CODE" != "200" ]]; then
+      log_error "Failed to fetch default OU (HTTP $HTTP_CODE)"
+      exit 1
+    fi
+    DEFAULT_OU_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$DEFAULT_OU_ID" ]]; then
+      log_error "Could not extract default OU ID"
+      exit 1
+    fi
+    log_info "Using OU ID: $DEFAULT_OU_ID"
+
+    # ---------------------------------------------------------------------------
+    # Helper: create or get group by name; echoes the group ID
+    # ---------------------------------------------------------------------------
+    create_or_get_group() {
+      local name="$1" description="$2"
+      local payload="{\"name\":\"${name}\",\"ouId\":\"${DEFAULT_OU_ID}\",\"description\":\"${description}\"}"
+      local response http_code body id
+
+      response=$(thunder_api_call POST "/groups" "$payload")
+      http_code="${response: -3}"
+      body="${response%???}"
+
+      if [[ "$http_code" == "201" ]] || [[ "$http_code" == "200" ]]; then
+        id=$(echo "$body" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        log_success "Created group '${name}' (id: $id)" >&2
+        echo "$id"
+        return 0
+      fi
+
+      if [[ "$http_code" == "409" ]]; then
+        log_warning "Group '${name}' already exists, retrieving ID..." >&2
+        response=$(thunder_api_call GET "/groups")
+        body="${response%???}"
+        id=$(echo "$body" | sed 's/},{/}\n{/g' | grep "\"name\":\"${name}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ -z "$id" ]]; then
+          log_error "Group '${name}' reported 409 but not found in list" >&2
+          exit 1
+        fi
+        log_success "Found existing group '${name}' (id: $id)" >&2
+        echo "$id"
+        return 0
+      fi
+
+      log_error "Failed to create group '${name}' (HTTP $http_code): $body" >&2
+      exit 1
+    }
+
+    # ===========================================================================
+    # Create default groups
+    # ===========================================================================
+    ADMINS_GROUP_ID=$(create_or_get_group "admins" "Administrative group with full access to all AMP resources")
+
+    # ===========================================================================
+    # Assign admin role to admins group
+    # ===========================================================================
+    log_info "Looking up admin role..."
+    RESPONSE=$(thunder_api_call GET "/roles")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+    if [[ "$HTTP_CODE" != "200" ]]; then
+      log_error "Failed to fetch roles (HTTP $HTTP_CODE)"
+      exit 1
+    fi
+
+    ADMIN_ROLE_ID=$(echo "$BODY" | sed 's/},{/}\n{/g' | grep '"name":"admin"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$ADMIN_ROLE_ID" ]]; then
+      log_error "Could not find admin role"
+      exit 1
+    fi
+    log_info "Found admin role (id: $ADMIN_ROLE_ID)"
+
+    log_info "Assigning admin role to admins group..."
+    ASSIGN_PAYLOAD='{"assignments":[{"id":"'${ADMINS_GROUP_ID}'","type":"group"}]}'
+    RESPONSE=$(thunder_api_call POST "/roles/$ADMIN_ROLE_ID/assignments/add" "$ASSIGN_PAYLOAD")
+    HTTP_CODE="${RESPONSE: -3}"
+    if [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "204" ]] || [[ "$HTTP_CODE" == "409" ]]; then
+      log_success "Assigned admin role to admins group"
+    else
+      log_error "Failed to assign admin role to admins group (HTTP $HTTP_CODE)"
+      echo "Response: ${RESPONSE%???}"
+      exit 1
+    fi
+
+    log_info "Default group provisioning complete (1 group created/updated)."
