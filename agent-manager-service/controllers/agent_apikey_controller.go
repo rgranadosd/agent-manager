@@ -68,7 +68,7 @@ func (c *agentAPIKeyController) CreateAPIKey(w http.ResponseWriter, r *http.Requ
 	agentName := r.PathValue(utils.PathParamAgentName)
 	envID := r.PathValue(utils.PathParamEnvID)
 
-    if !validateOrgFromPath(w, ctx, orgName) {
+	if !validateOrgFromPath(w, ctx, orgName) {
 		return
 	}
 
