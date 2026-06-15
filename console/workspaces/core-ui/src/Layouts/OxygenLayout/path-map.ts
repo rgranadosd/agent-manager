@@ -5,8 +5,7 @@ import { absoluteRouteMap, relativeRouteMap } from "@agent-management-platform/t
 
 export function usePagePath(path: string) {
     const match = useMatch(path + "/:page/*");
-    const matchWithSubPage = useMatch(path + "/:page/:subPage/*");
-    return { page: match?.params.page ?? null, subPage: matchWithSubPage?.params.subPage ?? null };
+    return { page: match?.params.page ?? null };
 }
 
 export function useActiveOrgPage() {
@@ -40,32 +39,25 @@ export function useActiveProjectPage() {
 }
 
 export function useActiveAgentPage() {
-    const { page, subPage } = usePagePath(
+    const { page } = usePagePath(
         absoluteRouteMap.children.org.children.projects.children.agents.path,
     );
 
     return useMemo(() => {
+        // Standard agent pages own their own nav highlight; everything else
+        // (custom/component pages) reuses `page` as the active label. Monitors
+        // now live under `environment/:envId`, so they fall under "environment".
         if (
             page !== "environment" &&
-            subPage !== "evaluation" &&
             page !==
                 relativeRouteMap.children.org.children.projects.children.agents
                     .children.build.path &&
             page !==
                 relativeRouteMap.children.org.children.projects.children.agents
-                    .children.deployment.path &&
-            page !==
-                relativeRouteMap.children.org.children.projects.children.agents
-                    .children.environment.path &&
-            page !==
-                relativeRouteMap.children.org.children.projects.children.agents
-                    .children.evaluation.path
+                    .children.deployment.path
         ) {
             return page;
         }
-        if (subPage && page === "evaluation") {
-            return `${page}/${subPage}`;
-        }
         return null;
-    }, [page, subPage]);
+    }, [page]);
 }

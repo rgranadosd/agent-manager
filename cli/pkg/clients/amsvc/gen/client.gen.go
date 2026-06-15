@@ -147,6 +147,14 @@ type ClientInterface interface {
 	// ListDeploymentPipelines request
 	ListDeploymentPipelines(ctx context.Context, orgName string, params *ListDeploymentPipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateDeploymentPipelineWithBody request with any body
+	CreateDeploymentPipelineWithBody(ctx context.Context, orgName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateDeploymentPipeline(ctx context.Context, orgName string, body CreateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeploymentPipeline request
+	DeleteDeploymentPipeline(ctx context.Context, orgName string, pipelineName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListEnvironments request
 	ListEnvironments(ctx context.Context, orgName string, params *ListEnvironmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -379,6 +387,16 @@ type ClientInterface interface {
 	// GetAgentConfigurations request
 	GetAgentConfigurations(ctx context.Context, orgName string, projName string, agentName string, params *GetAgentConfigurationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateAgentConfigurationsWithBody request with any body
+	UpdateAgentConfigurationsWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAgentConfigurations(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentConfigurationsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAgentDeploySettingsWithBody request with any body
+	UpdateAgentDeploySettingsWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAgentDeploySettings(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentDeploySettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAgentDeployments request
 	ListAgentDeployments(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -439,7 +457,7 @@ type ClientInterface interface {
 	UpdateAgentModelConfig(ctx context.Context, orgName string, projName string, agentName string, configId openapi_types.UUID, body UpdateAgentModelConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListMonitors request
-	ListMonitors(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListMonitors(ctx context.Context, orgName string, projName string, agentName string, params *ListMonitorsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateMonitorWithBody request with any body
 	CreateMonitorWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -484,6 +502,11 @@ type ClientInterface interface {
 	// StopMonitor request
 	StopMonitor(ctx context.Context, orgName string, projName string, agentName string, monitorName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PromoteAgentWithBody request with any body
+	PromoteAgentWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PromoteAgent(ctx context.Context, orgName string, projName string, agentName string, body PromoteAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PublishAgentKindWithBody request with any body
 	PublishAgentKindWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -515,6 +538,11 @@ type ClientInterface interface {
 
 	// GetDeploymentPipeline request
 	GetDeploymentPipeline(ctx context.Context, orgName string, projName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDeploymentPipelineWithBody request with any body
+	UpdateDeploymentPipelineWithBody(ctx context.Context, orgName string, projName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateDeploymentPipeline(ctx context.Context, orgName string, projName string, body UpdateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListLLMProxies request
 	ListLLMProxies(ctx context.Context, orgName string, projName string, params *ListLLMProxiesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -794,6 +822,42 @@ func (c *Client) ListDataPlanes(ctx context.Context, orgName string, reqEditors 
 
 func (c *Client) ListDeploymentPipelines(ctx context.Context, orgName string, params *ListDeploymentPipelinesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListDeploymentPipelinesRequest(c.Server, orgName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploymentPipelineWithBody(ctx context.Context, orgName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentPipelineRequestWithBody(c.Server, orgName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateDeploymentPipeline(ctx context.Context, orgName string, body CreateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDeploymentPipelineRequest(c.Server, orgName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteDeploymentPipeline(ctx context.Context, orgName string, pipelineName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeploymentPipelineRequest(c.Server, orgName, pipelineName)
 	if err != nil {
 		return nil, err
 	}
@@ -1812,6 +1876,54 @@ func (c *Client) GetAgentConfigurations(ctx context.Context, orgName string, pro
 	return c.Client.Do(req)
 }
 
+func (c *Client) UpdateAgentConfigurationsWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAgentConfigurationsRequestWithBody(c.Server, orgName, projName, agentName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAgentConfigurations(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentConfigurationsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAgentConfigurationsRequest(c.Server, orgName, projName, agentName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAgentDeploySettingsWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAgentDeploySettingsRequestWithBody(c.Server, orgName, projName, agentName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAgentDeploySettings(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentDeploySettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAgentDeploySettingsRequest(c.Server, orgName, projName, agentName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListAgentDeployments(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAgentDeploymentsRequest(c.Server, orgName, projName, agentName)
 	if err != nil {
@@ -2076,8 +2188,8 @@ func (c *Client) UpdateAgentModelConfig(ctx context.Context, orgName string, pro
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListMonitors(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListMonitorsRequest(c.Server, orgName, projName, agentName)
+func (c *Client) ListMonitors(ctx context.Context, orgName string, projName string, agentName string, params *ListMonitorsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMonitorsRequest(c.Server, orgName, projName, agentName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2268,6 +2380,30 @@ func (c *Client) StopMonitor(ctx context.Context, orgName string, projName strin
 	return c.Client.Do(req)
 }
 
+func (c *Client) PromoteAgentWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteAgentRequestWithBody(c.Server, orgName, projName, agentName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PromoteAgent(ctx context.Context, orgName string, projName string, agentName string, body PromoteAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteAgentRequest(c.Server, orgName, projName, agentName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PublishAgentKindWithBody(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPublishAgentKindRequestWithBody(c.Server, orgName, projName, agentName, contentType, body)
 	if err != nil {
@@ -2402,6 +2538,30 @@ func (c *Client) GetTraceScores(ctx context.Context, orgName string, projName st
 
 func (c *Client) GetDeploymentPipeline(ctx context.Context, orgName string, projName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetDeploymentPipelineRequest(c.Server, orgName, projName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentPipelineWithBody(ctx context.Context, orgName string, projName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentPipelineRequestWithBody(c.Server, orgName, projName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateDeploymentPipeline(ctx context.Context, orgName string, projName string, body UpdateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDeploymentPipelineRequest(c.Server, orgName, projName, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3457,6 +3617,94 @@ func NewListDeploymentPipelinesRequest(server string, orgName string, params *Li
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateDeploymentPipelineRequest calls the generic CreateDeploymentPipeline builder with application/json body
+func NewCreateDeploymentPipelineRequest(server string, orgName string, body CreateDeploymentPipelineJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDeploymentPipelineRequestWithBody(server, orgName, "application/json", bodyReader)
+}
+
+// NewCreateDeploymentPipelineRequestWithBody generates requests for CreateDeploymentPipeline with any type of body
+func NewCreateDeploymentPipelineRequestWithBody(server string, orgName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/deployment-pipelines", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDeploymentPipelineRequest generates requests for DeleteDeploymentPipeline
+func NewDeleteDeploymentPipelineRequest(server string, orgName string, pipelineName string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pipelineName", pipelineName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/deployment-pipelines/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -6904,6 +7152,128 @@ func NewGetAgentConfigurationsRequest(server string, orgName string, projName st
 	return req, nil
 }
 
+// NewUpdateAgentConfigurationsRequest calls the generic UpdateAgentConfigurations builder with application/json body
+func NewUpdateAgentConfigurationsRequest(server string, orgName string, projName string, agentName string, body UpdateAgentConfigurationsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAgentConfigurationsRequestWithBody(server, orgName, projName, agentName, "application/json", bodyReader)
+}
+
+// NewUpdateAgentConfigurationsRequestWithBody generates requests for UpdateAgentConfigurations with any type of body
+func NewUpdateAgentConfigurationsRequestWithBody(server string, orgName string, projName string, agentName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "projName", projName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "agentName", agentName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/projects/%s/agents/%s/configurations", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateAgentDeploySettingsRequest calls the generic UpdateAgentDeploySettings builder with application/json body
+func NewUpdateAgentDeploySettingsRequest(server string, orgName string, projName string, agentName string, body UpdateAgentDeploySettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAgentDeploySettingsRequestWithBody(server, orgName, projName, agentName, "application/json", bodyReader)
+}
+
+// NewUpdateAgentDeploySettingsRequestWithBody generates requests for UpdateAgentDeploySettings with any type of body
+func NewUpdateAgentDeploySettingsRequestWithBody(server string, orgName string, projName string, agentName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "projName", projName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "agentName", agentName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/projects/%s/agents/%s/deploy-settings", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListAgentDeploymentsRequest generates requests for ListAgentDeployments
 func NewListAgentDeploymentsRequest(server string, orgName string, projName string, agentName string) (*http.Request, error) {
 	var err error
@@ -7842,7 +8212,7 @@ func NewUpdateAgentModelConfigRequestWithBody(server string, orgName string, pro
 }
 
 // NewListMonitorsRequest generates requests for ListMonitors
-func NewListMonitorsRequest(server string, orgName string, projName string, agentName string) (*http.Request, error) {
+func NewListMonitorsRequest(server string, orgName string, projName string, agentName string, params *ListMonitorsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7879,6 +8249,28 @@ func NewListMonitorsRequest(server string, orgName string, projName string, agen
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -8844,6 +9236,67 @@ func NewStopMonitorRequest(server string, orgName string, projName string, agent
 	return req, nil
 }
 
+// NewPromoteAgentRequest calls the generic PromoteAgent builder with application/json body
+func NewPromoteAgentRequest(server string, orgName string, projName string, agentName string, body PromoteAgentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPromoteAgentRequestWithBody(server, orgName, projName, agentName, "application/json", bodyReader)
+}
+
+// NewPromoteAgentRequestWithBody generates requests for PromoteAgent with any type of body
+func NewPromoteAgentRequestWithBody(server string, orgName string, projName string, agentName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "projName", projName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "agentName", agentName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/projects/%s/agents/%s/promote", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewPublishAgentKindRequest calls the generic PublishAgentKind builder with application/json body
 func NewPublishAgentKindRequest(server string, orgName string, projName string, agentName string, body PublishAgentKindJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -9420,6 +9873,60 @@ func NewGetDeploymentPipelineRequest(server string, orgName string, projName str
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateDeploymentPipelineRequest calls the generic UpdateDeploymentPipeline builder with application/json body
+func NewUpdateDeploymentPipelineRequest(server string, orgName string, projName string, body UpdateDeploymentPipelineJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDeploymentPipelineRequestWithBody(server, orgName, projName, "application/json", bodyReader)
+}
+
+// NewUpdateDeploymentPipelineRequestWithBody generates requests for UpdateDeploymentPipeline with any type of body
+func NewUpdateDeploymentPipelineRequestWithBody(server string, orgName string, projName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgName", orgName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "projName", projName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/projects/%s/deployment-pipeline", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -10201,6 +10708,14 @@ type ClientWithResponsesInterface interface {
 	// ListDeploymentPipelinesWithResponse request
 	ListDeploymentPipelinesWithResponse(ctx context.Context, orgName string, params *ListDeploymentPipelinesParams, reqEditors ...RequestEditorFn) (*ListDeploymentPipelinesResp, error)
 
+	// CreateDeploymentPipelineWithBodyWithResponse request with any body
+	CreateDeploymentPipelineWithBodyWithResponse(ctx context.Context, orgName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentPipelineResp, error)
+
+	CreateDeploymentPipelineWithResponse(ctx context.Context, orgName string, body CreateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentPipelineResp, error)
+
+	// DeleteDeploymentPipelineWithResponse request
+	DeleteDeploymentPipelineWithResponse(ctx context.Context, orgName string, pipelineName string, reqEditors ...RequestEditorFn) (*DeleteDeploymentPipelineResp, error)
+
 	// ListEnvironmentsWithResponse request
 	ListEnvironmentsWithResponse(ctx context.Context, orgName string, params *ListEnvironmentsParams, reqEditors ...RequestEditorFn) (*ListEnvironmentsResp, error)
 
@@ -10433,6 +10948,16 @@ type ClientWithResponsesInterface interface {
 	// GetAgentConfigurationsWithResponse request
 	GetAgentConfigurationsWithResponse(ctx context.Context, orgName string, projName string, agentName string, params *GetAgentConfigurationsParams, reqEditors ...RequestEditorFn) (*GetAgentConfigurationsResp, error)
 
+	// UpdateAgentConfigurationsWithBodyWithResponse request with any body
+	UpdateAgentConfigurationsWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentConfigurationsResp, error)
+
+	UpdateAgentConfigurationsWithResponse(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentConfigurationsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentConfigurationsResp, error)
+
+	// UpdateAgentDeploySettingsWithBodyWithResponse request with any body
+	UpdateAgentDeploySettingsWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentDeploySettingsResp, error)
+
+	UpdateAgentDeploySettingsWithResponse(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentDeploySettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentDeploySettingsResp, error)
+
 	// ListAgentDeploymentsWithResponse request
 	ListAgentDeploymentsWithResponse(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*ListAgentDeploymentsResp, error)
 
@@ -10493,7 +11018,7 @@ type ClientWithResponsesInterface interface {
 	UpdateAgentModelConfigWithResponse(ctx context.Context, orgName string, projName string, agentName string, configId openapi_types.UUID, body UpdateAgentModelConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentModelConfigResp, error)
 
 	// ListMonitorsWithResponse request
-	ListMonitorsWithResponse(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*ListMonitorsResp, error)
+	ListMonitorsWithResponse(ctx context.Context, orgName string, projName string, agentName string, params *ListMonitorsParams, reqEditors ...RequestEditorFn) (*ListMonitorsResp, error)
 
 	// CreateMonitorWithBodyWithResponse request with any body
 	CreateMonitorWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMonitorResp, error)
@@ -10538,6 +11063,11 @@ type ClientWithResponsesInterface interface {
 	// StopMonitorWithResponse request
 	StopMonitorWithResponse(ctx context.Context, orgName string, projName string, agentName string, monitorName string, reqEditors ...RequestEditorFn) (*StopMonitorResp, error)
 
+	// PromoteAgentWithBodyWithResponse request with any body
+	PromoteAgentWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteAgentResp, error)
+
+	PromoteAgentWithResponse(ctx context.Context, orgName string, projName string, agentName string, body PromoteAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteAgentResp, error)
+
 	// PublishAgentKindWithBodyWithResponse request with any body
 	PublishAgentKindWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PublishAgentKindResp, error)
 
@@ -10569,6 +11099,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetDeploymentPipelineWithResponse request
 	GetDeploymentPipelineWithResponse(ctx context.Context, orgName string, projName string, reqEditors ...RequestEditorFn) (*GetDeploymentPipelineResp, error)
+
+	// UpdateDeploymentPipelineWithBodyWithResponse request with any body
+	UpdateDeploymentPipelineWithBodyWithResponse(ctx context.Context, orgName string, projName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentPipelineResp, error)
+
+	UpdateDeploymentPipelineWithResponse(ctx context.Context, orgName string, projName string, body UpdateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentPipelineResp, error)
 
 	// ListLLMProxiesWithResponse request
 	ListLLMProxiesWithResponse(ctx context.Context, orgName string, projName string, params *ListLLMProxiesParams, reqEditors ...RequestEditorFn) (*ListLLMProxiesResp, error)
@@ -11021,6 +11556,54 @@ func (r ListDeploymentPipelinesResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListDeploymentPipelinesResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateDeploymentPipelineResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *DeploymentPipelineResponse
+	JSON400      *ErrorResponse
+	JSON409      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDeploymentPipelineResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDeploymentPipelineResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteDeploymentPipelineResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeploymentPipelineResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeploymentPipelineResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -12648,6 +13231,54 @@ func (r GetAgentConfigurationsResp) StatusCode() int {
 	return 0
 }
 
+type UpdateAgentConfigurationsResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAgentConfigurationsResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAgentConfigurationsResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAgentDeploySettingsResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAgentDeploySettingsResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAgentDeploySettingsResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListAgentDeploymentsResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13371,6 +14002,32 @@ func (r StopMonitorResp) StatusCode() int {
 	return 0
 }
 
+type PromoteAgentResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *PromoteAgentResponse
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON409      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r PromoteAgentResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PromoteAgentResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type PublishAgentKindResp struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13563,6 +14220,31 @@ func (r GetDeploymentPipelineResp) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetDeploymentPipelineResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateDeploymentPipelineResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentPipelineResponse
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDeploymentPipelineResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDeploymentPipelineResp) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -14029,6 +14711,32 @@ func (c *ClientWithResponses) ListDeploymentPipelinesWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseListDeploymentPipelinesResp(rsp)
+}
+
+// CreateDeploymentPipelineWithBodyWithResponse request with arbitrary body returning *CreateDeploymentPipelineResp
+func (c *ClientWithResponses) CreateDeploymentPipelineWithBodyWithResponse(ctx context.Context, orgName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDeploymentPipelineResp, error) {
+	rsp, err := c.CreateDeploymentPipelineWithBody(ctx, orgName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeploymentPipelineResp(rsp)
+}
+
+func (c *ClientWithResponses) CreateDeploymentPipelineWithResponse(ctx context.Context, orgName string, body CreateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDeploymentPipelineResp, error) {
+	rsp, err := c.CreateDeploymentPipeline(ctx, orgName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDeploymentPipelineResp(rsp)
+}
+
+// DeleteDeploymentPipelineWithResponse request returning *DeleteDeploymentPipelineResp
+func (c *ClientWithResponses) DeleteDeploymentPipelineWithResponse(ctx context.Context, orgName string, pipelineName string, reqEditors ...RequestEditorFn) (*DeleteDeploymentPipelineResp, error) {
+	rsp, err := c.DeleteDeploymentPipeline(ctx, orgName, pipelineName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeploymentPipelineResp(rsp)
 }
 
 // ListEnvironmentsWithResponse request returning *ListEnvironmentsResp
@@ -14767,6 +15475,40 @@ func (c *ClientWithResponses) GetAgentConfigurationsWithResponse(ctx context.Con
 	return ParseGetAgentConfigurationsResp(rsp)
 }
 
+// UpdateAgentConfigurationsWithBodyWithResponse request with arbitrary body returning *UpdateAgentConfigurationsResp
+func (c *ClientWithResponses) UpdateAgentConfigurationsWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentConfigurationsResp, error) {
+	rsp, err := c.UpdateAgentConfigurationsWithBody(ctx, orgName, projName, agentName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentConfigurationsResp(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAgentConfigurationsWithResponse(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentConfigurationsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentConfigurationsResp, error) {
+	rsp, err := c.UpdateAgentConfigurations(ctx, orgName, projName, agentName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentConfigurationsResp(rsp)
+}
+
+// UpdateAgentDeploySettingsWithBodyWithResponse request with arbitrary body returning *UpdateAgentDeploySettingsResp
+func (c *ClientWithResponses) UpdateAgentDeploySettingsWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentDeploySettingsResp, error) {
+	rsp, err := c.UpdateAgentDeploySettingsWithBody(ctx, orgName, projName, agentName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentDeploySettingsResp(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAgentDeploySettingsWithResponse(ctx context.Context, orgName string, projName string, agentName string, body UpdateAgentDeploySettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentDeploySettingsResp, error) {
+	rsp, err := c.UpdateAgentDeploySettings(ctx, orgName, projName, agentName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentDeploySettingsResp(rsp)
+}
+
 // ListAgentDeploymentsWithResponse request returning *ListAgentDeploymentsResp
 func (c *ClientWithResponses) ListAgentDeploymentsWithResponse(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*ListAgentDeploymentsResp, error) {
 	rsp, err := c.ListAgentDeployments(ctx, orgName, projName, agentName, reqEditors...)
@@ -14959,8 +15701,8 @@ func (c *ClientWithResponses) UpdateAgentModelConfigWithResponse(ctx context.Con
 }
 
 // ListMonitorsWithResponse request returning *ListMonitorsResp
-func (c *ClientWithResponses) ListMonitorsWithResponse(ctx context.Context, orgName string, projName string, agentName string, reqEditors ...RequestEditorFn) (*ListMonitorsResp, error) {
-	rsp, err := c.ListMonitors(ctx, orgName, projName, agentName, reqEditors...)
+func (c *ClientWithResponses) ListMonitorsWithResponse(ctx context.Context, orgName string, projName string, agentName string, params *ListMonitorsParams, reqEditors ...RequestEditorFn) (*ListMonitorsResp, error) {
+	rsp, err := c.ListMonitors(ctx, orgName, projName, agentName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -15100,6 +15842,23 @@ func (c *ClientWithResponses) StopMonitorWithResponse(ctx context.Context, orgNa
 	return ParseStopMonitorResp(rsp)
 }
 
+// PromoteAgentWithBodyWithResponse request with arbitrary body returning *PromoteAgentResp
+func (c *ClientWithResponses) PromoteAgentWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteAgentResp, error) {
+	rsp, err := c.PromoteAgentWithBody(ctx, orgName, projName, agentName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteAgentResp(rsp)
+}
+
+func (c *ClientWithResponses) PromoteAgentWithResponse(ctx context.Context, orgName string, projName string, agentName string, body PromoteAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteAgentResp, error) {
+	rsp, err := c.PromoteAgent(ctx, orgName, projName, agentName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteAgentResp(rsp)
+}
+
 // PublishAgentKindWithBodyWithResponse request with arbitrary body returning *PublishAgentKindResp
 func (c *ClientWithResponses) PublishAgentKindWithBodyWithResponse(ctx context.Context, orgName string, projName string, agentName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PublishAgentKindResp, error) {
 	rsp, err := c.PublishAgentKindWithBody(ctx, orgName, projName, agentName, contentType, body, reqEditors...)
@@ -15202,6 +15961,23 @@ func (c *ClientWithResponses) GetDeploymentPipelineWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseGetDeploymentPipelineResp(rsp)
+}
+
+// UpdateDeploymentPipelineWithBodyWithResponse request with arbitrary body returning *UpdateDeploymentPipelineResp
+func (c *ClientWithResponses) UpdateDeploymentPipelineWithBodyWithResponse(ctx context.Context, orgName string, projName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDeploymentPipelineResp, error) {
+	rsp, err := c.UpdateDeploymentPipelineWithBody(ctx, orgName, projName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentPipelineResp(rsp)
+}
+
+func (c *ClientWithResponses) UpdateDeploymentPipelineWithResponse(ctx context.Context, orgName string, projName string, body UpdateDeploymentPipelineJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDeploymentPipelineResp, error) {
+	rsp, err := c.UpdateDeploymentPipeline(ctx, orgName, projName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDeploymentPipelineResp(rsp)
 }
 
 // ListLLMProxiesWithResponse request returning *ListLLMProxiesResp
@@ -16027,6 +16803,86 @@ func ParseListDeploymentPipelinesResp(rsp *http.Response) (*ListDeploymentPipeli
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDeploymentPipelineResp parses an HTTP response from a CreateDeploymentPipelineWithResponse call
+func ParseCreateDeploymentPipelineResp(rsp *http.Response) (*CreateDeploymentPipelineResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDeploymentPipelineResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest DeploymentPipelineResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeploymentPipelineResp parses an HTTP response from a DeleteDeploymentPipelineWithResponse call
+func ParseDeleteDeploymentPipelineResp(rsp *http.Response) (*DeleteDeploymentPipelineResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeploymentPipelineResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -19165,6 +20021,86 @@ func ParseGetAgentConfigurationsResp(rsp *http.Response) (*GetAgentConfiguration
 	return response, nil
 }
 
+// ParseUpdateAgentConfigurationsResp parses an HTTP response from a UpdateAgentConfigurationsWithResponse call
+func ParseUpdateAgentConfigurationsResp(rsp *http.Response) (*UpdateAgentConfigurationsResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAgentConfigurationsResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAgentDeploySettingsResp parses an HTTP response from a UpdateAgentDeploySettingsWithResponse call
+func ParseUpdateAgentDeploySettingsResp(rsp *http.Response) (*UpdateAgentDeploySettingsResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAgentDeploySettingsResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListAgentDeploymentsResp parses an HTTP response from a ListAgentDeploymentsWithResponse call
 func ParseListAgentDeploymentsResp(rsp *http.Response) (*ListAgentDeploymentsResp, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20514,6 +21450,60 @@ func ParseStopMonitorResp(rsp *http.Response) (*StopMonitorResp, error) {
 	return response, nil
 }
 
+// ParsePromoteAgentResp parses an HTTP response from a PromoteAgentWithResponse call
+func ParsePromoteAgentResp(rsp *http.Response) (*PromoteAgentResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PromoteAgentResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest PromoteAgentResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePublishAgentKindResp parses an HTTP response from a PublishAgentKindWithResponse call
 func ParsePublishAgentKindResp(rsp *http.Response) (*PublishAgentKindResp, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20856,6 +21846,53 @@ func ParseGetDeploymentPipelineResp(rsp *http.Response) (*GetDeploymentPipelineR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDeploymentPipelineResp parses an HTTP response from a UpdateDeploymentPipelineWithResponse call
+func ParseUpdateDeploymentPipelineResp(rsp *http.Response) (*UpdateDeploymentPipelineResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDeploymentPipelineResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentPipelineResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse

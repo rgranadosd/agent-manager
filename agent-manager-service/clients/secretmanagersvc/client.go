@@ -139,13 +139,16 @@ func (l SecretLocation) KVPath() (string, error) {
 }
 
 // SecretRefName builds the SecretReference name from location fields.
-// Uses ConfigName-EnvironmentName-EntityName-secrets if ConfigName is set,
-// otherwise uses EntityName-secrets.
+// When EnvironmentName is set, it is always included to ensure each environment
+// gets its own SecretReference CR (e.g. my-agent-default-secrets, my-agent-staging-secrets).
+// When ConfigName is also set, it is prepended (e.g. config-staging-my-agent-secrets).
 // The name is sanitized for Kubernetes naming (lowercase, max 63 chars).
 func (l SecretLocation) SecretRefName() string {
 	var name string
 	if l.ConfigName != "" && l.EnvironmentName != "" {
 		name = fmt.Sprintf("%s-%s-%s-secrets", sanitizeForK8sName(l.ConfigName), sanitizeForK8sName(l.EnvironmentName), sanitizeForK8sName(l.EntityName))
+	} else if l.EnvironmentName != "" {
+		name = fmt.Sprintf("%s-%s-secrets", sanitizeForK8sName(l.EntityName), sanitizeForK8sName(l.EnvironmentName))
 	} else {
 		name = fmt.Sprintf("%s-secrets", sanitizeForK8sName(l.EntityName))
 	}

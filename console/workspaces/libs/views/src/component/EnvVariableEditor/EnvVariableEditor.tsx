@@ -16,9 +16,17 @@
  * under the License.
  */
 
+import {
+  Box,
+  Checkbox,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
+  Stack,
+  Tooltip,
+} from '@wso2/oxygen-ui';
+import { Edit, Eye, EyeOff, Trash2 as DeleteOutline, X } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { Alert, Box, Checkbox, Chip, FormControlLabel, IconButton, Stack } from '@wso2/oxygen-ui';
-import { Trash2 as DeleteOutline, Edit as EditIcon, X as CancelIcon } from '@wso2/oxygen-ui-icons-react';
 import { TextInput } from '../FormElements';
 
 export interface EnvVariableEditorProps {
@@ -102,22 +110,47 @@ export function EnvVariableEditor({
   keyDisabled = false,
   isExistingSecret = false,
 }: EnvVariableEditorProps) {
-  const [isEditingSecret, setIsEditingSecret] = useState(false);
+  // Existing secrets start locked: the stored value is never returned, so the
+  // field is masked until the user explicitly clicks Edit to enter a new value.
+  const [isEditing, setIsEditing] = useState(false);
+  // Snapshot of the value when editing started, so Cancel can restore it even
+  // after the user has typed a new value.
+  const [valueBeforeEdit, setValueBeforeEdit] = useState('');
+  // Toggles plaintext reveal of a secret value while the user is typing it.
+  const [showValue, setShowValue] = useState(false);
 
-  // For existing secrets, value is locked unless user explicitly enables editing
-  const isSecretLocked = isExistingSecret && isSensitive && !isEditingSecret;
+  const isSecretField = isValueSecret || isSensitive;
+  const isSecretLocked = isExistingSecret && isSensitive && !isEditing;
 
-  const handleEnableEditing = () => {
-    setIsEditingSecret(true);
-    // Clear the value when enabling editing since the existing value is masked
-    onValueChange('');
+  const handleStartEdit = () => {
+    setValueBeforeEdit(valueValue);
+    setIsEditing(true);
   };
 
-  const handleCancelEditing = () => {
-    setIsEditingSecret(false);
-    // Clear the value since we're canceling the edit
-    onValueChange('');
+  const handleCancelEdit = () => {
+    // Restore the previous value and re-lock the field, discarding any edits.
+    onValueChange(valueBeforeEdit);
+    setIsEditing(false);
+    setShowValue(false);
   };
+
+  // Reveal toggle for secret values; hidden while the field is locked since
+  // there is nothing entered to reveal.
+  const valueEndAdornment =
+    isSecretField && !isSecretLocked ? (
+      <InputAdornment position="end">
+        <Tooltip title={showValue ? 'Hide value' : 'Show value'}>
+          <IconButton
+            size="small"
+            edge="end"
+            aria-label={showValue ? 'Hide value' : 'Show value'}
+            onClick={() => setShowValue((prev) => !prev)}
+          >
+            {showValue ? <EyeOff size={16} /> : <Eye size={16} />}
+          </IconButton>
+        </Tooltip>
+      </InputAdornment>
+    ) : undefined;
 
   return (
     <Stack key={index} direction="column" gap={1}>
@@ -137,7 +170,7 @@ export function EnvVariableEditor({
         <Box flex={1} minWidth={0}>
           <TextInput
             label={valueLabel}
-            type={isValueSecret || isSensitive ? 'password' : 'text'}
+            type={isSecretField && !showValue ? 'password' : 'text'}
             fullWidth
             size="small"
             value={valueValue}
@@ -146,40 +179,10 @@ export function EnvVariableEditor({
             helperText={valueError}
             disabled={isSecretLocked}
             placeholder={isSecretLocked ? '••••••••' : undefined}
+            slotProps={{ input: { endAdornment: valueEndAdornment } }}
           />
         </Box>
-        {/* Show Secret chip and edit/cancel button for existing secrets */}
-        {isExistingSecret && isSensitive && (
-          <Box display="flex" alignItems="center" gap={1} pb={1}>
-            <Chip
-              label="Secret"
-              size="small"
-              color="warning"
-              variant="outlined"
-            />
-            {!isEditingSecret ? (
-              <IconButton
-                size="small"
-                color="primary"
-                onClick={handleEnableEditing}
-                title="Edit secret value"
-              >
-                <EditIcon size={16} />
-              </IconButton>
-            ) : (
-              <IconButton
-                size="small"
-                color="default"
-                onClick={handleCancelEditing}
-                title="Cancel editing"
-              >
-                <CancelIcon size={16} />
-              </IconButton>
-            )}
-          </Box>
-        )}
-        {/* Show checkbox for new env variables (not existing secrets) */}
-        {onSensitiveChange && !isExistingSecret && (
+        {onSensitiveChange && (
           <Box mr={4}>
             <FormControlLabel
               control={
@@ -194,18 +197,34 @@ export function EnvVariableEditor({
             />
           </Box>
         )}
-        <Box pb={1}>
+        <Box pb={1} display="flex" alignItems="center">
+          {/* Always reserve this slot so the delete buttons stay aligned across
+              rows. Existing secrets toggle between Edit (locked) and Cancel
+              (editing); other fields keep the slot hidden. Cancel stays visible
+              for the whole edit session even after typing clears the stored
+              secret flag upstream. */}
+          <Tooltip title={isEditing ? 'Cancel edit' : 'Edit value'}>
+            <IconButton
+              size="small"
+              aria-label={isEditing ? 'Cancel edit' : 'Edit value'}
+              onClick={isEditing ? handleCancelEdit : handleStartEdit}
+              sx={
+                isEditing
+                  ? undefined
+                  : {
+                      visibility: isSecretLocked ? 'visible' : 'hidden',
+                      pointerEvents: isSecretLocked ? 'auto' : 'none',
+                    }
+              }
+            >
+              {isEditing ? <X size={16} /> : <Edit size={16} />}
+            </IconButton>
+          </Tooltip>
           <IconButton size="small" color="error" onClick={onRemove}>
             <DeleteOutline size={16} />
           </IconButton>
         </Box>
       </Stack>
-      {/* Warning message when editing an existing secret */}
-      {isEditingSecret && (
-        <Alert severity="warning" sx={{ py: 0.5 }}>
-          Updating a Secret value removes the previous value permanently and cannot be restored.
-        </Alert>
-      )}
     </Stack>
   );
 }

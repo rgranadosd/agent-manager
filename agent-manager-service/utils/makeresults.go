@@ -175,7 +175,7 @@ func ConvertToBuildResponse(build *models.BuildResponse) spec.BuildResponse {
 }
 
 func convertToBuildParameters(params models.BuildParameters) spec.BuildParameters {
-	return spec.BuildParameters{
+	bp := spec.BuildParameters{
 		CommitId:        params.CommitID,
 		Branch:          params.Branch,
 		RepoUrl:         params.RepoUrl,
@@ -184,6 +184,10 @@ func convertToBuildParameters(params models.BuildParameters) spec.BuildParameter
 		LanguageVersion: params.LanguageVersion,
 		RunCommand:      params.RunCommand,
 	}
+	if params.DockerfilePath != "" {
+		bp.DockerfilePath = spec.PtrString(params.DockerfilePath)
+	}
+	return bp
 }
 
 func ConvertToBuildListResponse(builds []*models.BuildResponse) []spec.BuildResponse {
@@ -474,12 +478,13 @@ func ConvertToProjectListItem(project *models.ProjectResponse) spec.ProjectListI
 	}
 
 	return spec.ProjectListItem{
-		Uuid:        project.UUID,
-		Name:        project.Name,
-		DisplayName: project.DisplayName,
-		Description: &project.Description,
-		CreatedAt:   project.CreatedAt,
-		OrgName:     project.OrgName,
+		Uuid:               project.UUID,
+		Name:               project.Name,
+		DisplayName:        project.DisplayName,
+		Description:        &project.Description,
+		CreatedAt:          project.CreatedAt,
+		OrgName:            project.OrgName,
+		DeploymentPipeline: &project.DeploymentPipeline,
 	}
 }
 

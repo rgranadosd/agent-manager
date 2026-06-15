@@ -38,13 +38,15 @@ import {
     type EvaluatorScoreSummary,
     type MonitorResponse,
 } from "@agent-management-platform/types";
+import { formatTraceWindow } from "@agent-management-platform/views";
 import { generatePath, Link } from "react-router-dom";
 import { DonutIcon, type DonutColor } from "./DonutIcon";
 
-interface EvalMonitorsCardProps {
+interface EnvMonitorsSectionProps {
     orgId: string;
     projectId: string;
     agentId: string;
+    envId: string;
 }
 
 const getMean = (evaluators: EvaluatorScoreSummary[]): number | null => {
@@ -53,6 +55,18 @@ const getMean = (evaluators: EvaluatorScoreSummary[]): number | null => {
         .filter((v): v is number => typeof v === "number");
     if (means.length === 0) return null;
     return means.reduce((a, b) => a + b, 0) / means.length;
+};
+
+/** Human-friendly run cadence for continuous monitors, e.g. "Runs every 10 mins". */
+const formatRunInterval = (minutes?: number): string | null => {
+    if (!minutes || minutes <= 0) return null;
+    if (minutes < 60) return `Runs every ${minutes} min${minutes === 1 ? "" : "s"}`;
+    if (minutes === 60) return "Runs hourly";
+    if (minutes === 1440) return "Runs daily";
+    if (minutes % 1440 === 0) return `Runs every ${minutes / 1440} days`;
+    if (minutes % 60 === 0) return `Runs every ${minutes / 60} hours`;
+    const hours = Math.floor(minutes / 60);
+    return `Runs every ${hours}h ${minutes % 60}m`;
 };
 
 const getScoreColor = (p: number | null): DonutColor => {
@@ -67,9 +81,10 @@ interface MonitorTileProps {
     orgId: string;
     projectId: string;
     agentId: string;
+    envId: string;
 }
 
-const MonitorTile: React.FC<MonitorTileProps> = ({ monitor, orgId, projectId, agentId }) => {
+const MonitorTile: React.FC<MonitorTileProps> = ({ monitor, orgId, projectId, agentId, envId }) => {
     const { data: scoresData, isLoading } = useMonitorScores(
         { orgName: orgId, projName: projectId, agentName: agentId, monitorName: monitor.name },
         { timeRange: TraceListTimeRange.SEVEN_DAYS },
@@ -83,12 +98,23 @@ const MonitorTile: React.FC<MonitorTileProps> = ({ monitor, orgId, projectId, ag
 
     const monitorHref = generatePath(
         absoluteRouteMap.children.org.children.projects.children.agents
-            .children.evaluation.children.monitor.children.view.path,
-        { orgId, projectId, agentId, monitorId: monitor.name },
+            .children.environment.children.evaluation.children.monitor.children.view.path,
+        { orgId, projectId, agentId, envId, monitorId: monitor.name },
     );
 
     const evaluatorNames = monitor.evaluators.map((e) => e.displayName).join(" · ");
     const color = getScoreColor(scorePercent);
+
+    // Surface a low-priority schedule hint so users understand the score's
+    // cadence: a fixed window for historical monitors, an interval for
+    // continuous (future) ones.
+    const scheduleLabel = useMemo(() => {
+        if (monitor.type === "past") {
+            if (!monitor.traceStart || !monitor.traceEnd) return null;
+            return formatTraceWindow(monitor.traceStart, monitor.traceEnd);
+        }
+        return formatRunInterval(monitor.intervalMinutes);
+    }, [monitor.type, monitor.traceStart, monitor.traceEnd, monitor.intervalMinutes]);
 
     return (
         <Card variant="outlined">
@@ -124,20 +150,33 @@ const MonitorTile: React.FC<MonitorTileProps> = ({ monitor, orgId, projectId, ag
                             {evaluatorNames}
                         </Typography>
                     )}
+                    {scheduleLabel && (
+                        <Typography variant="caption" color="text.disabled" noWrap display="block" title={scheduleLabel}>
+                            {scheduleLabel}
+                        </Typography>
+                    )}
                 </Box>
             </CardContent>
         </Card>
     );
 };
 
-export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
-    orgId, projectId, agentId,
+/**
+ * Per-environment "Agent Performance" monitors, rendered as a section inside an
+ * EnvironmentCard (alongside EnvObservabilitySection). Lists only the monitors
+ * that belong to this environment. Renders nothing when the env has no monitors.
+ */
+export const EnvMonitorsSection: React.FC<EnvMonitorsSectionProps> = ({
+    orgId, projectId, agentId, envId,
 }) => {
-    const { data: monitorsList, isLoading } = useListMonitors({
-        orgName: orgId,
-        projName: projectId,
-        agentName: agentId,
-    });
+    const { data: monitorsList, isLoading } = useListMonitors(
+        {
+            orgName: orgId,
+            projName: projectId,
+            agentName: agentId,
+        },
+        { environmentName: envId },
+    );
 
     const monitors = monitorsList?.monitors ?? [];
 
@@ -147,8 +186,8 @@ export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
 
     const allMonitorsHref = generatePath(
         absoluteRouteMap.children.org.children.projects.children.agents
-            .children.evaluation.children.monitor.path,
-        { orgId, projectId, agentId },
+            .children.environment.children.evaluation.children.monitor.path,
+        { orgId, projectId, agentId, envId },
     );
 
     const gridSx = {
@@ -158,40 +197,42 @@ export const EvalMonitorsCard: React.FC<EvalMonitorsCardProps> = ({
     };
 
     return (
-        <Card variant="outlined">
-            <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" pb={1}>
-                    <Typography variant="h6">Agent Performance</Typography>
-                    <Button
-                        size="small"
-                        variant="text"
-                        endIcon={<ChevronRight size={14} />}
-                        component={Link}
-                        to={allMonitorsHref}
-                        sx={{ minWidth: 0 }}
-                    >
-                        View all
-                    </Button>
+        <>
+            <Divider sx={{ mt: 2, mb: 1 }} />
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}
+                    sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Agent Performance
+                </Typography>
+                <Button
+                    size="small"
+                    variant="text"
+                    endIcon={<ChevronRight size={14} />}
+                    component={Link}
+                    to={allMonitorsHref}
+                    sx={{ minWidth: 0, fontSize: "0.75rem" }}
+                >
+                    View all
+                </Button>
+            </Box>
+            {isLoading ? (
+                <Box sx={gridSx}>
+                    {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={96} />)}
                 </Box>
-                <Divider sx={{ mb: 1.5 }} />
-                {isLoading ? (
-                    <Box sx={gridSx}>
-                        {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={96} />)}
-                    </Box>
-                ) : (
-                    <Box sx={gridSx}>
-                        {monitors.map((monitor) => (
-                            <MonitorTile
-                                key={monitor.name}
-                                monitor={monitor}
-                                orgId={orgId}
-                                projectId={projectId}
-                                agentId={agentId}
-                            />
-                        ))}
-                    </Box>
-                )}
-            </CardContent>
-        </Card>
+            ) : (
+                <Box sx={gridSx}>
+                    {monitors.map((monitor) => (
+                        <MonitorTile
+                            key={monitor.name}
+                            monitor={monitor}
+                            orgId={orgId}
+                            projectId={projectId}
+                            agentId={agentId}
+                            envId={envId}
+                        />
+                    ))}
+                </Box>
+            )}
+        </>
     );
 };

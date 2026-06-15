@@ -32,6 +32,9 @@ import (
 type InfraResourceManager interface {
 	ListOrgEnvironments(ctx context.Context, orgName string) ([]*models.EnvironmentResponse, error)
 	GetProjectDeploymentPipeline(ctx context.Context, orgName string, projectName string) (*models.DeploymentPipelineResponse, error)
+	CreateOrgDeploymentPipeline(ctx context.Context, orgName string, displayName string, description *string, projectName *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error)
+	UpdateOrgDeploymentPipeline(ctx context.Context, orgName string, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error)
+	UpdateProjectDeploymentPipeline(ctx context.Context, orgName string, projectName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error)
 	ListOrganizations(ctx context.Context, limit int, offset int) ([]*models.OrganizationResponse, int32, error)
 	GetOrganization(ctx context.Context, orgName string) (*models.OrganizationResponse, error)
 	ListProjects(ctx context.Context, orgName string, limit int, offset int) ([]*models.ProjectResponse, int32, error)
@@ -39,6 +42,7 @@ type InfraResourceManager interface {
 	CreateProject(ctx context.Context, orgName string, payload spec.CreateProjectRequest) (*models.ProjectResponse, error)
 	UpdateProject(ctx context.Context, orgName string, projectName string, payload spec.UpdateProjectRequest) (*models.ProjectResponse, error)
 	DeleteProject(ctx context.Context, orgName string, projectName string) error
+	DeleteOrgDeploymentPipeline(ctx context.Context, orgName, pipelineName string) error
 	ListOrgDeploymentPipelines(ctx context.Context, orgName string, limit int, offset int) ([]*models.DeploymentPipelineResponse, int, error)
 	GetDataplanes(ctx context.Context, orgName string) ([]*models.DataPlaneResponse, error)
 }
@@ -322,6 +326,86 @@ func (s *infraResourceManager) GetProjectDeploymentPipeline(ctx context.Context,
 	return deploymentPipeline, nil
 }
 
+func (s *infraResourceManager) CreateOrgDeploymentPipeline(ctx context.Context, orgName string, displayName string, description *string, projectName *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error) {
+	s.logger.Info("Creating deployment pipeline", "orgName", orgName, "displayName", displayName)
+
+	pipelineName := slugify(displayName) // slugify is defined in evaluator_manager.go
+	if pipelineName == "" {
+		return nil, fmt.Errorf("invalid display name: cannot derive a valid pipeline name")
+	}
+
+	created, err := s.ocClient.CreateDeploymentPipeline(ctx, orgName, pipelineName, &displayName, description, promotionPaths)
+	if err != nil {
+		s.logger.Error("Failed to create deployment pipeline", "orgName", orgName, "error", err)
+		return nil, err
+	}
+
+	// If a projectName was provided, link the newly created pipeline as the project's deploymentPipelineRef.
+	// OpenChoreo's DeploymentPipeline model has no projectName; the project↔pipeline link is represented
+	// via Project.spec.deploymentPipelineRef and must be set separately.
+	if projectName != nil && *projectName != "" {
+		project, getErr := s.ocClient.GetProject(ctx, orgName, *projectName)
+		if getErr != nil {
+			s.logger.Error("Failed to fetch project for pipeline linkage", "orgName", orgName, "projectName", *projectName, "error", getErr)
+			return nil, fmt.Errorf("failed to link deployment pipeline to project: %w", getErr)
+		}
+		if patchErr := s.ocClient.PatchProject(ctx, orgName, *projectName, client.PatchProjectRequest{
+			DisplayName:        project.DisplayName,
+			Description:        project.Description,
+			DeploymentPipeline: pipelineName,
+		}); patchErr != nil {
+			s.logger.Error("Failed to patch project with deployment pipeline ref", "orgName", orgName, "projectName", *projectName, "pipelineName", pipelineName, "error", patchErr)
+			return nil, fmt.Errorf("failed to link deployment pipeline to project: %w", patchErr)
+		}
+	}
+
+	s.logger.Info("Deployment pipeline created successfully", "orgName", orgName, "pipelineName", pipelineName)
+	return created, nil
+}
+
+func (s *infraResourceManager) UpdateOrgDeploymentPipeline(ctx context.Context, orgName string, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error) {
+	s.logger.Info("Updating deployment pipeline", "orgName", orgName, "pipelineName", pipelineName)
+	updated, err := s.ocClient.UpdateDeploymentPipeline(ctx, orgName, pipelineName, displayName, description, promotionPaths)
+	if err != nil {
+		s.logger.Error("Failed to update deployment pipeline", "orgName", orgName, "pipelineName", pipelineName, "error", err)
+		return nil, err
+	}
+	s.logger.Info("Deployment pipeline updated successfully", "orgName", orgName, "pipelineName", pipelineName)
+	return updated, nil
+}
+
+func (s *infraResourceManager) UpdateProjectDeploymentPipeline(ctx context.Context, orgName string, projectName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error) {
+	s.logger.Info("Updating deployment pipeline", "orgName", orgName, "projectName", projectName)
+
+	// Get the project's deployment pipeline reference
+	pipeline, err := s.ocClient.GetProjectDeploymentPipeline(ctx, orgName, projectName)
+	if err != nil {
+		s.logger.Error("Failed to get deployment pipeline", "orgName", orgName, "projectName", projectName, "error", err)
+		return nil, err
+	}
+
+	updated, err := s.ocClient.UpdateDeploymentPipeline(ctx, orgName, pipeline.Name, displayName, description, promotionPaths)
+	if err != nil {
+		s.logger.Error("Failed to update deployment pipeline", "orgName", orgName, "pipelineName", pipeline.Name, "error", err)
+		return nil, fmt.Errorf("failed to update deployment pipeline: %w", err)
+	}
+
+	s.logger.Info("Deployment pipeline updated successfully", "orgName", orgName, "projectName", projectName)
+	return updated, nil
+}
+
+func (s *infraResourceManager) DeleteOrgDeploymentPipeline(ctx context.Context, orgName string, pipelineName string) error {
+	s.logger.Info("Deleting deployment pipeline", "orgName", orgName, "pipelineName", pipelineName)
+
+	if err := s.ocClient.DeleteOrgDeploymentPipeline(ctx, orgName, pipelineName); err != nil {
+		s.logger.Error("Failed to delete deployment pipeline", "orgName", orgName, "pipelineName", pipelineName, "error", err)
+		return fmt.Errorf("failed to delete deployment pipeline: %w", err)
+	}
+
+	s.logger.Info("Deployment pipeline deleted successfully", "orgName", orgName, "pipelineName", pipelineName)
+	return nil
+}
+
 func (s *infraResourceManager) GetDataplanes(ctx context.Context, orgName string) ([]*models.DataPlaneResponse, error) {
 	s.logger.Debug("GetDataplanes called", "orgName", orgName)
 
@@ -332,13 +416,13 @@ func (s *infraResourceManager) GetDataplanes(ctx context.Context, orgName string
 		return nil, err
 	}
 
-	s.logger.Debug("Fetching dataplanes from OpenChoreo", "orgName", orgName)
-	dataplanes, err := s.ocClient.ListDataPlanes(ctx, orgName)
+	s.logger.Debug("Fetching dataplanes from OpenChoreo")
+	dataplanes, err := s.ocClient.ListDataPlanes(ctx)
 	if err != nil {
-		s.logger.Error("Failed to get dataplanes from OpenChoreo", "orgName", orgName, "error", err)
+		s.logger.Error("Failed to get dataplanes from OpenChoreo", "error", err)
 		return nil, err
 	}
 
-	s.logger.Info("Fetched dataplanes successfully", "orgName", orgName, "count", len(dataplanes))
+	s.logger.Info("Fetched dataplanes successfully", "count", len(dataplanes))
 	return dataplanes, nil
 }

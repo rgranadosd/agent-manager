@@ -18,7 +18,8 @@
 
 import React from "react";
 import { PageLayout } from "@agent-management-platform/views";
-import { Button } from "@wso2/oxygen-ui";
+import { EnvironmentSelector } from "@agent-management-platform/shared-component";
+import { Button, Stack } from "@wso2/oxygen-ui";
 import { Plus } from "@wso2/oxygen-ui-icons-react";
 import { generatePath, Link, useParams } from "react-router-dom";
 import { absoluteRouteMap } from "@agent-management-platform/types";
@@ -37,24 +38,28 @@ export const EvalMonitorsComponent: React.FC = () => {
       title="Eval Monitors"
       disableIcon
       actions={
-        <Button
-          variant="contained"
-          component={Link}
-          to={generatePath(
-            absoluteRouteMap.children.org.children.projects.children.agents
-              .children.evaluation.children.monitor.children.create.path,
-            {
-              orgId: orgId,
-              projectId: projectId,
-              agentId: agentId,
-              envId: envId,
-            },
-          )}
-          startIcon={<Plus />}
-          color="primary"
-        >
-          Add monitor
-        </Button>
+        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+          <EnvironmentSelector />
+          <Button
+            variant="contained"
+            component={Link}
+            to={generatePath(
+              absoluteRouteMap.children.org.children.projects.children.agents
+                .children.environment.children.evaluation.children.monitor
+                .children.create.path,
+              {
+                orgId: orgId,
+                projectId: projectId,
+                agentId: agentId,
+                envId: envId,
+              },
+            )}
+            startIcon={<Plus />}
+            color="primary"
+          >
+            Add monitor
+          </Button>
+        </Stack>
       }
     >
       <MonitorTable />

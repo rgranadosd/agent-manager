@@ -33,7 +33,6 @@ export function TopNavigation() {
     orgId: string;
     projectId: string;
     agentId: string;
-    envId: string;
   }>();
 
   const commonOrgPages = useActiveOrgPage();
