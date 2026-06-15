@@ -10066,6 +10066,9 @@ components:
           type: boolean
           description: Whether this is a production environment
           example: false
+        gateway:
+          description: Gateway configuration with ingress and egress network specs. Sourced from the underlying OpenChoreo environment.
+          $ref: "#/components/schemas/GatewaySpec"
         createdAt:
           type: string
           format: date-time
@@ -10118,6 +10121,9 @@ components:
           type: boolean
           description: Whether this is a production environment
           example: false
+        gateway:
+          description: Optional gateway configuration with ingress and egress network specs. Forwarded to the OpenChoreo CreateEnvironment call.
+          $ref: "#/components/schemas/GatewaySpec"
 
     UpdateEnvironmentRequest:
       type: object
@@ -10137,6 +10143,50 @@ components:
         isProduction:
           type: boolean
           description: Whether this is a production environment
+        gateway:
+          description: Updated gateway configuration with ingress and egress network specs. Omit to keep the current value.
+          $ref: "#/components/schemas/GatewaySpec"
+
+    GatewaySpec:
+      type: object
+      description: Gateway configuration with ingress and egress network specs
+      properties:
+        ingress:
+          $ref: "#/components/schemas/GatewayNetworkSpec"
+        egress:
+          $ref: "#/components/schemas/GatewayNetworkSpec"
+
+    GatewayNetworkSpec:
+      type: object
+      description: External and internal gateway endpoints
+      properties:
+        external:
+          $ref: "#/components/schemas/GatewayEndpointSpec"
+        internal:
+          $ref: "#/components/schemas/GatewayEndpointSpec"
+
+    GatewayEndpointSpec:
+      type: object
+      description: Gateway resource endpoint configuration
+      properties:
+        http:
+          $ref: "#/components/schemas/GatewayListenerSpec"
+        https:
+          $ref: "#/components/schemas/GatewayListenerSpec"
+        tls:
+          $ref: "#/components/schemas/GatewayListenerSpec"
+
+    GatewayListenerSpec:
+      type: object
+      description: Gateway listener configuration
+      properties:
+        port:
+          type: integer
+          format: int32
+          description: Port number
+        host:
+          type: string
+          description: Virtual host for the listener
 
     UpdateAgentConfigurationsRequest:
       type: object

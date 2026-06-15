@@ -64,6 +64,7 @@ func (s *environmentService) CreateEnvironment(ctx context.Context, orgName stri
 		Description:  req.Description,
 		DataplaneRef: req.DataplaneRef,
 		IsProduction: req.IsProduction,
+		Gateway:      toOCClientGatewaySpec(req.Gateway),
 	}
 
 	env, err := s.ocClient.CreateEnvironment(ctx, orgName, ocReq)
@@ -80,6 +81,7 @@ func (s *environmentService) CreateEnvironment(ctx context.Context, orgName stri
 		Description:      req.Description,
 		DataplaneRef:     env.DataplaneRef,
 		IsProduction:     env.IsProduction,
+		Gateway:          env.Gateway,
 		CreatedAt:        env.CreatedAt,
 		UpdatedAt:        env.CreatedAt,
 	}, nil
@@ -110,6 +112,7 @@ func (s *environmentService) GetEnvironment(ctx context.Context, orgName string,
 		DataplaneRef:     env.DataplaneRef,
 		DNSPrefix:        env.DNSPrefix,
 		IsProduction:     env.IsProduction,
+		Gateway:          env.Gateway,
 		CreatedAt:        env.CreatedAt,
 		UpdatedAt:        env.CreatedAt,
 	}, nil
@@ -159,6 +162,7 @@ func (s *environmentService) ListEnvironments(ctx context.Context, orgName strin
 			DataplaneRef:     env.DataplaneRef,
 			DNSPrefix:        env.DNSPrefix,
 			IsProduction:     env.IsProduction,
+			Gateway:          env.Gateway,
 			CreatedAt:        env.CreatedAt,
 			UpdatedAt:        env.CreatedAt,
 		}
@@ -179,6 +183,7 @@ func (s *environmentService) UpdateEnvironment(ctx context.Context, orgName stri
 		DisplayName:  req.DisplayName,
 		Description:  req.Description,
 		IsProduction: req.IsProduction,
+		Gateway:      toOCClientGatewaySpec(req.Gateway),
 	}
 
 	env, err := s.ocClient.UpdateEnvironment(ctx, orgName, envID, ocReq)
@@ -203,6 +208,7 @@ func (s *environmentService) UpdateEnvironment(ctx context.Context, orgName stri
 		Description:      description,
 		DataplaneRef:     env.DataplaneRef,
 		IsProduction:     env.IsProduction,
+		Gateway:          env.Gateway,
 		CreatedAt:        env.CreatedAt,
 		UpdatedAt:        env.CreatedAt,
 	}, nil
@@ -321,4 +327,49 @@ func (s *environmentService) GetEnvironmentGateways(ctx context.Context, orgName
 	}
 
 	return responses, nil
+}
+
+// -----------------------------------------------------------------------------
+// Gateway spec translation: models.GatewaySpec (internal DTO) → occlient
+// GatewaySpec (OC-bound request type). Direct field-by-field copy; the OC
+// client layer constructs the runtime-only fields (gateway resource name/
+// namespace, listener name).
+// -----------------------------------------------------------------------------
+
+func toOCClientGatewaySpec(g *models.GatewaySpec) *occlient.GatewaySpec {
+	if g == nil {
+		return nil
+	}
+	return &occlient.GatewaySpec{
+		Ingress: toOCClientGatewayNetworkSpec(g.Ingress),
+		Egress:  toOCClientGatewayNetworkSpec(g.Egress),
+	}
+}
+
+func toOCClientGatewayNetworkSpec(n *models.GatewayNetworkSpec) *occlient.GatewayNetworkSpec {
+	if n == nil {
+		return nil
+	}
+	return &occlient.GatewayNetworkSpec{
+		External: toOCClientGatewayEndpointSpec(n.External),
+		Internal: toOCClientGatewayEndpointSpec(n.Internal),
+	}
+}
+
+func toOCClientGatewayEndpointSpec(e *models.GatewayEndpointSpec) *occlient.GatewayEndpointSpec {
+	if e == nil {
+		return nil
+	}
+	return &occlient.GatewayEndpointSpec{
+		HTTP:  toOCClientGatewayListenerSpec(e.HTTP),
+		HTTPS: toOCClientGatewayListenerSpec(e.HTTPS),
+		TLS:   toOCClientGatewayListenerSpec(e.TLS),
+	}
+}
+
+func toOCClientGatewayListenerSpec(l *models.GatewayListenerSpec) *occlient.GatewayListenerSpec {
+	if l == nil {
+		return nil
+	}
+	return &occlient.GatewayListenerSpec{Port: l.Port, Host: l.Host}
 }

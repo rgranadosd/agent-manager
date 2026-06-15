@@ -104,6 +104,19 @@ environment:
   isCritical: false
   # DNS Prefix for the gateway
   dnsPrefix: "default"
+  # Gateway ingress details persisted on the default Environment CR. This mirrors
+  # what add-environment.sh writes for other envs so every env CR carries its
+  # gateway info explicitly. name/namespace MUST reference the real data-plane
+  # Gateway so agent HTTPRoutes attach to it; OC builds agent route hostnames as
+  # "<env>-<org>.<listener.host>".
+  gateway:
+    # Real data-plane Gateway the agent routes attach to (parentRef).
+    name: gateway-default
+    namespace: openchoreo-data-plane
+    # http: agent-facing host (distinct from the gateway-runtime host gateway.localhost).
+    http:
+      host: am-gateway.localhost
+      port: 19080
 
 # Deployment Pipeline configuration
 deploymentPipeline:
@@ -157,11 +170,16 @@ gatewayTls:
   # Certificate renewal time (default: 720h = 30 days before expiry)
   renewBefore: 720h
   # Common name for the certificate
-  commonName: "*.openchoreoapis.localhost"
+  commonName: "*.agentmanager.localhost"
   # DNS names for the certificate
   dnsNames:
-    - "*.openchoreoapis.localhost"
-    - "openchoreoapis.localhost"
+    - "*.agentmanager.localhost"
+    - "agentmanager.localhost"
+    # Per-environment agent gateway host advertised on Environment CRs by
+    # add-environment.sh (ENV_INGRESS_HOST=am-gateway.localhost). Agent routes
+    # land on "<env>-<org>.am-gateway.localhost", so HTTPS needs this SAN.
+    - "*.am-gateway.localhost"
+    - "am-gateway.localhost"
   # Issuer reference for cert-manager
   issuerRef:
     # Name of the issuer (created by openchoreo-data-plane chart)

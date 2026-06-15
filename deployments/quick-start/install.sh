@@ -901,16 +901,16 @@ CA_CERT=$(kubectl get secret cluster-agent-tls -n openchoreo-data-plane -o jsonp
 
 # Data plane gateway external ingress (advertised host/port for deployed-agent
 # endpoints). Overridable so the VM installer can advertise a public sslip.io host
-# fronted by Caddy instead of the local openchoreoapis.localhost:19080. The default
-# keeps the local-install behaviour. See deployments/vm/lib-vm.sh:
+# fronted by Caddy instead of the local amp.localhost:19080. The default
+# keeps the local-install behaviour. See deployments/quick-start/vm/lib-vm.sh:
 # render_dataplane_external_ingress.
 DP_EXTERNAL_INGRESS="${DP_EXTERNAL_INGRESS:-$(cat <<'EOB'
         http:
-          host: "openchoreoapis.localhost"
+          host: "agentmanager.localhost"
           listenerName: http
           port: 19080
         https:
-          host: "openchoreoapis.localhost"
+          host: "agentmanager.localhost"
           listenerName: https
           port: 19443
 EOB

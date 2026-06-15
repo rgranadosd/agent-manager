@@ -73,7 +73,8 @@ GATEWAY_NAMESPACE="${GATEWAY_NAMESPACE:-openchoreo-data-plane}"
 
 CHART_REF="oci://ghcr.io/wso2/wso2-amp-api-platform-gateway-extension"
 
-# Port the gateway runtime is exposed on (matches values.yaml gateway.vhost default).
+# Port the data-plane gateway HTTP listener exposes (matches the ClusterDataPlane
+# gateway http listener). HTTPS is left to inherit from the dataplane gateway.
 GATEWAY_VHOST_PORT="${GATEWAY_VHOST_PORT:-19080}"
 
 # Base URL the gateway uses to reach Agent Manager. Both /api/v1 and the
@@ -108,6 +109,8 @@ DISPLAY_NAME_JSON=$(printf '%s' "${DISPLAY_NAME}" | sed -e 's/\\/\\\\/g' -e 's/"
 # --- Step 1: Create environment ---
 echo ""
 echo "🌍 Creating environment '${ENV_NAME}'..."
+
+ENV_INGRESS_HOST="${ENV_INGRESS_HOST:-am-gateway.localhost}"
 ENV_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${AGENT_MANAGER_API_URL}/orgs/${ORG_NAME}/environments" \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/json" \
@@ -116,7 +119,17 @@ ENV_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${AGENT_MANAGER_API_URL}/org
         \"displayName\": \"${DISPLAY_NAME_JSON}\",
         \"dataplaneRef\": \"${DATAPLANE_REF}\",
         \"dnsPrefix\": \"${ENV_NAME}\",
-        \"isProduction\": ${IS_PRODUCTION}
+        \"isProduction\": ${IS_PRODUCTION},
+        \"gateway\": {
+            \"ingress\": {
+                \"external\": {
+                    \"http\": {
+                        \"host\": \"${ENV_INGRESS_HOST}\",
+                        \"port\": ${GATEWAY_VHOST_PORT}
+                    }
+                }
+            }
+        }
     }")
 
 ENV_HTTP_CODE=$(echo "$ENV_RESPONSE" | tail -1)
@@ -177,8 +190,8 @@ fi
 echo ""
 echo "=== Environment '${ENV_NAME}' setup complete ==="
 echo ""
-echo "  Environment:  ${ENV_NAME}"
-echo "  Display Name: ${DISPLAY_NAME}"
-echo "  Gateway Host: ${ENV_NAME}-${ORG_NAME}.gateway.localhost:${GATEWAY_VHOST_PORT}"
-echo "  Promotion:    default → ${ENV_NAME}"
+echo "  Environment:     ${ENV_NAME}"
+echo "  Display Name:    ${DISPLAY_NAME}"
+echo "  Gateway Runtime: ${ENV_NAME}-${ORG_NAME}.gateway.localhost:${GATEWAY_VHOST_PORT}"
+echo "  Promotion:       default → ${ENV_NAME}"
 echo ""

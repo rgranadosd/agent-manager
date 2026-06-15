@@ -203,6 +203,7 @@ type CreateEnvironmentRequest struct {
 	Description  string
 	DataplaneRef string
 	IsProduction bool
+	Gateway      *GatewaySpec
 }
 
 // UpdateEnvironmentRequest contains data for updating an environment
@@ -210,6 +211,36 @@ type UpdateEnvironmentRequest struct {
 	DisplayName  *string
 	Description  *string
 	IsProduction *bool
+	Gateway      *GatewaySpec
+}
+
+// GatewaySpec is the subset of the OC EnvironmentSpec.Gateway configuration that
+// callers can set. OC-only runtime fields (gateway resource Name/Namespace,
+// listener Name) are filled in by the client when building the OC payload.
+type GatewaySpec struct {
+	Ingress *GatewayNetworkSpec
+	Egress  *GatewayNetworkSpec
+}
+
+// GatewayNetworkSpec splits a network direction (ingress/egress) into external
+// and internal endpoints.
+type GatewayNetworkSpec struct {
+	External *GatewayEndpointSpec
+	Internal *GatewayEndpointSpec
+}
+
+// GatewayEndpointSpec is the listener configuration for one endpoint.
+type GatewayEndpointSpec struct {
+	HTTP  *GatewayListenerSpec
+	HTTPS *GatewayListenerSpec
+	TLS   *GatewayListenerSpec
+}
+
+// GatewayListenerSpec is the subset of GatewayListenerSpec exposed through the
+// agent-manager API; ListenerName is constructed by the client.
+type GatewayListenerSpec struct {
+	Port *int32
+	Host *string
 }
 
 // DeployRequest contains data for deploying a component
