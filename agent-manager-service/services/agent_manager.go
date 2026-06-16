@@ -2568,8 +2568,11 @@ func validateAuthExclusivity(cfg resolvedCORSConfig) error {
 }
 
 // buildPolicies builds the api-configuration trait policies from resolved config.
+// Returns a non-nil slice so the "no authentication" mode (no CORS, no auth)
+// marshals to an empty JSON array — the api-configuration trait rejects a null
+// policies field ("policies must be of type array").
 func buildPolicies(cfg resolvedCORSConfig) []map[string]interface{} {
-	var policies []map[string]interface{}
+	policies := make([]map[string]interface{}, 0)
 	// CORS must be first so preflight OPTIONS requests are handled before
 	// any auth policy runs. Exactly one auth policy (api-key-auth or jwt-auth)
 	// is appended after — mutual exclusivity is enforced upstream.

@@ -172,6 +172,21 @@ func TestBuildPolicies_Modes(t *testing.T) {
 		}
 	})
 
+	t.Run("no auth and no cors returns empty non-nil slice", func(t *testing.T) {
+		// Must be non-nil so it marshals to [] not null — the api-configuration
+		// trait rejects a null policies field.
+		p := buildPolicies(resolvedCORSConfig{
+			OAuthHeaderName:       models.DefaultOAuthHeaderName,
+			OAuthAuthHeaderPrefix: models.DefaultOAuthAuthHeaderPrefix,
+		})
+		if p == nil {
+			t.Fatalf("expected non-nil empty slice, got nil")
+		}
+		if len(p) != 0 {
+			t.Errorf("expected 0 policies, got %v", p)
+		}
+	})
+
 	t.Run("api key", func(t *testing.T) {
 		cfg := base
 		cfg.EnableApiKeySecurity = true
