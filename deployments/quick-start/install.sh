@@ -865,7 +865,7 @@ fi
 
 log_step "Step 7/13: Installing OpenChoreo Control Plane"
 
-if helm status "openchoreo-control-plane" -n "openchoreo-control-plane" &>/dev/null; then
+if [[ "$(helm status "openchoreo-control-plane" -n "openchoreo-control-plane" -o json 2>/dev/null | grep -o '"status":"[^"]*"' | grep -o '[^"]*$')" == "deployed" ]]; then
     log_info "openchoreo-control-plane already installed, skipping..."
 else
     log_info "Installing openchoreo-control-plane..."
