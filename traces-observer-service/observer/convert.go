@@ -57,3 +57,33 @@ func ConvertSpanDetailsToSpan(traceID string, d *SpanDetailsResponse) opensearch
 		Resource:        d.ResourceAttributes,
 	}
 }
+
+// ConvertSpanInfoToSpan builds an opensearch.Span from a SpanInfo returned by
+// the spans-query endpoint with includeAttributes=true. It mirrors
+// ConvertSpanDetailsToSpan: the spans-query response carries the same fields
+// (spanKind, status, attributes, resourceAttributes) the per-span details
+// endpoint does, so the export path needs no GetSpanDetails round-trip.
+//
+// Service is extracted from resourceAttributes["openchoreo.dev/component-uid"]
+// and Resource is set to resourceAttributes so process.go lookups keep working.
+func ConvertSpanInfoToSpan(traceID string, s SpanInfo) opensearch.Span {
+	service := ""
+	if uid, ok := s.ResourceAttributes[componentUIDResourceKey].(string); ok {
+		service = uid
+	}
+
+	return opensearch.Span{
+		TraceID:         traceID,
+		SpanID:          s.SpanID,
+		ParentSpanID:    s.ParentSpanID,
+		Name:            s.SpanName,
+		Service:         service,
+		StartTime:       s.StartTime,
+		EndTime:         s.EndTime,
+		DurationInNanos: s.DurationNs,
+		Kind:            s.Kind,
+		Status:          s.Status,
+		Attributes:      s.Attributes,
+		Resource:        s.ResourceAttributes,
+	}
+}

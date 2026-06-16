@@ -36,6 +36,10 @@ type TracesQueryRequest struct {
 	Limit       *int                 `json:"limit,omitempty"`
 	SortOrder   *string              `json:"sortOrder,omitempty"`
 	SearchScope ComponentSearchScope `json:"searchScope"`
+	// IncludeAttributes requests inline span attributes on the spans-query
+	// endpoint. A plain bool with omitempty: false is dropped from the wire,
+	// so trace-list queries that leave it unset send nothing.
+	IncludeAttributes bool `json:"includeAttributes,omitempty"`
 }
 
 // TraceInfo represents a single trace entry in TracesQueryResponse.
@@ -58,15 +62,22 @@ type TracesQueryResponse struct {
 	TookMs int         `json:"tookMs"`
 }
 
-// SpanInfo represents a single span summary in TraceSpansQueryResponse.
-// Attributes are not included; use GetSpanDetails for the full span.
+// SpanInfo represents a single span in TraceSpansQueryResponse.
+// Kind and Status are always returned by the observer; Attributes and
+// ResourceAttributes are populated only when the request set
+// IncludeAttributes=true. Note the observer uses the wire key "spanKind"
+// here, whereas SpanDetailsResponse uses "kind".
 type SpanInfo struct {
-	SpanID       string    `json:"spanId"`
-	SpanName     string    `json:"spanName"`
-	ParentSpanID string    `json:"parentSpanId"`
-	StartTime    time.Time `json:"startTime"`
-	EndTime      time.Time `json:"endTime"`
-	DurationNs   int64     `json:"durationNs"`
+	SpanID             string                 `json:"spanId"`
+	SpanName           string                 `json:"spanName"`
+	ParentSpanID       string                 `json:"parentSpanId"`
+	StartTime          time.Time              `json:"startTime"`
+	EndTime            time.Time              `json:"endTime"`
+	DurationNs         int64                  `json:"durationNs"`
+	Kind               string                 `json:"spanKind,omitempty"`
+	Status             string                 `json:"status,omitempty"`
+	Attributes         map[string]interface{} `json:"attributes,omitempty"`
+	ResourceAttributes map[string]interface{} `json:"resourceAttributes,omitempty"`
 }
 
 // TraceSpansQueryResponse is the response from
