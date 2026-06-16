@@ -19,14 +19,15 @@ package models
 import "time"
 
 type EnvironmentResponse struct {
-	UUID         string    `json:"uuid"`
-	Name         string    `json:"name"`
-	DataplaneRef string    `json:"dataplaneRef"`
-	DisplayName  string    `json:"displayName,omitempty"`
-	IsProduction bool      `json:"isProduction"`
-	DNSPrefix    string    `json:"dnsPrefix,omitempty"`
-	Description  string    `json:"description,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
+	UUID         string       `json:"uuid"`
+	Name         string       `json:"name"`
+	DataplaneRef string       `json:"dataplaneRef"`
+	DisplayName  string       `json:"displayName,omitempty"`
+	IsProduction bool         `json:"isProduction"`
+	DNSPrefix    string       `json:"dnsPrefix,omitempty"`
+	Description  string       `json:"description,omitempty"`
+	Gateway      *GatewaySpec `json:"gateway,omitempty"`
+	CreatedAt    time.Time    `json:"createdAt"`
 }
 
 type DataPlaneResponse struct {

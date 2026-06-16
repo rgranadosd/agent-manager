@@ -1,6 +1,8 @@
 # CoreDNS custom config for k3d clusters
-# Rewrites *.openchoreo.localhost and *.amp.localhost hostnames to host.k3d.internal
-# so pods can reach services exposed via k3d load balancer
+# Rewrites *.openchoreo.localhost, *.amp.localhost, *.agentmanager.localhost and
+# *.am-gateway.localhost hostnames to host.k3d.internal so pods can reach services
+# exposed via the k3d load balancer (including agent endpoints fronted by the
+# data-plane gateway).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,6 +17,25 @@ data:
   amp.override: |
     rewrite stop {
       name regex (.+\.)?amp\.localhost host.k3d.internal
+      answer auto
+    }
+  # Data-plane default agent host (ClusterDataPlane gateway ingress host). The
+  # "default" environment and any env that doesn't override the gateway host use
+  # "<env>-<org>.agentmanager.localhost"; without this rewrite in-cluster lookups
+  # fall through to loopback (127.0.0.1) and agent-to-agent calls fail.
+  agentmanager.override: |
+    rewrite stop {
+      name regex (.+\.)?agentmanager\.localhost host.k3d.internal
+      answer auto
+    }
+  # Agent gateway host advertised on Environment CRs (ENV_INGRESS_HOST in
+  # add-environment.sh). Without this, in-cluster lookups of
+  # "<env>-<org>.am-gateway.localhost" fall through to loopback (127.0.0.1),
+  # breaking agent-to-agent calls through the gateway. Route them to the k3d
+  # host so they hairpin back into the data-plane gateway on its published port.
+  amgateway.override: |
+    rewrite stop {
+      name regex (.+\.)?am-gateway\.localhost host.k3d.internal
       answer auto
     }
   # The dev gateway chart + setup-gateway.sh reach agent-manager via

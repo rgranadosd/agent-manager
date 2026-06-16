@@ -30,7 +30,8 @@ type CreateEnvironmentRequest struct {
 	// DNS prefix for the environment
 	DnsPrefix string `json:"dnsPrefix"`
 	// Whether this is a production environment
-	IsProduction *bool `json:"isProduction,omitempty"`
+	IsProduction *bool        `json:"isProduction,omitempty"`
+	Gateway      *GatewaySpec `json:"gateway,omitempty"`
 }
 
 // NewCreateEnvironmentRequest instantiates a new CreateEnvironmentRequest object
@@ -214,6 +215,38 @@ func (o *CreateEnvironmentRequest) SetIsProduction(v bool) {
 	o.IsProduction = &v
 }
 
+// GetGateway returns the Gateway field value if set, zero value otherwise.
+func (o *CreateEnvironmentRequest) GetGateway() GatewaySpec {
+	if o == nil || IsNil(o.Gateway) {
+		var ret GatewaySpec
+		return ret
+	}
+	return *o.Gateway
+}
+
+// GetGatewayOk returns a tuple with the Gateway field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CreateEnvironmentRequest) GetGatewayOk() (*GatewaySpec, bool) {
+	if o == nil || IsNil(o.Gateway) {
+		return nil, false
+	}
+	return o.Gateway, true
+}
+
+// HasGateway returns a boolean if a field has been set.
+func (o *CreateEnvironmentRequest) HasGateway() bool {
+	if o != nil && !IsNil(o.Gateway) {
+		return true
+	}
+
+	return false
+}
+
+// SetGateway gets a reference to the given GatewaySpec and assigns it to the Gateway field.
+func (o *CreateEnvironmentRequest) SetGateway(v GatewaySpec) {
+	o.Gateway = &v
+}
+
 func (o CreateEnvironmentRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -233,6 +266,9 @@ func (o CreateEnvironmentRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize["dnsPrefix"] = o.DnsPrefix
 	if !IsNil(o.IsProduction) {
 		toSerialize["isProduction"] = o.IsProduction
+	}
+	if !IsNil(o.Gateway) {
+		toSerialize["gateway"] = o.Gateway
 	}
 	return toSerialize, nil
 }

@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -122,6 +123,12 @@ func (c *openChoreoClient) CreateEnvironment(ctx context.Context, namespaceName 
 
 	isProduction := req.IsProduction
 	dataplaneRefKind := ocapi.EnvironmentSpecDataPlaneRefKindClusterDataPlane
+
+	gateway, err := c.resolveEnvGatewaySpec(ctx, req.DataplaneRef, req.Gateway)
+	if err != nil && !errors.Is(err, errInheritGateway) {
+		return nil, fmt.Errorf("failed to resolve gateway spec: %w", err)
+	}
+
 	body := ocapi.CreateEnvironmentJSONRequestBody{
 		Metadata: ocapi.ObjectMeta{
 			Name:        req.Name,
@@ -137,6 +144,7 @@ func (c *openChoreoClient) CreateEnvironment(ctx context.Context, namespaceName 
 				Name: req.DataplaneRef,
 			},
 			IsProduction: &isProduction,
+			Gateway:      gateway,
 		},
 	}
 
@@ -200,6 +208,20 @@ func (c *openChoreoClient) UpdateEnvironment(ctx context.Context, namespaceName,
 			env.Spec = &ocapi.EnvironmentSpec{}
 		}
 		env.Spec.IsProduction = req.IsProduction
+	}
+	if req.Gateway != nil {
+		if env.Spec == nil {
+			env.Spec = &ocapi.EnvironmentSpec{}
+		}
+		dataPlaneRef := ""
+		if env.Spec.DataPlaneRef != nil {
+			dataPlaneRef = env.Spec.DataPlaneRef.Name
+		}
+		gateway, gwErr := c.resolveEnvGatewaySpec(ctx, dataPlaneRef, req.Gateway)
+		if gwErr != nil && !errors.Is(gwErr, errInheritGateway) {
+			return nil, fmt.Errorf("failed to resolve gateway spec: %w", gwErr)
+		}
+		env.Spec.Gateway = gateway
 	}
 
 	resp, err := c.ocClient.UpdateEnvironmentWithResponse(ctx, namespaceName, environmentName, *env)
@@ -619,6 +641,7 @@ func convertEnvironmentToResponse(env *ocapi.Environment) *models.EnvironmentRes
 
 	var dataplaneRef string
 	var isProduction bool
+	var gateway *models.GatewaySpec
 	if env.Spec != nil {
 		if env.Spec.DataPlaneRef != nil {
 			dataplaneRef = env.Spec.DataPlaneRef.Name
@@ -626,6 +649,7 @@ func convertEnvironmentToResponse(env *ocapi.Environment) *models.EnvironmentRes
 		if env.Spec.IsProduction != nil {
 			isProduction = *env.Spec.IsProduction
 		}
+		gateway = fromOCGatewaySpec(env.Spec.Gateway)
 	}
 
 	return &models.EnvironmentResponse{
@@ -635,6 +659,158 @@ func convertEnvironmentToResponse(env *ocapi.Environment) *models.EnvironmentRes
 		DataplaneRef: dataplaneRef,
 		IsProduction: isProduction,
 		Description:  description,
+		Gateway:      gateway,
 		CreatedAt:    createdAt,
 	}
+}
+
+// -----------------------------------------------------------------------------
+// Gateway spec resolution
+//
+// OpenChoreo resolves an Environment's effective gateway by merging at the
+// endpoint-object level (see openchoreo internal/pipeline/component/context:
+// mergeGatewayNetworkData): if Environment.spec.gateway.ingress.external is set
+// it WHOLLY REPLACES the dataplane's external endpoint — there is no per-field
+// fallback, and Name/Namespace are required with no defaulting webhook. The
+// agent HTTPRoute's parentRef is built straight from these (name+namespace), and
+// its hostname from "<env>-<org>.<listener.host>".
+//
+
+// errInheritGateway signals that no gateway spec should be emitted and the
+// environment should inherit the dataplane gateway. It is an expected outcome,
+// not a failure — callers check it with errors.Is and treat the spec as absent.
+var errInheritGateway = errors.New("no gateway spec; inherit dataplane gateway")
+
+// resolveEnvGatewaySpec turns the caller-supplied (trimmed) gateway override into
+// a complete OC GatewaySpec by seeding from the dataplane's gateway and applying
+// only the host/port the caller set. It returns errInheritGateway when there is
+// no override or no dataplane base to anchor Name/Namespace, meaning the
+// environment should inherit the dataplane gateway.
+func (c *openChoreoClient) resolveEnvGatewaySpec(ctx context.Context, dataPlaneRef string, override *GatewaySpec) (*ocapi.GatewaySpec, error) {
+	if override == nil {
+		return nil, errInheritGateway
+	}
+
+	// Propagates errInheritGateway when the dataplane has no gateway to seed
+	// Name/Namespace from — we can't form a valid override, so inherit instead.
+	base, err := c.getClusterDataPlaneGateway(ctx, dataPlaneRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ocapi.GatewaySpec{
+		Ingress: applyNetworkOverride(base.Ingress, override.Ingress),
+		Egress:  applyNetworkOverride(base.Egress, override.Egress),
+	}, nil
+}
+
+// getClusterDataPlaneGateway fetches the ClusterDataPlane's gateway config (the
+// source OC falls back to). Environments here always reference a ClusterDataPlane
+// (see CreateEnvironment). It returns errInheritGateway when the dataplane has no
+// gateway set, so there is no base to seed an override from.
+func (c *openChoreoClient) getClusterDataPlaneGateway(ctx context.Context, dataPlaneRef string) (*ocapi.GatewaySpec, error) {
+	resp, err := c.ocClient.GetClusterDataPlaneWithResponse(ctx, dataPlaneRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster dataplane %q: %w", dataPlaneRef, err)
+	}
+	if resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+		return nil, handleErrorResponse(resp.StatusCode(), ErrorResponses{
+			JSON401: resp.JSON401,
+			JSON403: resp.JSON403,
+			JSON404: resp.JSON404,
+			JSON500: resp.JSON500,
+		})
+	}
+	if resp.JSON200.Spec == nil || resp.JSON200.Spec.Gateway == nil {
+		return nil, errInheritGateway
+	}
+	return resp.JSON200.Spec.Gateway, nil
+}
+
+// applyNetworkOverride returns the dataplane network endpoint with any caller
+// host/port overrides applied. The base carries the real Name/Namespace.
+func applyNetworkOverride(base *ocapi.GatewayNetworkSpec, ov *GatewayNetworkSpec) *ocapi.GatewayNetworkSpec {
+	if base == nil {
+		return nil
+	}
+	out := *base
+	if ov != nil {
+		out.External = applyEndpointOverride(base.External, ov.External)
+		out.Internal = applyEndpointOverride(base.Internal, ov.Internal)
+	}
+	return &out
+}
+
+func applyEndpointOverride(base *ocapi.GatewayEndpointSpec, ov *GatewayEndpointSpec) *ocapi.GatewayEndpointSpec {
+	if base == nil {
+		return nil
+	}
+	out := *base // preserves required Name/Namespace
+	if ov != nil {
+		out.Http = applyListenerOverride(base.Http, ov.HTTP)
+		out.Https = applyListenerOverride(base.Https, ov.HTTPS)
+		out.Tls = applyListenerOverride(base.Tls, ov.TLS)
+	}
+	return &out
+}
+
+// applyListenerOverride patches host/port from the caller onto the dataplane
+// listener, preserving ListenerName. If the dataplane has no such listener there
+// is nothing to anchor to, so the override slot is dropped (inherits nothing).
+func applyListenerOverride(base *ocapi.GatewayListenerSpec, ov *GatewayListenerSpec) *ocapi.GatewayListenerSpec {
+	if base == nil || ov == nil {
+		return base
+	}
+	out := *base
+	if ov.Host != nil {
+		out.Host = ov.Host
+	}
+	if ov.Port != nil {
+		out.Port = ov.Port
+	}
+	return &out
+}
+
+func fromOCGatewaySpec(g *ocapi.GatewaySpec) *models.GatewaySpec {
+	if g == nil {
+		return nil
+	}
+	ingress := fromOCGatewayNetworkSpec(g.Ingress)
+	egress := fromOCGatewayNetworkSpec(g.Egress)
+	if ingress == nil && egress == nil {
+		return nil
+	}
+	return &models.GatewaySpec{Ingress: ingress, Egress: egress}
+}
+
+func fromOCGatewayNetworkSpec(n *ocapi.GatewayNetworkSpec) *models.GatewayNetworkSpec {
+	if n == nil {
+		return nil
+	}
+	external := fromOCGatewayEndpointSpec(n.External)
+	internal := fromOCGatewayEndpointSpec(n.Internal)
+	if external == nil && internal == nil {
+		return nil
+	}
+	return &models.GatewayNetworkSpec{External: external, Internal: internal}
+}
+
+func fromOCGatewayEndpointSpec(e *ocapi.GatewayEndpointSpec) *models.GatewayEndpointSpec {
+	if e == nil {
+		return nil
+	}
+	http := fromOCGatewayListenerSpec(e.Http)
+	https := fromOCGatewayListenerSpec(e.Https)
+	tls := fromOCGatewayListenerSpec(e.Tls)
+	if http == nil && https == nil && tls == nil {
+		return nil
+	}
+	return &models.GatewayEndpointSpec{HTTP: http, HTTPS: https, TLS: tls}
+}
+
+func fromOCGatewayListenerSpec(l *ocapi.GatewayListenerSpec) *models.GatewayListenerSpec {
+	if l == nil {
+		return nil
+	}
+	return &models.GatewayListenerSpec{Port: l.Port, Host: l.Host}
 }

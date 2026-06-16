@@ -6,7 +6,7 @@ gateway:
   httpsPort: 19443
   tls:
     enabled: false
-    hostname: "*.openchoreoapis.localhost"
+    hostname: "*.agentmanager.localhost"
     certificateRefs:
       - name: gateway-tls
         namespace: openchoreo-data-plane

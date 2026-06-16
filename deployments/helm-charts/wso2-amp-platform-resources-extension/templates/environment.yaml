@@ -13,3 +13,17 @@ spec:
     kind: ClusterDataPlane
     name: default
   isProduction: {{ .Values.environment.isCritical }}
+  # Persist the gateway ingress details on the Environment CR (instead of
+  # inheriting silently from the ClusterDataPlane), so every env CR carries its
+  # gateway info explicitly. name/namespace reference the real data-plane Gateway
+  # so agent HTTPRoutes attach to it; OC builds route hostnames as
+  # "<env>-<org>.<listener.host>".
+  gateway:
+    ingress:
+      external:
+        name: {{ .Values.environment.gateway.name }}
+        namespace: {{ .Values.environment.gateway.namespace }}
+        http:
+          host: {{ .Values.environment.gateway.http.host | quote }}
+          listenerName: http
+          port: {{ .Values.environment.gateway.http.port }}
