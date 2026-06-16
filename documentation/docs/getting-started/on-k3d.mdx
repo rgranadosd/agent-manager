@@ -144,7 +144,7 @@ kubectl cluster-info --context k3d-amp-local
 Enables `*.openchoreo.localhost` DNS resolution inside the cluster:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/openchoreo/openchoreo/v1.0.1/install/k3d/common/coredns-custom.yaml
+kubectl apply -f https://raw.githubusercontent.com/openchoreo/openchoreo/v1.1.1/install/k3d/common/coredns-custom.yaml
 ```
 
 ### Step 3: Install Cluster Prerequisites
@@ -303,7 +303,7 @@ The Control Plane is configured with Backstage disabled (Agent Manager provides 
 ```bash
 helm install openchoreo-control-plane \
   oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane \
-  --version 1.0.1 \
+  --version 1.1.1 \
   --namespace openchoreo-control-plane \
   --create-namespace \
   --timeout 600s \
@@ -340,7 +340,7 @@ kubectl create configmap cluster-gateway-ca \
 ```bash
 helm install openchoreo-data-plane \
   oci://ghcr.io/openchoreo/helm-charts/openchoreo-data-plane \
-  --version 1.0.1 \
+  --version 1.1.1 \
   --namespace openchoreo-data-plane \
   --create-namespace \
   --timeout 600s \
@@ -407,12 +407,12 @@ helm upgrade --install registry docker-registry \
   --repo https://twuni.github.io/docker-registry.helm \
   --namespace openchoreo-workflow-plane \
   --create-namespace \
-  --values https://raw.githubusercontent.com/openchoreo/openchoreo/v1.0.1/install/k3d/single-cluster/values-registry.yaml \
+  --values https://raw.githubusercontent.com/openchoreo/openchoreo/v1.1.1/install/k3d/single-cluster/values-registry.yaml \
   --timeout 120s
 
 helm install openchoreo-workflow-plane \
   oci://ghcr.io/openchoreo/helm-charts/openchoreo-workflow-plane \
-  --version 1.0.1 \
+  --version 1.1.1 \
   --namespace openchoreo-workflow-plane \
   --create-namespace \
   --timeout 600s
@@ -532,7 +532,7 @@ Install the Observability Plane:
 ```bash
 helm install openchoreo-observability-plane \
   oci://ghcr.io/openchoreo/helm-charts/openchoreo-observability-plane \
-  --version 1.0.1 \
+  --version 1.1.1 \
   --namespace openchoreo-observability-plane \
   --create-namespace \
   --timeout 25m \
@@ -550,15 +550,16 @@ helm upgrade --install observability-logs-opensearch \
   oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
   --create-namespace \
   --namespace openchoreo-observability-plane \
-  --version 0.3.8 \
+  --version 0.4.1 \
   --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
+  --set adapter.openSearchSecretName="opensearch-admin-credentials" \
   --timeout 10m
 
 # Enable Fluent Bit log collection
 helm upgrade observability-logs-opensearch \
   oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
   --namespace openchoreo-observability-plane \
-  --version 0.3.8 \
+  --version 0.4.1 \
   --reuse-values \
   --set fluent-bit.enabled=true \
   --timeout 10m
@@ -568,8 +569,7 @@ helm upgrade --install observability-metrics-prometheus \
   oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
   --create-namespace \
   --namespace openchoreo-observability-plane \
-  --version 0.2.4 \
-  --set adapter.image.tag=0.2.4 \
+  --version 0.6.1 \
   --timeout 10m
 
 # Tracing module (uses the custom OTel Collector ConfigMap)
@@ -577,7 +577,7 @@ helm upgrade --install observability-traces-opensearch \
   oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
   --create-namespace \
   --namespace openchoreo-observability-plane \
-  --version 0.3.7 \
+  --version 0.4.1 \
   --set openSearch.enabled=false \
   --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
   --set opentelemetry-collector.configMap.existingName="amp-opentelemetry-collector-config" \
