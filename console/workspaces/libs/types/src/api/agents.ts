@@ -25,6 +25,11 @@ export interface ModelConfigRequest {
   environmentVariables?: EnvironmentVariableConfig[];
 }
 
+export interface MCPConfigRequest {
+  proxyName: string;
+  environmentVariables?: EnvironmentVariableConfig[];
+}
+
 // Requests
 interface AgentRequestBase {
   name: string;
@@ -36,6 +41,7 @@ interface AgentRequestBase {
   configurations?: Configurations;
   inputInterface?: InputInterface;
   modelConfig?: ModelConfigRequest[];
+  mcpConfig?: MCPConfigRequest[];
 }
 
 interface UpdateAgentBasicInfoRequest {

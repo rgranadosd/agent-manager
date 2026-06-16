@@ -32,6 +32,8 @@ type CreateAgentRequest struct {
 	InputInterface *InputInterface `json:"inputInterface,omitempty"`
 	// Optional LLM configurations to create atomically with the agent. Applied to the component's initial (lowest) environment. Name and type are auto-generated.
 	ModelConfig []ModelConfigRequest `json:"modelConfig,omitempty"`
+	// Optional MCP proxy configurations to create atomically with the agent. Applied to the component's initial (lowest) environment. Name and type are auto-generated.
+	McpConfig []MCPConfigRequest `json:"mcpConfig,omitempty"`
 }
 
 // NewCreateAgentRequest instantiates a new CreateAgentRequest object
@@ -318,6 +320,38 @@ func (o *CreateAgentRequest) SetModelConfig(v []ModelConfigRequest) {
 	o.ModelConfig = v
 }
 
+// GetMcpConfig returns the McpConfig field value if set, zero value otherwise.
+func (o *CreateAgentRequest) GetMcpConfig() []MCPConfigRequest {
+	if o == nil || IsNil(o.McpConfig) {
+		var ret []MCPConfigRequest
+		return ret
+	}
+	return o.McpConfig
+}
+
+// GetMcpConfigOk returns a tuple with the McpConfig field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CreateAgentRequest) GetMcpConfigOk() ([]MCPConfigRequest, bool) {
+	if o == nil || IsNil(o.McpConfig) {
+		return nil, false
+	}
+	return o.McpConfig, true
+}
+
+// HasMcpConfig returns a boolean if a field has been set.
+func (o *CreateAgentRequest) HasMcpConfig() bool {
+	if o != nil && !IsNil(o.McpConfig) {
+		return true
+	}
+
+	return false
+}
+
+// SetMcpConfig gets a reference to the given []MCPConfigRequest and assigns it to the McpConfig field.
+func (o *CreateAgentRequest) SetMcpConfig(v []MCPConfigRequest) {
+	o.McpConfig = v
+}
+
 func (o CreateAgentRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -348,6 +382,9 @@ func (o CreateAgentRequest) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ModelConfig) {
 		toSerialize["modelConfig"] = o.ModelConfig
+	}
+	if !IsNil(o.McpConfig) {
+		toSerialize["mcpConfig"] = o.McpConfig
 	}
 	return toSerialize, nil
 }

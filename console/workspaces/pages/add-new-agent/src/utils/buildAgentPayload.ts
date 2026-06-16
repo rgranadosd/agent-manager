@@ -18,11 +18,17 @@
 
 import {
   CreateAgentRequest,
+  MCPConfigRequest,
   ModelConfigRequest,
   OrgProjPathParams,
   PromotionPath,
 } from "@agent-management-platform/types";
-import { AddAgentFormValues, CreateAgentFormValues, LLMProviderFormEntry } from "../form/schema";
+import {
+  AddAgentFormValues,
+  CreateAgentFormValues,
+  LLMProviderFormEntry,
+  MCPProxyFormEntry,
+} from "../form/schema";
 
 export function findLowestEnvironmentName(
   promotionPaths: PromotionPath[] = [],
@@ -94,13 +100,46 @@ export function buildModelConfig(
   return configs.length > 0 ? configs : undefined;
 }
 
+function buildOneMCPConfig(
+  entry: MCPProxyFormEntry,
+  initialEnvironmentName: string | undefined,
+): MCPConfigRequest | null {
+  // The create-side config applies only to the component's initial environment.
+  const proxy = initialEnvironmentName
+    ? entry.selectedProxyByEnv[initialEnvironmentName]
+    : null;
+  if (!proxy) return null;
+
+  const environmentVariables = [
+    ...(entry.urlVarName ? [{ key: "url", name: entry.urlVarName }] : []),
+    ...(entry.apikeyVarName ? [{ key: "apikey", name: entry.apikeyVarName }] : []),
+  ];
+
+  return {
+    proxyName: proxy.id,
+    ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
+  };
+}
+
+export function buildMCPConfig(
+  mcpProxies: MCPProxyFormEntry[],
+  initialEnvironmentName: string | undefined,
+): MCPConfigRequest[] | undefined {
+  if (!mcpProxies.length) return undefined;
+  const configs = mcpProxies.map((entry) => buildOneMCPConfig(entry, initialEnvironmentName))
+    .filter((c): c is MCPConfigRequest => c !== null);
+  return configs.length > 0 ? configs : undefined;
+}
+
 export const buildAgentCreationPayload = (
   data: AddAgentFormValues,
   params: OrgProjPathParams,
   llmProviders: LLMProviderFormEntry[] = [],
   initialEnvironmentName?: string,
+  mcpProxies: MCPProxyFormEntry[] = [],
 ): { params: OrgProjPathParams; body: CreateAgentRequest } => {
   const modelConfig = buildModelConfig(llmProviders, initialEnvironmentName);
+  const mcpConfig = buildMCPConfig(mcpProxies, initialEnvironmentName);
 
   if (data.deploymentType === "new") {
     return {
@@ -173,6 +212,7 @@ export const buildAgentCreationPayload = (
             : {}),
         },
         ...(modelConfig ? { modelConfig } : {}),
+        ...(mcpConfig ? { mcpConfig } : {}),
       },
     };
   }
@@ -202,8 +242,10 @@ export const buildCatalogAgentPayload = (
   version: string,
   llmProviders: LLMProviderFormEntry[] = [],
   initialEnvironmentName?: string,
+  mcpProxies: MCPProxyFormEntry[] = [],
 ): { params: OrgProjPathParams; body: CreateAgentRequest } => {
   const modelConfig = buildModelConfig(llmProviders, initialEnvironmentName);
+  const mcpConfig = buildMCPConfig(mcpProxies, initialEnvironmentName);
 
   return {
     params,
@@ -237,6 +279,7 @@ export const buildCatalogAgentPayload = (
         enableAutoInstrumentation: data.enableAutoInstrumentation,
       },
       ...(modelConfig ? { modelConfig } : {}),
+      ...(mcpConfig ? { mcpConfig } : {}),
     },
   };
 };

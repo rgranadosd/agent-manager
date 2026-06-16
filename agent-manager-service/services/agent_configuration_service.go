@@ -44,6 +44,7 @@ type AgentConfigurationService interface {
 	Create(ctx context.Context, orgName, projectName, agentID string,
 		req models.CreateAgentModelConfigRequest, createdBy string) (*models.AgentModelConfigResponse, error)
 	ValidateProvidersInCatalog(ctx context.Context, orgName string, providerHandles []string) error
+	ValidateMCPProxiesInCatalog(ctx context.Context, orgName string, proxyHandles []string) error
 	Get(ctx context.Context, configUUID uuid.UUID, orgName, projectName, agentName string) (*models.AgentModelConfigResponse, error)
 	GetMCP(ctx context.Context, configUUID uuid.UUID, orgName, projectName, agentName string) (*models.AgentModelConfigResponse, error)
 	GetByAgent(ctx context.Context, agentID, orgName string) (*models.AgentModelConfigResponse, error)
@@ -451,6 +452,40 @@ func (s *agentConfigurationService) ValidateProvidersInCatalog(
 		}
 		if !provider.InCatalog {
 			return fmt.Errorf("%w: provider %s must be in catalog", utils.ErrInvalidInput, handle)
+		}
+	}
+	return nil
+}
+
+// ValidateMCPProxiesInCatalog verifies each handle resolves to an existing MCP proxy
+// that is published in the catalog. Mirrors ValidateProvidersInCatalog and is used by the
+// MCP auto-wiring preflight so a bad proxy fails fast before the component is created.
+func (s *agentConfigurationService) ValidateMCPProxiesInCatalog(
+	ctx context.Context, orgName string, proxyHandles []string,
+) error {
+	if s.mcpProxyRepo == nil {
+		return fmt.Errorf("MCP configuration service is not fully configured")
+	}
+	seen := make(map[string]struct{}, len(proxyHandles))
+	for _, handle := range proxyHandles {
+		handle = strings.TrimSpace(handle)
+		if handle == "" {
+			return fmt.Errorf("%w: MCP proxy name is required", utils.ErrInvalidInput)
+		}
+		if _, dup := seen[handle]; dup {
+			continue
+		}
+		seen[handle] = struct{}{}
+
+		proxy, err := s.mcpProxyRepo.GetByHandle(ctx, handle, orgName)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("MCP proxy %s not found: %w", handle, utils.ErrMCPProxyNotFound)
+			}
+			return fmt.Errorf("failed to validate MCP proxy %s: %w", handle, err)
+		}
+		if proxy.Artifact == nil || !proxy.Artifact.InCatalog {
+			return fmt.Errorf("%w: MCP proxy %s must be in catalog", utils.ErrInvalidInput, handle)
 		}
 	}
 	return nil

@@ -7669,6 +7669,14 @@ components:
             type are auto-generated.
           items:
             $ref: "#/components/schemas/ModelConfigRequest"
+        mcpConfig:
+          type: array
+          description: >-
+            Optional MCP proxy configurations to create atomically with the
+            agent. Applied to the component's initial (lowest) environment. Name
+            and type are auto-generated.
+          items:
+            $ref: "#/components/schemas/MCPConfigRequest"
 
     ModelConfigRequest:
       type: object
@@ -7682,6 +7690,23 @@ components:
             component's initial (lowest) environment.
         configuration:
           $ref: "#/components/schemas/EnvProviderConfiguration"
+        environmentVariables:
+          type: array
+          description: Optional custom environment variable names exposed to the agent
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/EnvironmentVariableConfig"
+
+    MCPConfigRequest:
+      type: object
+      required:
+        - proxyName
+      properties:
+        proxyName:
+          type: string
+          description: >-
+            Handle of an already-configured MCP proxy. Applied to the
+            component's initial (lowest) environment.
         environmentVariables:
           type: array
           description: Optional custom environment variable names exposed to the agent
