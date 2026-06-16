@@ -25,6 +25,11 @@ K3D_CONFIG="${K3D_CONFIG:-${SCRIPT_DIR}/k3d-config.yaml}"
 GATEWAY_OPERATOR_VERSION="0.7.0"
 GATEWAY_CHART_VERSION="1.1.0"
 
+# OpenChoreo community module versions compatible with OpenChoreo ${OPENCHOREO_VERSION}
+OBSERVABILITY_LOGS_OPENSEARCH_VERSION="0.4.1"
+OBSERVABILITY_TRACING_OPENSEARCH_VERSION="0.4.1"
+OBSERVABILITY_METRICS_PROMETHEUS_VERSION="0.6.1"
+
 # Source AMP installation helpers
 source "${SCRIPT_DIR}/install-helpers.sh"
 
@@ -1214,7 +1219,7 @@ if helm upgrade --install observability-logs-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.4.1 \
+    --version "${OBSERVABILITY_LOGS_OPENSEARCH_VERSION}" \
     --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
     --set adapter.openSearchSecretName="opensearch-admin-credentials" \
     --timeout 10m; then
@@ -1228,7 +1233,7 @@ log_info "Enabling log collection with fluent-bit..."
 if helm upgrade observability-logs-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
     --namespace openchoreo-observability-plane \
-    --version 0.4.1 \
+    --version "${OBSERVABILITY_LOGS_OPENSEARCH_VERSION}" \
     --reuse-values \
     --set fluent-bit.enabled=true \
     --timeout 10m; then
@@ -1243,7 +1248,7 @@ if helm upgrade --install observability-metrics-prometheus \
     oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.6.1 \
+    --version "${OBSERVABILITY_METRICS_PROMETHEUS_VERSION}" \
     --timeout 10m; then
     log_success "observability-metrics-prometheus installed successfully"
 else
@@ -1256,7 +1261,7 @@ if helm upgrade --install observability-traces-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.4.1 \
+    --version "${OBSERVABILITY_TRACING_OPENSEARCH_VERSION}" \
     --set openSearch.enabled=false \
     --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
     --set opentelemetry-collector.configMap.existingName="amp-opentelemetry-collector-config" \
