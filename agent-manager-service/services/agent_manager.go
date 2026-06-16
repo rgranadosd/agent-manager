@@ -614,6 +614,11 @@ func (s *agentManagerService) persistInstrumentationConfig(ctx context.Context, 
 		CORSAllowMethods:          strings.Split(defaultCORS.AllowMethods, ","),
 		CORSAllowHeaders:          strings.Split(defaultCORS.AllowHeaders, ","),
 		CORSAllowCredentials:      defaultCORS.AllowCredentials,
+		// OAuth off by default; header columns are NOT NULL so set the defaults
+		// explicitly (the Select("*") Upsert would otherwise write empty strings).
+		EnableOAuthSecurity:   false,
+		OAuthHeaderName:       models.DefaultOAuthHeaderName,
+		OAuthAuthHeaderPrefix: models.DefaultOAuthAuthHeaderPrefix,
 	}
 
 	if err := s.agentConfigRepo.Upsert(agentConfig); err != nil {
@@ -676,6 +681,7 @@ func (s *agentManagerService) GetAgent(ctx context.Context, orgName string, proj
 				// No config in DB - use defaults for display purposes
 				defaultEnabled := true
 				defaultCORSEnabled := true
+				defaultOAuthDisabled := false
 				defCORS := config.GetAgentWorkloadConfig().CORS
 				agent.Configurations = &models.Configurations{
 					EnableAutoInstrumentation: &defaultEnabled,
@@ -687,6 +693,7 @@ func (s *agentManagerService) GetAgent(ctx context.Context, orgName string, proj
 						AllowHeaders:     strings.Split(defCORS.AllowHeaders, ","),
 						AllowCredentials: &defCORS.AllowCredentials,
 					},
+					EnableOAuthSecurity: &defaultOAuthDisabled,
 				}
 			} else if configErr != nil {
 				s.logger.Warn("Failed to read agent config from database", "agentName", agentName, "environment", lowestEnv, "error", configErr)
@@ -702,6 +709,8 @@ func (s *agentManagerService) GetAgent(ctx context.Context, orgName string, proj
 						AllowHeaders:     agentConfig.CORSAllowHeaders,
 						AllowCredentials: &agentConfig.CORSAllowCredentials,
 					},
+					EnableOAuthSecurity: &agentConfig.EnableOAuthSecurity,
+					OAuthConfig:         oauthConfigFromAgentConfig(agentConfig),
 				}
 			}
 
@@ -2222,7 +2231,10 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 
 	// Resolve config values: request > DB > defaults
 	tracingCfg := resolveTracingConfig(existingConfig, req.EnableAutoInstrumentation, true)
-	apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, true)
+	apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, req.EnableOAuthSecurity, req.OauthConfig, true)
+	if err := validateAuthExclusivity(apiCfg); err != nil {
+		return "", err
+	}
 	enableAutoInstrumentation := tracingCfg.EnableAutoInstrumentation
 	enableApiKeySecurity := apiCfg.EnableApiKeySecurity
 	if apiCfg.CORSAllowCredentials {
@@ -2365,6 +2377,13 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			CORSAllowMethods:          apiCfg.CORSAllowMethods,
 			CORSAllowHeaders:          apiCfg.CORSAllowHeaders,
 			CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
+			EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
+			OAuthIssuers:              apiCfg.OAuthIssuers,
+			OAuthAudiences:            apiCfg.OAuthAudiences,
+			OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
+			OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
+			OAuthHeaderName:           apiCfg.OAuthHeaderName,
+			OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
 		}
 		if configErr := s.agentConfigRepo.Upsert(agentConfig); configErr != nil {
 			s.logger.Error("Failed to persist instrumentation config to database", "agentName", agentName, "environment", lowestEnv, "error", configErr)
@@ -2390,6 +2409,14 @@ type resolvedCORSConfig struct {
 	CORSAllowMethods     []string
 	CORSAllowHeaders     []string
 	CORSAllowCredentials bool
+	// OAuth security (mutually exclusive with EnableApiKeySecurity).
+	EnableOAuthSecurity   bool
+	OAuthIssuers          []string
+	OAuthAudiences        []string
+	OAuthRequiredScopes   []string
+	OAuthRequiredClaims   map[string]interface{}
+	OAuthHeaderName       string
+	OAuthAuthHeaderPrefix string
 }
 
 // resolveTracingConfig resolves instrumentation config: request > DB > default (true if withDefaults, else false).
@@ -2404,8 +2431,8 @@ func resolveTracingConfig(existingConfig *models.AgentConfig, enableAutoInstrume
 	return resolved
 }
 
-// resolveAPIConfig resolves CORS and API key security config: request > DB > env-var defaults (only if withDefaults).
-func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *bool, corsConfig *spec.CORSConfig, withDefaults bool) resolvedCORSConfig {
+// resolveAPIConfig resolves CORS, API key, and OAuth security config: request > DB > env-var defaults (only if withDefaults).
+func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *bool, corsConfig *spec.CORSConfig, enableOAuthSecurity *bool, oauthConfig *spec.OAuthConfig, withDefaults bool) resolvedCORSConfig {
 	var resolved resolvedCORSConfig
 	if withDefaults {
 		defaultCORS := config.GetAgentWorkloadConfig().CORS
@@ -2416,6 +2443,7 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 			CORSAllowMethods:     strings.Split(defaultCORS.AllowMethods, ","),
 			CORSAllowHeaders:     strings.Split(defaultCORS.AllowHeaders, ","),
 			CORSAllowCredentials: defaultCORS.AllowCredentials,
+			EnableOAuthSecurity:  false,
 		}
 	}
 
@@ -2432,6 +2460,17 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 			resolved.CORSAllowHeaders = existingConfig.CORSAllowHeaders
 		}
 		resolved.CORSAllowCredentials = existingConfig.CORSAllowCredentials
+		resolved.EnableOAuthSecurity = existingConfig.EnableOAuthSecurity
+		resolved.OAuthIssuers = existingConfig.OAuthIssuers
+		resolved.OAuthAudiences = existingConfig.OAuthAudiences
+		resolved.OAuthRequiredScopes = existingConfig.OAuthRequiredScopes
+		resolved.OAuthRequiredClaims = existingConfig.OAuthRequiredClaims
+		if existingConfig.OAuthHeaderName != "" {
+			resolved.OAuthHeaderName = existingConfig.OAuthHeaderName
+		}
+		if existingConfig.OAuthAuthHeaderPrefix != "" {
+			resolved.OAuthAuthHeaderPrefix = existingConfig.OAuthAuthHeaderPrefix
+		}
 	}
 
 	if enableApiKeySecurity != nil {
@@ -2455,19 +2494,108 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 		}
 	}
 
+	if enableOAuthSecurity != nil {
+		resolved.EnableOAuthSecurity = *enableOAuthSecurity
+	}
+	if oauthConfig != nil {
+		if oauthConfig.Issuers != nil {
+			resolved.OAuthIssuers = oauthConfig.Issuers
+		}
+		if oauthConfig.Audiences != nil {
+			resolved.OAuthAudiences = oauthConfig.Audiences
+		}
+		if oauthConfig.RequiredScopes != nil {
+			resolved.OAuthRequiredScopes = oauthConfig.RequiredScopes
+		}
+		if oauthConfig.RequiredClaims != nil {
+			resolved.OAuthRequiredClaims = oauthConfig.RequiredClaims
+		}
+		if oauthConfig.HeaderName != nil && *oauthConfig.HeaderName != "" {
+			resolved.OAuthHeaderName = *oauthConfig.HeaderName
+		}
+		if oauthConfig.AuthHeaderPrefix != nil && *oauthConfig.AuthHeaderPrefix != "" {
+			resolved.OAuthAuthHeaderPrefix = *oauthConfig.AuthHeaderPrefix
+		}
+	}
+
+	// Header name/prefix are NOT NULL columns — guarantee non-empty values so the
+	// Upsert never writes an empty string over the gateway-compatible defaults.
+	if resolved.OAuthHeaderName == "" {
+		resolved.OAuthHeaderName = models.DefaultOAuthHeaderName
+	}
+	if resolved.OAuthAuthHeaderPrefix == "" {
+		resolved.OAuthAuthHeaderPrefix = models.DefaultOAuthAuthHeaderPrefix
+	}
+
 	return resolved
 }
 
-// buildPolicies builds the api-configuration trait policies from resolved CORS config.
+// oauthConfigFromAgentConfig builds the response OAuth config from a persisted
+// agent config row. Empty issuers reflect the configured default; empty header
+// fields fall back to the gateway-compatible defaults.
+func oauthConfigFromAgentConfig(cfg *models.AgentConfig) *models.OAuthConfig {
+	issuers := cfg.OAuthIssuers
+	if len(issuers) == 0 {
+		if defaultIssuer := config.GetAgentWorkloadConfig().OAuth.DefaultIssuer; defaultIssuer != "" {
+			issuers = []string{defaultIssuer}
+		}
+	}
+	headerName := cfg.OAuthHeaderName
+	if headerName == "" {
+		headerName = models.DefaultOAuthHeaderName
+	}
+	authHeaderPrefix := cfg.OAuthAuthHeaderPrefix
+	if authHeaderPrefix == "" {
+		authHeaderPrefix = models.DefaultOAuthAuthHeaderPrefix
+	}
+	return &models.OAuthConfig{
+		Issuers:          issuers,
+		Audiences:        cfg.OAuthAudiences,
+		RequiredScopes:   cfg.OAuthRequiredScopes,
+		RequiredClaims:   cfg.OAuthRequiredClaims,
+		HeaderName:       headerName,
+		AuthHeaderPrefix: authHeaderPrefix,
+	}
+}
+
+// validateAuthExclusivity rejects configs that enable both API key and OAuth
+// security — only one auth policy may be attached to an agent endpoint.
+func validateAuthExclusivity(cfg resolvedCORSConfig) error {
+	if cfg.EnableApiKeySecurity && cfg.EnableOAuthSecurity {
+		return fmt.Errorf("%w: API key and OAuth security are mutually exclusive — enable only one", utils.ErrInvalidInput)
+	}
+	return nil
+}
+
+// buildPolicies builds the api-configuration trait policies from resolved config.
 func buildPolicies(cfg resolvedCORSConfig) []map[string]interface{} {
 	var policies []map[string]interface{}
 	// CORS must be first so preflight OPTIONS requests are handled before
-	// any auth policy runs. api-key-auth is always appended after.
+	// any auth policy runs. Exactly one auth policy (api-key-auth or jwt-auth)
+	// is appended after — mutual exclusivity is enforced upstream.
 	if cfg.CORSEnabled {
 		policies = append(policies, client.CORSPolicy(cfg.CORSAllowOrigins, cfg.CORSAllowMethods, cfg.CORSAllowHeaders, cfg.CORSAllowCredentials))
 	}
 	if cfg.EnableApiKeySecurity {
 		policies = append(policies, client.APIKeyAuthPolicy())
+	}
+	if cfg.EnableOAuthSecurity {
+		issuers := cfg.OAuthIssuers
+		if len(issuers) == 0 {
+			// Empty issuers fall back to the configured default key manager at
+			// build time, so the default can change via config without rewriting DB rows.
+			if defaultIssuer := config.GetAgentWorkloadConfig().OAuth.DefaultIssuer; defaultIssuer != "" {
+				issuers = []string{defaultIssuer}
+			}
+		}
+		policies = append(policies, client.OAuthPolicy(client.OAuthPolicyParams{
+			Issuers:          issuers,
+			Audiences:        cfg.OAuthAudiences,
+			RequiredScopes:   cfg.OAuthRequiredScopes,
+			RequiredClaims:   cfg.OAuthRequiredClaims,
+			HeaderName:       cfg.OAuthHeaderName,
+			AuthHeaderPrefix: cfg.OAuthAuthHeaderPrefix,
+		}))
 	}
 	return policies
 }
@@ -2671,7 +2799,10 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 		// AgentConfig. When useConfigFromSourceEnv=false the request takes precedence
 		// where set; any unset field falls back to the source env's values.
 		tracingCfg := resolveTracingConfig(existingConfig, req.EnableAutoInstrumentation, false)
-		apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, false)
+		apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, req.EnableOAuthSecurity, req.OauthConfig, false)
+		if err := validateAuthExclusivity(apiCfg); err != nil {
+			return err
+		}
 		policies := buildPolicies(apiCfg)
 
 		// Each environment must have its own unique artifact UUID so the gateway controller
@@ -2712,6 +2843,13 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			CORSAllowMethods:          apiCfg.CORSAllowMethods,
 			CORSAllowHeaders:          apiCfg.CORSAllowHeaders,
 			CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
+			EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
+			OAuthIssuers:              apiCfg.OAuthIssuers,
+			OAuthAudiences:            apiCfg.OAuthAudiences,
+			OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
+			OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
+			OAuthHeaderName:           apiCfg.OAuthHeaderName,
+			OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
 		}
 		if upsertErr := s.agentConfigRepo.Upsert(agentConfig); upsertErr != nil {
 			s.logger.Error("Failed to persist agent config for target environment", "agentName", agentName, "environment", req.TargetEnvironment, "error", upsertErr)
@@ -2762,7 +2900,10 @@ func (s *agentManagerService) UpdateAgentDeploySettings(ctx context.Context, org
 		existingConfig = cfg
 	}
 	tracingCfg := resolveTracingConfig(existingConfig, req.EnableAutoInstrumentation, false)
-	apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, false)
+	apiCfg := resolveAPIConfig(existingConfig, req.EnableApiKeySecurity, req.CorsConfig, req.EnableOAuthSecurity, req.OauthConfig, false)
+	if err := validateAuthExclusivity(apiCfg); err != nil {
+		return err
+	}
 	policies := buildPolicies(apiCfg)
 
 	// Each environment must keep its own existing API artifact UUID so we don't churn the
@@ -2794,6 +2935,13 @@ func (s *agentManagerService) UpdateAgentDeploySettings(ctx context.Context, org
 		CORSAllowMethods:          apiCfg.CORSAllowMethods,
 		CORSAllowHeaders:          apiCfg.CORSAllowHeaders,
 		CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
+		EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
+		OAuthIssuers:              apiCfg.OAuthIssuers,
+		OAuthAudiences:            apiCfg.OAuthAudiences,
+		OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
+		OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
+		OAuthHeaderName:           apiCfg.OAuthHeaderName,
+		OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
 	}
 	if existingConfig != nil {
 		// Preserve any pinned instrumentation_version that wasn't part of this request.
