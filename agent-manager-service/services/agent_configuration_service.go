@@ -33,6 +33,7 @@ import (
 
 	"github.com/wso2/agent-manager/agent-manager-service/clients/openchoreosvc/client"
 	"github.com/wso2/agent-manager/agent-manager-service/clients/secretmanagersvc"
+	"github.com/wso2/agent-manager/agent-manager-service/config"
 	"github.com/wso2/agent-manager/agent-manager-service/models"
 	"github.com/wso2/agent-manager/agent-manager-service/repositories"
 	"github.com/wso2/agent-manager/agent-manager-service/utils"
@@ -58,6 +59,14 @@ type AgentConfigurationService interface {
 	// DB for all LLM configurations of this agent in the given environment. Used during deploy to
 	// identify which component env var secretRefs are system-managed (LLM config) vs user-provided.
 	ListAgentLLMConfigSecretReferences(ctx context.Context, agentID, orgName, environmentName string) (map[string]struct{}, error)
+	// ListSystemManagedEnvVarKeys returns the set of env var keys that are system-managed
+	// (i.e. injected by LLM configurations) for the given agent and environment.
+	// Used during promote to strip these keys from inherited workload overrides.
+	ListSystemManagedEnvVarKeys(ctx context.Context, agentID, orgName, environmentName string) (map[string]bool, error)
+	// BuildSystemManagedEnvVarsFromConfig constructs the LLM env vars for a given agent
+	// and environment from the DB config. Used during promotion when the target environment's
+	// ReleaseBinding doesn't have these vars yet.
+	BuildSystemManagedEnvVarsFromConfig(ctx context.Context, agentID, orgName, environmentName string) ([]client.EnvVar, error)
 }
 
 type EnvConfigTemplate struct {
@@ -159,13 +168,20 @@ func scopedProxyIdentifier(projectName, agentName, configName, envName string) s
 	return fmt.Sprintf("%s-%s", prefix, hashSuffix)
 }
 
-// buildProxyURL constructs the proxy base URL from a gateway vhost and an optional context path.
-
-func buildProxyURL(vhost string, contextPath *string) string {
-	if contextPath != nil {
-		return fmt.Sprintf("%s%s", vhost, *contextPath)
+// buildProxyURL constructs the proxy base URL from a gateway and an optional context path.
+// For internal agents, it uses the in-cluster gateway runtime service name (ClusterIP)
+// so pods can reach the gateway without depending on external DNS.
+// For external agents, it uses the gateway's vhost (reachable from outside the cluster).
+func buildProxyURL(gateway *models.Gateway, contextPath *string, isInternal bool) string {
+	base := gateway.Vhost
+	if isInternal {
+		gwRuntime := config.GetConfig().GatewayRuntime
+		base = fmt.Sprintf("http://%s%s:%d", gateway.Name, gwRuntime.HostSuffix, gwRuntime.Port)
 	}
-	return vhost
+	if contextPath != nil {
+		return fmt.Sprintf("%s%s", base, *contextPath)
+	}
+	return base
 }
 
 // buildLLMEnvVars constructs the two env vars (URL and API key) from the env config templates.
@@ -509,7 +525,7 @@ func (s *agentConfigurationService) Create(ctx context.Context, orgName, project
 		if proxy != nil {
 			proxyContext = proxy.Configuration.Context
 		}
-		proxyURL := buildProxyURL(gateway.Vhost, proxyContext)
+		proxyURL := buildProxyURL(gateway, proxyContext, !isExternalAgent)
 
 		// Capture credentials for external agents.
 		if isExternalAgent {
@@ -849,7 +865,7 @@ func (s *agentConfigurationService) processEnvProviderChange(
 	// Internal-agent only: inject env vars into Component/ReleaseBinding.
 	// SecretReference is already created/updated by secretClient.CreateSecret above.
 	if !isExternalAgent {
-		proxyURL := buildProxyURL(gateway.Vhost, proxy.Configuration.Context)
+		proxyURL := buildProxyURL(gateway, proxy.Configuration.Context, true)
 		envVarsToInject := buildLLMEnvVars(envConfigTemplates, proxyURL, secretRefName)
 		if uvErr := s.ocClient.UpdateComponentEnvVars(ctx, orgName, config.ProjectName, config.AgentID, envVarsToInject); uvErr != nil {
 			s.logger.Error("failed to update Component CR env vars in Scenario A — Component CR in inconsistent state", "env", envName, "err", uvErr)
@@ -1104,7 +1120,7 @@ func (s *agentConfigurationService) processNewEnv(
 	// last-write-wins clobbering across multiple environments (HIGH-3).
 	if !isExternalAgent {
 		// Reuse the gateway already resolved for deployment (resolveGatewayForProvider)
-		proxyURL := buildProxyURL(gateway.Vhost, proxy.Configuration.Context)
+		proxyURL := buildProxyURL(gateway, proxy.Configuration.Context, true)
 
 		envVarsToInject := buildLLMEnvVars(envConfigTemplates, proxyURL, secretRefName)
 		// Inject per-env URL into the ReleaseBinding for this specific environment.
@@ -1407,7 +1423,7 @@ func (s *agentConfigurationService) Update(ctx context.Context, configUUID uuid.
 							s.logger.Warn("Phase 1b: failed to resolve gateway for re-injection", "environment", envName, "err", gwErr)
 							continue
 						}
-						proxyURL := buildProxyURL(gateway.Vhost, mapping.LLMProxy.Configuration.Context)
+						proxyURL := buildProxyURL(gateway, mapping.LLMProxy.Configuration.Context, true)
 						// Use persisted SecretReference from DB rather than deriving from mutable config name.
 						envVars1b, varErr1b := s.envVariableRepo.ListByConfigAndEnv(ctx, existingConfig.UUID, mapping.EnvironmentUUID)
 						secretRefName := ""
@@ -2296,25 +2312,6 @@ func (s *agentConfigurationService) buildLLMProxyUpdateConfig(
 	return proxyConfig, providerUUID, nil
 }
 
-func (s *agentConfigurationService) storeSecret(ctx context.Context, orgName, projectName, agentName, envName, configName, entityName, secretKey, secretValue string) (string, error) {
-	// Store provider API key in OpenBao KV
-	secretLoc := secretmanagersvc.SecretLocation{
-		OrgName:         orgName,
-		ProjectName:     projectName,
-		AgentName:       agentName,
-		EnvironmentName: envName,
-		EntityName:      entityName,
-		ConfigName:      configName,
-		SecretKey:       secretKey,
-	}
-	kvPath, err := s.secretClient.CreateSecret(ctx, secretLoc,
-		map[string]string{secretKey: secretValue})
-	if err != nil {
-		return "", fmt.Errorf("failed to store provider API key in KV: %w", err)
-	}
-	return kvPath, nil
-}
-
 // buildEnvironmentVariables generates environment variable templates from config name.
 // If overrides are provided, user-supplied names take precedence over auto-generated ones.
 // Validates all names using ValidateEnvironmentVariableName.
@@ -2427,6 +2424,32 @@ func (s *agentConfigurationService) loadExistingVarNames(ctx context.Context, co
 		}
 	}
 	return result, nil
+}
+
+// dedupeEnvVariablesByKey collapses per-environment DB rows into config-level entries.
+// Rows are stored per-environment but the variable name is config-level — agent source code
+// reads url/apikey by the same env var name regardless of which provider is bound to a given
+// environment. First occurrence per key wins.
+func (s *agentConfigurationService) dedupeEnvVariablesByKey(configUUID uuid.UUID, vars []models.AgentEnvConfigVariable) []models.EnvironmentVariableConfig {
+	seen := make(map[string]string)
+	result := make([]models.EnvironmentVariableConfig, 0, len(vars))
+	for _, v := range vars {
+		if existing, already := seen[v.VariableKey]; already {
+			if existing != v.VariableName {
+				s.logger.Warn(
+					"environment variable name differs across environments — using first-occurrence value",
+					"configUUID", configUUID,
+					"key", v.VariableKey,
+					"firstValue", existing,
+					"otherValue", v.VariableName,
+				)
+			}
+			continue
+		}
+		seen[v.VariableKey] = v.VariableName
+		result = append(result, models.EnvironmentVariableConfig{Name: v.VariableName, Key: v.VariableKey})
+	}
+	return result
 }
 
 // rollbackProxies cleans up created proxies, deployments, and API keys on failure
@@ -2600,14 +2623,8 @@ func (s *agentConfigurationService) buildConfigResponse(ctx context.Context, con
 		}
 	}
 
-	// Build environment variables list (only variable names, not secrets)
-	envVars := make([]models.EnvironmentVariableConfig, len(config.EnvVariables))
-	for i, v := range config.EnvVariables {
-		envVars[i] = models.EnvironmentVariableConfig{
-			Name: v.VariableName,
-			Key:  v.VariableKey,
-		}
-	}
+	// Variable rows are stored per-environment but names are config-level — collapse to one entry per key.
+	envVars := s.dedupeEnvVariablesByKey(config.UUID, config.EnvVariables)
 
 	return &models.AgentModelConfigResponse{
 		UUID:                 config.UUID.String(),
@@ -2706,14 +2723,8 @@ func (s *agentConfigurationService) buildExternalAgentConfigResponse(
 		}
 	}
 
-	// Build environment variables list
-	envVars := make([]models.EnvironmentVariableConfig, len(reloadedConfig.EnvVariables))
-	for i, v := range reloadedConfig.EnvVariables {
-		envVars[i] = models.EnvironmentVariableConfig{
-			Name: v.VariableName,
-			Key:  v.VariableKey,
-		}
-	}
+	// Variable rows are stored per-environment but names are config-level — collapse to one entry per key.
+	envVars := s.dedupeEnvVariablesByKey(reloadedConfig.UUID, reloadedConfig.EnvVariables)
 
 	return &models.AgentModelConfigResponse{
 		UUID:                 reloadedConfig.UUID.String(),
@@ -2754,5 +2765,106 @@ func (s *agentConfigurationService) ListAgentLLMConfigSecretReferences(ctx conte
 	for _, ref := range refs {
 		result[ref] = struct{}{}
 	}
+	return result, nil
+}
+
+func (s *agentConfigurationService) ListSystemManagedEnvVarKeys(ctx context.Context, agentID, orgName, environmentName string) (map[string]bool, error) {
+	env, err := s.ocClient.GetEnvironment(ctx, orgName, environmentName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get environment %q: %w", environmentName, err)
+	}
+	envUUID, err := uuid.Parse(env.UUID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid environment UUID %q: %w", env.UUID, err)
+	}
+
+	agentConfig, err := s.agentConfigRepo.GetByAgentID(ctx, agentID, orgName)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No LLM configuration exists for this agent — no system-managed keys
+			return map[string]bool{}, nil
+		}
+		return nil, fmt.Errorf("failed to get agent configuration: %w", err)
+	}
+
+	vars, err := s.envVariableRepo.ListByConfigAndEnv(ctx, agentConfig.UUID, envUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list env config variables: %w", err)
+	}
+
+	keys := make(map[string]bool, len(vars))
+	for _, v := range vars {
+		keys[v.VariableName] = true
+	}
+	return keys, nil
+}
+
+// BuildSystemManagedEnvVarsFromConfig constructs the LLM env vars (URL + API key ref)
+// for a given agent and environment from the DB config. Used during promotion when
+// the target environment's ReleaseBinding doesn't have these vars yet.
+func (s *agentConfigurationService) BuildSystemManagedEnvVarsFromConfig(ctx context.Context, agentID, orgName, environmentName string) ([]client.EnvVar, error) {
+	env, err := s.ocClient.GetEnvironment(ctx, orgName, environmentName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get environment %q: %w", environmentName, err)
+	}
+	envUUID, err := uuid.Parse(env.UUID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid environment UUID %q: %w", env.UUID, err)
+	}
+
+	agentConfig, err := s.agentConfigRepo.GetByAgentID(ctx, agentID, orgName)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get agent configuration: %w", err)
+	}
+
+	// Get the env-agent mapping for this environment to find the proxy
+	mapping, err := s.envMappingRepo.GetByConfigAndEnv(ctx, agentConfig.UUID, envUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get env mapping for %s: %w", environmentName, err)
+	}
+
+	// Use preloaded proxy from the mapping
+	proxy := mapping.LLMProxy
+	if proxy == nil {
+		return nil, fmt.Errorf("LLM proxy not found for mapping in environment %s", environmentName)
+	}
+
+	// Resolve gateway for the proxy URL
+	gateway, err := s.resolveGatewayForProxy(ctx, proxy.Handle, orgName, envUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve gateway: %w", err)
+	}
+	proxyURL := buildProxyURL(gateway, proxy.Configuration.Context, true)
+
+	// Get the env config variables to find the secret reference and variable names
+	vars, err := s.envVariableRepo.ListByConfigAndEnv(ctx, agentConfig.UUID, envUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list env config variables: %w", err)
+	}
+
+	// Build env vars from the DB config
+	var result []client.EnvVar
+	for _, v := range vars {
+		if v.SecretReference != "" {
+			result = append(result, client.EnvVar{
+				Key: v.VariableName,
+				ValueFrom: &client.EnvVarValueFrom{
+					SecretKeyRef: &client.SecretKeyRef{
+						Name: v.SecretReference,
+						Key:  secretmanagersvc.SecretKeyAPIKey,
+					},
+				},
+			})
+		} else {
+			result = append(result, client.EnvVar{
+				Key:   v.VariableName,
+				Value: proxyURL,
+			})
+		}
+	}
+
 	return result, nil
 }

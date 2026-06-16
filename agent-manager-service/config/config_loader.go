@@ -135,7 +135,7 @@ func loadEnvs() {
 		URL: r.readOptionalString("TRACE_OBSERVER_URL", "http://localhost:9098"),
 	}
 
-	config.InstrumentationURL = r.readOptionalString("INSTRUMENTATION_URL", "http://localhost:22893/otel")
+	config.InstrumentationURL = r.readOptionalString("INSTRUMENTATION_URL", "http://default-default.gateway.localhost:19080/otel")
 
 	config.IsLocalDevEnv = r.readOptionalBool("IS_LOCAL_DEV_ENV", false)
 	config.DefaultGatewayPort = int(r.readOptionalInt64("DEFAULT_GATEWAY_PORT", 19080))
@@ -235,6 +235,14 @@ func loadEnvs() {
 		MaxReplicas: int(r.readOptionalInt64("RESOURCE_MAX_REPLICAS", 10)),
 		MaxCPU:      r.readOptionalString("RESOURCE_MAX_CPU", "500m"),
 		MaxMemory:   r.readOptionalString("RESOURCE_MAX_MEMORY", "512Mi"),
+	}
+
+	// Gateway runtime addressing — how RestApi bindings reach the API Platform Gateway
+	// in-cluster. Override per deployment if the data-plane namespace or service-name
+	// suffix differs from the openchoreo defaults.
+	config.GatewayRuntime = GatewayRuntimeConfig{
+		HostSuffix: r.readOptionalString("GATEWAY_RUNTIME_HOST_SUFFIX", "-gateway-gateway-runtime.openchoreo-data-plane"),
+		Port:       int(r.readOptionalInt64("GATEWAY_RUNTIME_PORT", 22893)),
 	}
 
 	// Encryption key for secrets at rest (hex-encoded 32-byte AES-256 key)

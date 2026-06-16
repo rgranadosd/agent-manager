@@ -62,6 +62,7 @@ type EnvVars struct {
 	IsSensitive bool   `json:"isSensitive,omitempty"`
 	SecretRef   string `json:"secretRef,omitempty"`
 	SecretKey   string `json:"secretKey,omitempty"` // The key within the secret (e.g., "api-key")
+	IsSystem    bool   `json:"isSystem,omitempty"`  // Platform-injected (e.g. LLM_PROVIDER_URL); read-only for users
 }
 
 // FileMountEntry represents a file mount configuration
@@ -93,8 +94,9 @@ type BuildParameters struct {
 	Branch          string `json:"branch"`
 	CommitID        string `json:"commitId"`
 	Language        string `json:"language"`
-	LanguageVersion string `json:"languageVersion"`
-	RunCommand      string `json:"runCommand"`
+	LanguageVersion string `json:"languageVersion,omitempty"`
+	RunCommand      string `json:"runCommand,omitempty"`
+	DockerfilePath  string `json:"dockerfilePath,omitempty"`
 }
 
 // BuildStep represents a step in the build process

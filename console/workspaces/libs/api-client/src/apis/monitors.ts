@@ -27,6 +27,7 @@ import type {
   ListMonitorRunsPathParams,
   ListMonitorRunsQueryParams,
   ListMonitorsPathParams,
+  ListMonitorsQueryParams,
   LogsResponse,
   MonitorListResponse,
   MonitorResponse,
@@ -62,6 +63,7 @@ import {
 
 export async function listMonitors(
   params: ListMonitorsPathParams,
+  queryParams?: ListMonitorsQueryParams,
   getToken?: () => Promise<string>
 ): Promise<MonitorListResponse> {
   const org = encodeRequired(params.orgName, "orgName");
@@ -69,9 +71,14 @@ export async function listMonitors(
   const agent = encodeRequired(params.agentName, "agentName");
   const token = getToken ? await getToken() : undefined;
 
+  const searchParams: Record<string, string> = {};
+  if (queryParams?.environmentName) {
+    searchParams.environment = queryParams.environmentName;
+  }
+
   const res = await httpGET(
     `${SERVICE_BASE}/orgs/${org}/projects/${project}/agents/${agent}/monitors`,
-    { token }
+    { searchParams, token }
   );
   if (!res.ok) throw await res.json();
   return res.json();

@@ -67,6 +67,8 @@ interface DeploymentConfigProps {
   imageId: string;
   /** When provided (kind agents), seeds env vars from schema and locks those keys */
   configSchema?: AgentKindConfigSchemaItem[];
+  /** Hide CORS, API key security, and instrumentation sections — show env vars/files only */
+  hideSecurityConfig?: boolean;
 }
 
 export function DeploymentConfig({
@@ -78,6 +80,7 @@ export function DeploymentConfig({
   agentName,
   imageId,
   configSchema,
+  hideSecurityConfig = false,
 }: DeploymentConfigProps) {
   const [envVariables, setEnvVariables] = useState<
     Array<{
@@ -413,7 +416,7 @@ export function DeploymentConfig({
             )}
           </Form.Section>
 
-          {isPythonBuildpack && (
+          {!hideSecurityConfig && isPythonBuildpack && (
             <Form.Section>
               <Form.Header>Instrumentation</Form.Header>
               <Form.Stack spacing={1}>
@@ -454,7 +457,7 @@ export function DeploymentConfig({
             </Form.Section>
           )}
 
-          {isApiAgent && (
+          {!hideSecurityConfig && isApiAgent && (
             <Form.Section>
               <Form.Header>CORS Configuration</Form.Header>
               <Form.Stack spacing={1}>
@@ -592,7 +595,7 @@ export function DeploymentConfig({
             </Form.Section>
           )}
 
-          {isApiAgent && (
+          {!hideSecurityConfig && isApiAgent && (
             <Form.Section>
               <Form.Header>Endpoint Authentication</Form.Header>
               <Form.Stack spacing={1}>

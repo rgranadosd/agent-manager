@@ -10,17 +10,29 @@ spec:
     openAPIV3Schema:
       type: object
       properties:
-        otelEndpoint:
-          type: string
-          description: "OpenTelemetry collector endpoint URL"
         agentApiKey:
           type: string
           description: "API key for authenticating with the agent service"
+        envInjectionEnabled:
+          type: boolean
+          default: true
+          description: "Enable or disable env injection instrumentation"
       required:
-        - otelEndpoint
         - agentApiKey
 
-  # Create Secret for the agent API key
+  environmentConfigs:
+    openAPIV3Schema:
+      type: object
+      properties:
+        envInjectionEnabled:
+          type: boolean
+          description: "Enable or disable env injection instrumentation for this environment"
+        agentApiKey:
+          type: string
+          description: "Environment-specific API key for authenticating with the agent service"
+
+  # Always create the Secret — patches always run regardless of includeWhen,
+  # so the Secret must always exist to satisfy the AMP_AGENT_API_KEY secretKeyRef.
   creates:
     - template:
         apiVersion: v1
@@ -30,9 +42,13 @@ spec:
           namespace: ${metadata.namespace}
         type: Opaque
         stringData:
-          api-key: ${parameters.agentApiKey}
+          api-key: |
+             ${has(environmentConfigs.agentApiKey) ? environmentConfigs.agentApiKey : parameters.agentApiKey}
 
-  # Patches to modify the Deployment resource
+  # Patches to inject AMP_OTEL_ENDPOINT and AMP_AGENT_API_KEY.
+  # This is the sole injector for these vars across all agent types
+  # (Python buildpack and Docker). The python-otel-instrumentation-trait
+  # does NOT inject these to avoid duplicates.
   patches:
     - target:
         kind: Deployment
@@ -43,7 +59,9 @@ spec:
           path: /spec/template/spec/containers/0/env/-
           value:
             name: AMP_OTEL_ENDPOINT
-            value: "${parameters.otelEndpoint}"
+            # Derived from the apiGatewayName helper convention ("api-platform-<org>-<env>")
+            # + the gateway runtime in-cluster Service.
+            value: "http://api-platform-${metadata.componentNamespace}-${metadata.environmentName}-gateway-gateway-runtime.openchoreo-data-plane:22893/otel"
         - op: add
           path: /spec/template/spec/containers/0/env/-
           value:

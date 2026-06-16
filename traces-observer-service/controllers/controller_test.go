@@ -34,22 +34,29 @@ import (
 type fakeObserverClient struct {
 	// rootSpan is returned by GetSpanDetails when called for the root span.
 	rootSpan *observer.SpanDetailsResponse
+	// traces is the list returned by QueryTraces (export path).
+	traces []observer.TraceInfo
 	// spans is the list returned by QueryTraceSpans.
 	spans []observer.SpanInfo
 	// spanDetails maps spanID → detail response for GetSpanDetails lookups
 	// (excluding root, which is rootSpan).
 	spanDetails map[string]*observer.SpanDetailsResponse
 
+	// lastSpansReq records the request passed to the most recent
+	// QueryTraceSpans call so export tests can assert IncludeAttributes.
+	lastSpansReq observer.TracesQueryRequest
+
 	getSpanDetailsCalls  int32
 	queryTraceSpansCalls int32
 }
 
 func (f *fakeObserverClient) QueryTraces(_ context.Context, _ observer.TracesQueryRequest) (*observer.TracesQueryResponse, error) {
-	return nil, fmt.Errorf("not used by enrichTraceOverview tests")
+	return &observer.TracesQueryResponse{Traces: f.traces, Total: len(f.traces)}, nil
 }
 
-func (f *fakeObserverClient) QueryTraceSpans(_ context.Context, _ string, _ observer.TracesQueryRequest) (*observer.TraceSpansQueryResponse, error) {
+func (f *fakeObserverClient) QueryTraceSpans(_ context.Context, _ string, req observer.TracesQueryRequest) (*observer.TraceSpansQueryResponse, error) {
 	atomic.AddInt32(&f.queryTraceSpansCalls, 1)
+	f.lastSpansReq = req
 	return &observer.TraceSpansQueryResponse{Spans: f.spans, Total: len(f.spans)}, nil
 }
 
@@ -305,5 +312,63 @@ func TestEnrichTraceOverview_SkipsLeafAggregationForHugeTraces(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&fake.getSpanDetailsCalls); got != 0 {
 		t.Errorf("expected no GetSpanDetails calls (skip), got %d", got)
+	}
+}
+
+// TestExportTraces_UsesBulkAttributes verifies the export path fetches span
+// attributes inline via QueryTraceSpans(includeAttributes=true) and makes zero
+// GetSpanDetails calls, while preserving span kind/status/attributes.
+func TestExportTraces_UsesBulkAttributes(t *testing.T) {
+	now := time.Now()
+	rootAttrs := map[string]interface{}{
+		"traceloop.entity.input":  `{"inputs":"hello"}`,
+		"traceloop.entity.output": `{"outputs":{"messages":[{"kwargs":{"content":"hi"}}]}}`,
+	}
+	fake := &fakeObserverClient{
+		traces: []observer.TraceInfo{{
+			TraceID:    "trace-1",
+			RootSpanID: "root",
+			StartTime:  now.Add(-time.Minute),
+			EndTime:    now,
+			SpanCount:  2,
+		}},
+		spans: []observer.SpanInfo{
+			{SpanID: "root", SpanName: "invoke_agent", Kind: "SERVER", Status: "ok", StartTime: now.Add(-time.Minute), EndTime: now, Attributes: rootAttrs},
+			{SpanID: "child", SpanName: "llm", ParentSpanID: "root", Kind: "INTERNAL", Status: "ok", StartTime: now.Add(-30 * time.Second), EndTime: now},
+		},
+	}
+	c := NewTracingController(fake)
+
+	resp, err := c.ExportTraces(context.Background(), baseParams())
+	if err != nil {
+		t.Fatalf("ExportTraces returned error: %v", err)
+	}
+	if got := atomic.LoadInt32(&fake.getSpanDetailsCalls); got != 0 {
+		t.Errorf("expected 0 GetSpanDetails calls, got %d", got)
+	}
+	if !fake.lastSpansReq.IncludeAttributes {
+		t.Error("expected QueryTraceSpans to request IncludeAttributes=true")
+	}
+	if len(resp.Traces) != 1 {
+		t.Fatalf("expected 1 exported trace, got %d", len(resp.Traces))
+	}
+	tr := resp.Traces[0]
+	if len(tr.Spans) != 2 {
+		t.Fatalf("expected 2 spans, got %d", len(tr.Spans))
+	}
+	var root *opensearch.Span
+	for i := range tr.Spans {
+		if tr.Spans[i].SpanID == "root" {
+			root = &tr.Spans[i]
+		}
+	}
+	if root == nil {
+		t.Fatal("root span missing from export")
+	}
+	if root.Kind != "SERVER" {
+		t.Errorf("expected root Kind SERVER, got %q", root.Kind)
+	}
+	if _, ok := root.Attributes["traceloop.entity.input"]; !ok {
+		t.Error("expected root span to retain bulk-fetched attributes")
 	}
 }

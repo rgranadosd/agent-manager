@@ -222,13 +222,25 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
         { orgName: orgId, projName: projectId, agentName: agentId },
         { enabled: !external },
     );
-    const isSuspended = !external && deployments?.[envId]?.status === "suspended";
+    const deploymentStatus = deployments?.[envId]?.status;
+    const isSuspended = !external && deploymentStatus === "suspended";
+
+    // Observability is only meaningful once a deployment exists in a running,
+    // failed, or suspended state — there are no metrics or traces to show while
+    // an internal agent is not-deployed or still deploying. External agents have
+    // no deployment lifecycle, so they are always observable.
+    const hasObservableDeployment =
+        deploymentStatus === "active" ||
+        deploymentStatus === "error" ||
+        deploymentStatus === "failed" ||
+        deploymentStatus === "suspended";
+    const hideObservability = !external && !hasObservableDeployment;
 
     const { data: metrics, isLoading: isMetricsLoading } = useGetAgentMetrics(
         { agentName: agentId, orgName: orgId, projName: projectId },
         { environmentName: envId },
         {
-            enabled: !hideMetrics && !isSuspended,
+            enabled: !hideMetrics && !isSuspended && !hideObservability,
             enableAutoRefresh: true,
             timeRange: TraceListTimeRange.ONE_HOUR,
         },
@@ -236,7 +248,7 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
 
     const { traceList, isLoading: isTracesLoading } = useTraceList(
         orgId, projectId, agentId, envId, TraceListTimeRange.ONE_HOUR, 30, "desc",
-        undefined, undefined, { enableAutoRefresh: true },
+        undefined, undefined, { enableAutoRefresh: true, enabled: !hideObservability },
     );
 
     const cpuPts = metrics?.cpuUsage ?? [];
@@ -322,6 +334,11 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
         { orgId, projectId, agentId, envId },
     );
 
+    // Nothing to surface for a not-deployed / deploying internal environment.
+    if (hideObservability) {
+        return null;
+    }
+
     return (
         <>
             <Divider sx={{ mt: 2, mb: 1 }} />
@@ -392,7 +409,7 @@ export const EnvObservabilitySection: React.FC<EnvObservabilitySectionProps> = (
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600}
                             sx={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Metrics
+                            System Metrics
                         </Typography>
                         <Button
                             size="small"

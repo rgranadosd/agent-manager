@@ -17,20 +17,30 @@
  */
 
 import {
+  useDeployAgent,
+  useUpdateAgentDeploySettings,
   useGetAgent,
+  useGetAgentConfigurations,
   useGetAgentMetrics,
   useGetAgentResourceConfigs,
+  useGetDeploymentPipeline,
   useListAgentDeployments,
   useListAgentKindVersions,
   useUpdateDeploymentState,
 } from "@agent-management-platform/api-client";
 import { NoDataFound, TextInput } from "@agent-management-platform/views";
 import {
+  ArrowUpFromLine,
   Clock,
   Cpu,
   ExternalLink,
   FlaskConical,
+  Globe,
+  Key,
+  LineChart,
+  MoreHorizontal,
   Rocket,
+  ScrollText,
   Workflow,
   PlayCircle,
   PauseCircle,
@@ -46,12 +56,17 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   Collapse,
   Divider,
   IconButton,
+  Menu,
+  MenuItem,
   Skeleton,
   Stack,
+  Switch,
+  Tooltip,
   Typography,
   useTheme,
 } from "@wso2/oxygen-ui";
@@ -62,6 +77,8 @@ import {
   formatUsagePercent,
   getUsagePercentVariant,
 } from "@agent-management-platform/shared-component";
+import { EditSecurityConfigDrawer } from "./EditSecurityConfigDrawer";
+import { EditDeployConfigDrawer } from "./EditDeployConfigDrawer";
 import {
   absoluteRouteMap,
   AgentResourceConfigsResponse,
@@ -72,8 +89,9 @@ import {
 } from "@agent-management-platform/types";
 import { extractBuildIdFromImageId } from "../utils/extractBuildIdFromImageId";
 import { formatDistanceToNow } from "date-fns";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditResourceConfigsDrawer } from "./EditResourceConfigsDrawer";
+import { PromoteAgentDrawer } from "./PromoteAgentDrawer";
 
 function DeploymentStatusPanel({ status }: { status: DeploymentStatus }) {
   const theme = useTheme();
@@ -147,8 +165,8 @@ function ResourceConfigsPanel({
       : undefined;
   const memoryPercent =
     lastMemory !== undefined &&
-    lastMemoryRequest !== undefined &&
-    lastMemoryRequest > 0
+      lastMemoryRequest !== undefined &&
+      lastMemoryRequest > 0
       ? formatUsagePercent(lastMemory, lastMemoryRequest)
       : undefined;
   const cpuVariant =
@@ -157,16 +175,16 @@ function ResourceConfigsPanel({
       : undefined;
   const memoryVariant =
     lastMemory !== undefined &&
-    lastMemoryRequest !== undefined &&
-    lastMemoryRequest > 0
+      lastMemoryRequest !== undefined &&
+      lastMemoryRequest > 0
       ? getUsagePercentVariant(lastMemory, lastMemoryRequest)
       : undefined;
 
   if (isLoading) {
     return (
-      <Stack direction="row" gap={1}  justifyContent="center" alignItems="center" width="100%">
+      <Stack direction="row" gap={1} justifyContent="center" alignItems="center" width="100%">
         <Skeleton variant="rounded" width={"100%"} height={32} />
-        </Stack>
+      </Stack>
     );
   }
   if (!resourceConfigs) {
@@ -225,6 +243,9 @@ interface DeployCardProps {
 
 const ENV_ID_PARAM = "envId";
 const OPEN_RES_CONFIG_PARAM = "openResConfig";
+const OPEN_PROMOTE_PARAM = "openPromote";
+const OPEN_CONFIGURE_PARAM = "openConfigure";
+const OPEN_CORS_PARAM = "openCors";
 
 export function DeployCard(props: DeployCardProps) {
   const { currentEnvironment } = props;
@@ -233,6 +254,10 @@ export function DeployCard(props: DeployCardProps) {
 
   const resourceConfigDrawerOpen =
     searchParams.get(OPEN_RES_CONFIG_PARAM) === "open" &&
+    searchParams.get(ENV_ID_PARAM) === currentEnvironment.name;
+
+  const promoteDrawerOpen =
+    searchParams.get(OPEN_PROMOTE_PARAM) === "open" &&
     searchParams.get(ENV_ID_PARAM) === currentEnvironment.name;
 
   const handleOpenResourceConfigDrawer = useCallback(() => {
@@ -249,12 +274,79 @@ export function DeployCard(props: DeployCardProps) {
     setSearchParams(next);
   }, [searchParams, setSearchParams]);
 
+  const handleOpenPromoteDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set(ENV_ID_PARAM, currentEnvironment.name);
+    next.set(OPEN_PROMOTE_PARAM, "open");
+    setSearchParams(next);
+  }, [currentEnvironment.name, searchParams, setSearchParams]);
+
+  const handleClosePromoteDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(OPEN_PROMOTE_PARAM);
+    next.delete(ENV_ID_PARAM);
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
+
+  const configureDrawerOpen =
+    searchParams.get(OPEN_CONFIGURE_PARAM) === "open" &&
+    searchParams.get(ENV_ID_PARAM) === currentEnvironment.name;
+
+  const handleOpenConfigureDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set(ENV_ID_PARAM, currentEnvironment.name);
+    next.set(OPEN_CONFIGURE_PARAM, "open");
+    setSearchParams(next);
+  }, [currentEnvironment.name, searchParams, setSearchParams]);
+
+  const handleCloseConfigureDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(OPEN_CONFIGURE_PARAM);
+    next.delete(ENV_ID_PARAM);
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
+
+  const corsDrawerOpen =
+    searchParams.get(OPEN_CORS_PARAM) === "open" &&
+    searchParams.get(ENV_ID_PARAM) === currentEnvironment.name;
+
+  const handleOpenCorsDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set(ENV_ID_PARAM, currentEnvironment.name);
+    next.set(OPEN_CORS_PARAM, "open");
+    setSearchParams(next);
+  }, [currentEnvironment.name, searchParams, setSearchParams]);
+
+  const handleCloseCorsDrawer = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(OPEN_CORS_PARAM);
+    next.delete(ENV_ID_PARAM);
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
+
   const { data: deployments, isLoading: isDeploymentsLoading } =
     useListAgentDeployments({
       orgName: orgId,
       projName: projectId,
       agentName: agentId,
     });
+
+  const { data: pipeline } = useGetDeploymentPipeline({
+    orgName: orgId,
+    projName: projectId,
+  });
+
+  const hasPromotionTarget = useMemo(() => {
+    if (!pipeline) return false;
+    // Only show Promote when this environment has at least one downstream
+    // target. The last environment in a pipeline has no outgoing promotion
+    // path (or an empty target list), so the button is hidden for it.
+    return pipeline.promotionPaths.some(
+      (p) =>
+        p.sourceEnvironmentRef === currentEnvironment.name &&
+        (p.targetEnvironmentRefs?.length ?? 0) > 0,
+    );
+  }, [pipeline, currentEnvironment.name]);
   const { mutate: updateDeploymentState, isPending: isUpdating } =
     useUpdateDeploymentState();
 
@@ -299,6 +391,98 @@ export function DeployCard(props: DeployCardProps) {
     projName: projectId,
     agentName: agentId,
   });
+
+  const isApiAgent = agent?.agentType?.type === "agent-api";
+  const isPythonBuildpack =
+    agent?.build?.type === "buildpack" &&
+    "buildpack" in (agent.build ?? {}) &&
+    (agent.build as { buildpack?: { language?: string } }).buildpack?.language === "python";
+
+  // Inline toggles: API key auth + tracing
+  const [apiKeyEnabled, setApiKeyEnabled] = useState(false);
+  const [tracingEnabled, setTracingEnabled] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [actionsMenuAnchor, setActionsMenuAnchor] = useState<null | HTMLElement>(null);
+
+  useEffect(() => {
+    if (agent?.configurations?.enableApiKeySecurity !== undefined) {
+      setApiKeyEnabled(agent.configurations.enableApiKeySecurity);
+    }
+    if (agent?.configurations?.enableAutoInstrumentation !== undefined) {
+      setTracingEnabled(agent.configurations.enableAutoInstrumentation);
+    }
+  }, [
+    agent?.configurations?.enableApiKeySecurity,
+    agent?.configurations?.enableAutoInstrumentation,
+  ]);
+
+  // Keep the configurations query mounted so its cache invalidates after
+  // deploy-settings / configuration mutations finish.
+  useGetAgentConfigurations(
+    { orgName: orgId, projName: projectId, agentName: agentId },
+    { environment: currentEnvironment.name },
+  );
+
+  const { mutate: deployAgentMutate } = useDeployAgent();
+  const { mutate: updateDeploySettingsMutate } = useUpdateAgentDeploySettings();
+
+  // Stable debounced redeploy — reads latest values via ref at fire time
+  const latestToggleRef = useRef({ apiKey: apiKeyEnabled, tracing: tracingEnabled });
+  latestToggleRef.current = { apiKey: apiKeyEnabled, tracing: tracingEnabled };
+
+  const redeployContextRef = useRef({
+    orgId, projectId, agentId, currentEnvironment, isApiAgent, isPythonBuildpack,
+  });
+  redeployContextRef.current = {
+    orgId, projectId, agentId, currentEnvironment, isApiAgent, isPythonBuildpack,
+  };
+
+  const deployAgentRef = useRef(deployAgentMutate);
+  deployAgentRef.current = deployAgentMutate;
+  const updateDeploySettingsRef = useRef(updateDeploySettingsMutate);
+  updateDeploySettingsRef.current = updateDeploySettingsMutate;
+
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const debouncedRedeploy = useCallback(() => {
+    clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      const {
+        orgId: o, projectId: p, agentId: a,
+        currentEnvironment: env,
+        isApiAgent: isApi, isPythonBuildpack: isPy,
+      } = redeployContextRef.current;
+      if (!o || !p || !a || !env?.name) return;
+      const { apiKey, tracing } = latestToggleRef.current;
+      setIsSavingConfig(true);
+      updateDeploySettingsRef.current(
+        {
+          params: { orgName: o, projName: p, agentName: a },
+          body: {
+            environmentName: env.name,
+            ...(isPy && { enableAutoInstrumentation: tracing }),
+            ...(isApi && { enableApiKeySecurity: apiKey }),
+          },
+        },
+        { onSuccess: () => setIsSavingConfig(false), onError: () => setIsSavingConfig(false) },
+      );
+    }, 800);
+  }, []);
+
+  const corsEnabled = agent?.configurations?.corsConfig?.enabled ?? false;
+  const corsOrigins = agent?.configurations?.corsConfig?.allowOrigin ?? [];
+  const corsDetail = corsEnabled
+    ? corsOrigins.includes("*") ? "All origins" : `${corsOrigins.length} origin${corsOrigins.length !== 1 ? "s" : ""}`
+    : "Disabled";
+
   const kindName = agent?.kindName;
 
   const { data: kindVersions } = useListAgentKindVersions(
@@ -312,8 +496,8 @@ export function DeployCard(props: DeployCardProps) {
   const selectedBuildId = extractBuildIdFromImageId(currentDeployment?.imageId);
   const lastDeployedText = currentDeployment?.lastDeployed
     ? formatDistanceToNow(new Date(currentDeployment.lastDeployed), {
-        addSuffix: true,
-      })
+      addSuffix: true,
+    })
     : "Unknown";
 
   const handleStop = () => {
@@ -400,52 +584,9 @@ export function DeployCard(props: DeployCardProps) {
     >
       <CardContent>
         <Stack gap={2}>
-          <Stack
-            direction="row"
-            gap={1}
-            alignItems="center"
-            justifyContent="space-between"
-          >
-            <Stack direction="row" gap={1} alignItems="center">
-              <Typography variant="h5">
-                {currentEnvironment?.displayName} Environment
-              </Typography>
-            </Stack>
-            <Stack direction="row" height={15} gap={1} alignItems="center">
-              {currentDeployment?.status !== DeploymentStatus.SUSPENDED && (
-                <Button
-                  startIcon={<PauseCircle size={16} />}
-                  variant="outlined"
-                  size="small"
-                  onClick={handleStop}
-                  disabled={
-                    isUpdating ||
-                    currentDeployment?.status !== DeploymentStatus.ACTIVE
-                  }
-                >
-                  Suspend
-                </Button>
-              )}
-              {currentDeployment?.status === DeploymentStatus.SUSPENDED && (
-                <Button
-                  startIcon={
-                    isUpdating ? (
-                      <CircularProgress size={14} />
-                    ) : (
-                      <PlayCircle size={16} />
-                    )
-                  }
-                  variant="outlined"
-                  color="success"
-                  size="small"
-                  onClick={handleRedeploy}
-                  disabled={isUpdating}
-                >
-                  Re-deploy
-                </Button>
-              )}
-            </Stack>
-          </Stack>
+          <Typography variant="h5">
+            {currentEnvironment?.displayName} Environment
+          </Typography>
           <Divider />
           <Stack direction="row" gap={1} alignItems="center">
             <Typography variant="body2">Last Deployed</Typography>
@@ -519,36 +660,114 @@ export function DeployCard(props: DeployCardProps) {
             />
           ))}
 
-          <Collapse in={currentDeployment?.status === DeploymentStatus.ACTIVE}>
-            <Card variant="outlined" sx={{ padding: 1.4 }}>
-              <Stack gap={1}>
-                <Stack
-                  direction="row"
-                  gap={1}
-                  alignItems="center"
-                  justifyContent="space-between"
-                >
-                  <Typography variant="h6">Resource Usage</Typography>
-                  <Button
-                    variant="text"
-                    size="small"
-                    color="inherit"
-                    sx={{ padding: 0.5 }}
-                    startIcon={<SlidersVertical size={16} />}
-                    onClick={handleOpenResourceConfigDrawer}
-                  >
-                    Configure
-                  </Button>
+          <Collapse in={[
+            DeploymentStatus.ACTIVE, DeploymentStatus.ERROR, DeploymentStatus.FAILED,
+          ].includes(currentDeployment?.status as DeploymentStatus)}>
+            <Stack gap={2}>
+              <Card variant="outlined" sx={{ padding: 1.4, pt: 0.5 }}>
+                <Stack gap={1}>
+                  <Stack direction="row" gap={1} alignItems="center" justifyContent="space-between">
+                    <Typography variant="h6">Resource Usage</Typography>
+                    <Button
+                      variant="text"
+                      size="small"
+                      color="inherit"
+                      sx={{ padding: 0.5 }}
+                      startIcon={<SlidersVertical size={16} />}
+                      onClick={handleOpenResourceConfigDrawer}
+                    >
+                      Configure
+                    </Button>
+                  </Stack>
+                  <Stack direction="row" gap={1} alignItems="center">
+                    <ResourceConfigsPanel
+                      resourceConfigs={resourceConfigs}
+                      isLoading={isResourceConfigsLoading}
+                      metrics={metrics}
+                    />
+                  </Stack>
                 </Stack>
-                <Stack direction="row" gap={1} alignItems="center">
-                  <ResourceConfigsPanel
-                    resourceConfigs={resourceConfigs}
-                    isLoading={isResourceConfigsLoading}
-                    metrics={metrics}
-                  />
+              </Card>
+
+              <Card variant="outlined" sx={{ padding: 1.4 }}>
+                <Stack gap={1.5}>
+                  <Stack direction="row" gap={1} alignItems="center" justifyContent="space-between">
+                    <Typography variant="h6">Security & Observability</Typography>
+                    {isSavingConfig && <CircularProgress size={14} />}
+                  </Stack>
+
+                  {/* CORS — status + configure button */}
+                  {isApiAgent && (
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Globe size={14} style={{ opacity: 0.6 }} />
+                        <Typography variant="body2">CORS</Typography>
+                        <Tooltip title={corsDetail}>
+                          <Chip
+                            size="small"
+                            label={corsEnabled ? "On" : "Off"}
+                            color={corsEnabled ? "success" : "default"}
+                            variant="outlined"
+                            sx={{ height: 18, fontSize: "0.65rem", cursor: "default" }}
+                          />
+                        </Tooltip>
+                      </Box>
+                      <Button
+                        variant="text"
+                        size="small"
+                        color="inherit"
+                        sx={{ minWidth: 0, px: 0.5 }}
+                        startIcon={<SlidersVertical size={16} />}
+                        onClick={handleOpenCorsDrawer}
+                      >
+                        Configure
+                      </Button>
+                    </Box>
+                  )}
+
+                  {/* API Key Auth */}
+                  {isApiAgent && (
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Key size={14} style={{ opacity: 0.6 }} />
+                        <Typography variant="body2">API Key Auth</Typography>
+                        <Tooltip title="Requests must include the header: x-api-key: <your-key>">
+                          <Info size={13} style={{ opacity: 0.5, cursor: "help" }} />
+                        </Tooltip>
+                      </Box>
+                      <Switch
+                        size="small"
+                        checked={apiKeyEnabled}
+                        disabled={isSavingConfig}
+                        onChange={(_, checked) => {
+                          setApiKeyEnabled(checked);
+                          debouncedRedeploy();
+                        }}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Auto-Instrumentation */}
+                  {isPythonBuildpack && (
+                    <Box display="flex" alignItems="center" justifyContent="space-between">
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Workflow size={14} style={{ opacity: 0.6 }} />
+                        <Typography variant="body2">Auto-Instrumentation</Typography>
+                      </Box>
+                      <Switch
+                        size="small"
+                        checked={tracingEnabled}
+                        disabled={isSavingConfig}
+                        onChange={(_, checked) => {
+                          setTracingEnabled(checked);
+                          debouncedRedeploy();
+                        }}
+                      />
+                    </Box>
+                  )}
                 </Stack>
-              </Stack>
-            </Card>
+              </Card>
+            </Stack>
           </Collapse>
           {agentId && (
             <EditResourceConfigsDrawer
@@ -561,47 +780,176 @@ export function DeployCard(props: DeployCardProps) {
               environment={currentEnvironment.name}
             />
           )}
-          <Divider />
-          <Stack direction="row" justifyContent="center" spacing={2}>
-            <Button
-              variant="text"
-              component={Link}
-              to={generatePath(
-                absoluteRouteMap.children.org.children.projects.children.agents
-                  .children.environment.children.tryOut.path,
-                {
-                  orgId,
-                  projectId,
-                  agentId,
-                  envId: currentEnvironment?.name,
-                },
-              )}
-              size="small"
-              startIcon={<FlaskConical size={16} />}
-            >
-              Try It
-            </Button>
-            <Divider orientation="vertical" />
-            <Button
-              variant="text"
-              component={Link}
-              to={generatePath(
-                absoluteRouteMap.children.org.children.projects.children.agents
-                  .children.environment.children.observability.children.traces
-                  .path,
-                {
-                  orgId,
-                  projectId,
-                  agentId,
-                  envId: currentEnvironment?.name,
-                },
-              )}
-              size="small"
-              startIcon={<Workflow size={16} />}
-            >
-              View Traces
-            </Button>
-          </Stack>
+          {agentId && (
+            <EditDeployConfigDrawer
+              open={configureDrawerOpen}
+              onClose={handleCloseConfigureDrawer}
+              mode="update"
+              orgName={orgId ?? ""}
+              projName={projectId ?? ""}
+              agentName={agentId}
+              environment={currentEnvironment.name}
+              title={`Update ${currentEnvironment.displayName ?? currentEnvironment.name} Environment Configuration`}
+            />
+          )}
+          {agentId && (
+            <EditSecurityConfigDrawer
+              open={corsDrawerOpen}
+              onClose={handleCloseCorsDrawer}
+              orgName={orgId ?? ""}
+              projName={projectId ?? ""}
+              agentName={agentId}
+              environment={currentEnvironment.name}
+            />
+          )}
+          {agentId && orgId && projectId && (
+            <PromoteAgentDrawer
+              open={promoteDrawerOpen}
+              onClose={handleClosePromoteDrawer}
+              sourceEnvironment={currentEnvironment}
+              orgId={orgId}
+              projectId={projectId}
+              agentId={agentId}
+            />
+          )}
+          {agent?.provisioning?.type === "internal" && (
+            <>
+              <Divider />
+              <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                <Tooltip title="More actions">
+                  <IconButton size="small" onClick={(e) => setActionsMenuAnchor(e.currentTarget)}>
+                    <MoreHorizontal size={18} />
+                  </IconButton>
+                </Tooltip>
+                <Stack direction="row" justifyContent="right" spacing={1} alignItems="center"> 
+                <Button
+                  variant="text"
+                  size="small"
+                  startIcon={<SlidersVertical size={16} />}
+                  onClick={handleOpenConfigureDrawer}
+                  disabled={currentDeployment?.status === DeploymentStatus.DEPLOYING}
+                >
+                  Configure
+                </Button>
+                <Divider orientation="vertical" flexItem />
+                {currentDeployment?.status !== DeploymentStatus.SUSPENDED && (
+                  <Button
+                    startIcon={<PauseCircle size={16} />}
+                    variant="text"
+                    size="small"
+                    onClick={handleStop}
+                    disabled={
+                      isUpdating ||
+                      currentDeployment?.status !== DeploymentStatus.ACTIVE
+                    }
+                  >
+                    Suspend
+                  </Button>
+                )}
+                {currentDeployment?.status === DeploymentStatus.SUSPENDED && (
+                  <Button
+                    startIcon={
+                      isUpdating ? (
+                        <CircularProgress size={14} />
+                      ) : (
+                        <PlayCircle size={16} />
+                      )
+                    }
+                    variant="text"
+                    color="success"
+                    size="small"
+                    onClick={handleRedeploy}
+                    disabled={isUpdating}
+                  >
+                    Re-deploy
+                  </Button>
+                )}
+                {hasPromotionTarget && (
+                  <>
+                    <Divider orientation="vertical" flexItem />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<ArrowUpFromLine size={16} />}
+                      onClick={handleOpenPromoteDrawer}
+                      disabled={!isEnvironmentActive}
+                    >
+                      Promote
+                    </Button>
+                  </>
+                )}
+                </Stack>
+                <Menu
+                  anchorEl={actionsMenuAnchor}
+                  open={Boolean(actionsMenuAnchor)}
+                  onClose={() => setActionsMenuAnchor(null)}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                  transformOrigin={{ vertical: "bottom", horizontal: "right" }}
+                >
+                  <MenuItem
+                    component={Link}
+                    to={generatePath(
+                      absoluteRouteMap.children.org.children.projects.children.agents
+                        .children.environment.children.tryOut.path,
+                      { orgId, projectId, agentId, envId: currentEnvironment?.name },
+                    )}
+                    onClick={() => setActionsMenuAnchor(null)}
+                  >
+                    <FlaskConical size={16} style={{ marginRight: 8 }} />
+                    Test Agent
+                  </MenuItem>
+                  <MenuItem
+                    component={Link}
+                    to={generatePath(
+                      absoluteRouteMap.children.org.children.projects.children.agents
+                        .children.environment.children.observability.children.traces.path,
+                      { orgId, projectId, agentId, envId: currentEnvironment?.name },
+                    )}
+                    onClick={() => setActionsMenuAnchor(null)}
+                  >
+                    <Workflow size={16} style={{ marginRight: 8 }} />
+                    View Traces
+                  </MenuItem>
+                  <MenuItem
+                    component={Link}
+                    to={generatePath(
+                      absoluteRouteMap.children.org.children.projects.children.agents
+                        .children.environment.children.observability.children.logs.path,
+                      { orgId, projectId, agentId, envId: currentEnvironment?.name },
+                    )}
+                    onClick={() => setActionsMenuAnchor(null)}
+                  >
+                    <ScrollText size={16} style={{ marginRight: 8 }} />
+                    View Logs
+                  </MenuItem>
+                  <MenuItem
+                    component={Link}
+                    to={generatePath(
+                      absoluteRouteMap.children.org.children.projects.children.agents
+                        .children.environment.children.observability.children.metrics.path,
+                      { orgId, projectId, agentId, envId: currentEnvironment?.name },
+                    )}
+                    onClick={() => setActionsMenuAnchor(null)}
+                  >
+                    <LineChart size={16} style={{ marginRight: 8 }} />
+                    View Metrics
+                  </MenuItem>
+                  <MenuItem
+                    component={Link}
+                    to={generatePath(
+                      absoluteRouteMap.children.org.children.projects.children.agents
+                        .children.environment.children.security.path,
+                      { orgId, projectId, agentId, envId: currentEnvironment?.name },
+                    )}
+                    onClick={() => setActionsMenuAnchor(null)}
+                  >
+                    <Key size={16} style={{ marginRight: 8 }} />
+                    Manage Credentials
+                  </MenuItem>
+                </Menu>
+              </Stack>
+            </>
+          )}
         </Stack>
       </CardContent>
     </Card>

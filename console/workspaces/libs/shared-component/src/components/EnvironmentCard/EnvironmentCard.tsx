@@ -45,7 +45,6 @@ import {
   Clock,
   Rocket as RocketLaunchOutlined,
   FlaskConical as TryOutlined,
-  Workflow,
   Link as LinkOutlined,
   PauseCircle,
   Tag,
@@ -69,9 +68,15 @@ export interface EnvironmentCardProps {
   orgId: string;
   projectId: string;
   agentId: string;
-  external?: true;
   actions?: React.ReactNode;
   bottomContent?: React.ReactNode;
+  /**
+   * Whether this is the first (root) environment of the deployment pipeline.
+   * The root env is reached by deploying a build directly; downstream envs are
+   * reached by promoting from the previous environment. Defaults to true so
+   * callers without pipeline context keep the deploy-oriented wording.
+   */
+  isFirstEnvironment?: boolean;
 }
 
 export const EnvStatus = ({ status }: { status?: DeploymentStatus, }) => {
@@ -146,37 +151,43 @@ const formatRelativeTime = (value?: string | number | Date) => {
 };
 
 export const EnvironmentCard = (props: EnvironmentCardProps) => {
-  const { environment, external, orgId, projectId, agentId, actions, bottomContent } = props;
-  const { data: deployments, isLoading: isDeploymentsLoading } =
-    useListAgentDeployments(
-      {
-        orgName: orgId,
-        projName: projectId,
-        agentName: agentId,
-      },
-      {
-        enabled: !!orgId && !!projectId && !!agentId && !external,
-      }
-    );
-  const { data: agent } = useGetAgent({
+  const {
+    environment,
+    orgId,
+    projectId,
+    agentId,
+    actions,
+    bottomContent,
+    isFirstEnvironment = true,
+  } = props;
+  const theme = useTheme();
+  const { data: agent, isLoading: isAgentLoading } = useGetAgent({
     orgName: orgId,
     projName: projectId,
     agentName: agentId,
   });
-  const kindName = agent?.kindName;
 
+  const isExternal = agent?.provisioning?.type === "external";
+
+  const { data: deployments, isLoading: isDeploymentsLoading } =
+    useListAgentDeployments(
+      { orgName: orgId, projName: projectId, agentName: agentId },
+      { enabled: !!orgId && !!projectId && !!agentId && !!agent && !isExternal }
+    );
+
+  const kindName = agent?.kindName;
   const { data: kindVersions } = useListAgentKindVersions({
     orgName: orgId,
     kindName: kindName ?? "",
   });
 
-  const currentDiployment = deployments?.[environment?.name ?? "default"];
-  const theme = useTheme();
+  const currentDeployment = deployments?.[environment?.name ?? ""];
+  const envTitle = `${environment?.displayName ?? environment?.name ?? "Environment"} Environment`;
 
   const { data: buildsData } = useGetAgentBuilds({
-    orgName: !external ? orgId : "",
-    projName: !external ? projectId : "",
-    agentName: !external ? agentId : "",
+    orgName: !isExternal ? orgId : "",
+    projName: !isExternal ? projectId : "",
+    agentName: !isExternal ? agentId : "",
   });
 
   const hasSuccessfulBuild = buildsData?.builds?.some(
@@ -184,8 +195,8 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
   ) ?? false;
 
   const deployedVersion = (() => {
-    if (!currentDiployment?.imageId || !kindName) return null;
-    const matched = kindVersions?.find((v) => v.imageId === currentDiployment.imageId);
+    if (!currentDeployment?.imageId || !kindName) return null;
+    const matched = kindVersions?.find((v) => v.imageId === currentDeployment.imageId);
     return matched?.version ?? null;
   })();
 
@@ -193,7 +204,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
 
   const latestKindVersion = kindVersions?.length
     ? [...kindVersions].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )[0]
     : undefined;
 
@@ -202,22 +213,19 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
     !!latestKindVersion &&
     !!deployedVersion &&
     deployedVersion !== latestKindVersion.version;
-  if (isDeploymentsLoading) {
+
+  if (isAgentLoading || isDeploymentsLoading) {
     return <Skeleton variant="rounded" height={100} />;
   }
-  if (!currentDiployment) {
+
+  // ── External agent ────────────────────────────────────────────────────────
+  if (isExternal) {
     return (
       <Card variant="outlined">
         <CardContent>
-          <Box
-            display="flex"
-            flexDirection="row"
-            gap={1}
-            justifyContent="space-between"
-            alignItems="center"
-          >
+          <Box display="flex" flexDirection="row" gap={1} justifyContent="space-between" alignItems="center">
             <Box display="flex" flexDirection="row" gap={1} alignItems="center">
-              <Typography variant="h6">Default Environment</Typography>
+              <Typography variant="h6">{envTitle}</Typography>
               <Chip
                 icon={
                   <LinkOutlined size={16} color={theme.vars?.palette?.success?.main} />
@@ -239,27 +247,6 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
             </Box>
             <Box display="flex" flexDirection="row" gap={1} alignItems="center">
               {actions}
-              {!external && (
-                <Button
-                  startIcon={<Workflow size={16} />}
-                  variant="text"
-                  component={Link}
-                  to={generatePath(
-                    absoluteRouteMap.children.org.children.projects.children
-                      .agents.children.environment.children.observability.children.traces.path,
-                    {
-                      orgId,
-                      projectId,
-                      agentId,
-                      envId: environment?.name ?? "",
-                    }
-                  )}
-                  color="primary"
-                  size="small"
-                >
-                  View Traces
-                </Button>
-              )}
             </Box>
           </Box>
           {bottomContent}
@@ -267,10 +254,24 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
       </Card>
     );
   }
+
+  // ── Internal agent — not yet deployed ─────────────────────────────────────
+  if (!currentDeployment) {
+    return (
+      <Card variant="outlined" sx={{ "&.MuiCard-root": { backgroundColor: "background.paper" } }}>
+        <CardContent>
+          <Box display="flex" flexDirection="row" gap={1} alignItems="center">
+            <Typography variant="h6">{envTitle}</Typography>
+            <EnvStatus status={DeploymentStatus.INACTIVE} />
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── Internal agent — deployment exists ────────────────────────────────────
   return (
-    <Card
-      variant="outlined"
-    >
+    <Card variant="outlined">
       <CardContent>
         <Box
           display="flex"
@@ -284,7 +285,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
             <Typography variant="h6">
               {environment?.displayName} Environment
             </Typography>
-            {currentDiployment?.status === DeploymentStatus.ACTIVE && (
+            {currentDeployment?.status === DeploymentStatus.ACTIVE && (
               <>
                 <EnvStatus status={DeploymentStatus.ACTIVE} />
                 <Box
@@ -294,13 +295,13 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
                   alignItems="center"
                 >
                   <Clock size={16} color={theme.vars?.palette?.text?.secondary} />
-                  {formatRelativeTime(currentDiployment?.lastDeployed)}
+                  {formatRelativeTime(currentDeployment?.lastDeployed)}
                 </Box>
               </>
             )}
-            {(currentDiployment?.status === DeploymentStatus.ERROR ||
-              currentDiployment?.status === DeploymentStatus.FAILED) && (
-              <EnvStatus status={currentDiployment.status as DeploymentStatus} />
+            {(currentDeployment?.status === DeploymentStatus.ERROR ||
+              currentDeployment?.status === DeploymentStatus.FAILED) && (
+              <EnvStatus status={currentDeployment.status as DeploymentStatus} />
             )}
           </Box>
           <Box display="flex" flexDirection="row" gap={1} alignItems="center">
@@ -312,7 +313,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
                 variant="outlined"
               />
             )}
-            {currentDiployment?.status === DeploymentStatus.ACTIVE && (
+            {currentDeployment?.status === DeploymentStatus.ACTIVE && (
               <>
                 <Button
                   startIcon={<TryOutlined size={16} />}
@@ -348,14 +349,16 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
           pt={2}
           alignItems="center"
         >
-          {currentDiployment.status === DeploymentStatus.INACTIVE && (
+          {currentDeployment.status === DeploymentStatus.INACTIVE && (
             <NoDataFound
               disableBackground
               message="Not Deployed"
               icon={<RocketLaunchOutlined size={32} />}
               subtitle={
                 hasSuccessfulBuild
-                  ? "A successful build is available. Deploy it to get started."
+                  ? isFirstEnvironment
+                    ? "A successful build is available. Deploy it to get started."
+                    : "Promote a deployment from the previous environment to get started."
                   : "No successful build found. Build the agent before deploying."
               }
               action={
@@ -371,7 +374,7 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
                     )}
                     size="small"
                   >
-                    Go to Deployment
+                    {isFirstEnvironment ? "Go to Deployment" : "Promote"}
                   </Button>
                 ) : (
                   <Button
@@ -391,15 +394,11 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
               }
             />
           )}
-          {currentDiployment.status === DeploymentStatus.DEPLOYING && (
-            <NoDataFound
-              disableBackground
-              message="Deploying..."
-              icon={<CircularProgress size={32} />}
-            />
+          {currentDeployment.status === DeploymentStatus.DEPLOYING && (
+            <NoDataFound disableBackground message="Deploying..." icon={<CircularProgress size={32} />} />
           )}
-          {(currentDiployment.status === DeploymentStatus.ERROR ||
-            currentDiployment.status === DeploymentStatus.FAILED) && (
+          {(currentDeployment.status === DeploymentStatus.ERROR ||
+            currentDeployment.status === DeploymentStatus.FAILED) && (
             <Alert
               severity="error"
               sx={{ width: "100%" }}
@@ -421,29 +420,17 @@ export const EnvironmentCard = (props: EnvironmentCardProps) => {
               Deployment failed. Check the deployment page for more details.
             </Alert>
           )}
-          {currentDiployment.status === DeploymentStatus.ACTIVE && (
-            <Box
-              display="flex"
-              flexGrow={1}
-              flexDirection="column"
-              width="100%"
-              gap={isKindOutdated ? 2 : 4}
-              alignItems="flex-start"
-            >
+          {currentDeployment.status === DeploymentStatus.ACTIVE && (
+            <Box display="flex" flexGrow={1} flexDirection="column" width="100%" gap={isKindOutdated ? 2 : 4} alignItems="flex-start">
               {isKindOutdated && (
                 <Alert severity="warning" sx={{ width: "100%" }}>
-                  A newer version of this Agent Kind is available:{" "}
-                  <strong>v{latestKindVersion!.version}</strong>. Currently
-                  deployed: <strong>v{deployedVersion}</strong>.
+                  A newer version of this Agent Kind is available: <strong>v{latestKindVersion!.version}</strong>.{" "}
+                  Currently deployed: <strong>v{deployedVersion}</strong>.
                 </Alert>
               )}
-              {currentDiployment?.endpoints?.map((endpoint) => (
+              {currentDeployment.endpoints?.map((endpoint) => (
                 <TextInput
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                    },
-                  }}
+                  slotProps={{ input: { readOnly: true } }}
                   key={endpoint.url}
                   label="URL"
                   value={endpoint.url}

@@ -56,8 +56,33 @@ func NewEnvironmentService(logger *slog.Logger, gatewayRepo repositories.Gateway
 }
 
 func (s *environmentService) CreateEnvironment(ctx context.Context, orgName string, req *models.CreateEnvironmentRequest) (*models.GatewayEnvironmentResponse, error) {
-	s.logger.Warn("CreateEnvironment: Environments are managed by OpenChoreo and cannot be created via Agent Manager")
-	return nil, fmt.Errorf("environments are managed by OpenChoreo platform and cannot be created directly")
+	s.logger.Info("Creating environment in OpenChoreo", "name", req.Name, "orgName", orgName)
+
+	ocReq := occlient.CreateEnvironmentRequest{
+		Name:         req.Name,
+		DisplayName:  req.DisplayName,
+		Description:  req.Description,
+		DataplaneRef: req.DataplaneRef,
+		IsProduction: req.IsProduction,
+	}
+
+	env, err := s.ocClient.CreateEnvironment(ctx, orgName, ocReq)
+	if err != nil {
+		s.logger.Error("Failed to create environment in OpenChoreo", "orgName", orgName, "name", req.Name, "error", err)
+		return nil, fmt.Errorf("failed to create environment: %w", err)
+	}
+
+	return &models.GatewayEnvironmentResponse{
+		UUID:             env.UUID,
+		OrganizationName: orgName,
+		Name:             env.Name,
+		DisplayName:      env.DisplayName,
+		Description:      req.Description,
+		DataplaneRef:     env.DataplaneRef,
+		IsProduction:     env.IsProduction,
+		CreatedAt:        env.CreatedAt,
+		UpdatedAt:        env.CreatedAt,
+	}, nil
 }
 
 func (s *environmentService) GetEnvironment(ctx context.Context, orgName string, envID string) (*models.GatewayEnvironmentResponse, error) {
@@ -81,7 +106,7 @@ func (s *environmentService) GetEnvironment(ctx context.Context, orgName string,
 		OrganizationName: orgName,
 		Name:             env.Name,
 		DisplayName:      env.DisplayName,
-		Description:      "", // OpenChoreo EnvironmentResponse doesn't have description
+		Description:      env.Description,
 		DataplaneRef:     env.DataplaneRef,
 		DNSPrefix:        env.DNSPrefix,
 		IsProduction:     env.IsProduction,
@@ -130,7 +155,7 @@ func (s *environmentService) ListEnvironments(ctx context.Context, orgName strin
 			OrganizationName: orgName,
 			Name:             env.Name,
 			DisplayName:      env.DisplayName,
-			Description:      "", // OpenChoreo EnvironmentResponse doesn't have description
+			Description:      env.Description,
 			DataplaneRef:     env.DataplaneRef,
 			DNSPrefix:        env.DNSPrefix,
 			IsProduction:     env.IsProduction,
@@ -148,13 +173,90 @@ func (s *environmentService) ListEnvironments(ctx context.Context, orgName strin
 }
 
 func (s *environmentService) UpdateEnvironment(ctx context.Context, orgName string, envID string, req *models.UpdateEnvironmentRequest) (*models.GatewayEnvironmentResponse, error) {
-	s.logger.Warn("UpdateEnvironment: Environments are managed by OpenChoreo and cannot be updated via Agent Manager")
-	return nil, fmt.Errorf("environments are managed by OpenChoreo platform and cannot be updated directly")
+	s.logger.Info("Updating environment in OpenChoreo", "envID", envID, "orgName", orgName)
+
+	ocReq := occlient.UpdateEnvironmentRequest{
+		DisplayName:  req.DisplayName,
+		Description:  req.Description,
+		IsProduction: req.IsProduction,
+	}
+
+	env, err := s.ocClient.UpdateEnvironment(ctx, orgName, envID, ocReq)
+	if err != nil {
+		s.logger.Error("Failed to update environment in OpenChoreo", "orgName", orgName, "envID", envID, "error", err)
+		if errors.Is(err, utils.ErrNotFound) || errors.Is(err, utils.ErrEnvironmentNotFound) {
+			return nil, utils.ErrEnvironmentNotFound
+		}
+		return nil, fmt.Errorf("failed to update environment: %w", err)
+	}
+
+	description := ""
+	if req.Description != nil {
+		description = *req.Description
+	}
+
+	return &models.GatewayEnvironmentResponse{
+		UUID:             env.UUID,
+		OrganizationName: orgName,
+		Name:             env.Name,
+		DisplayName:      env.DisplayName,
+		Description:      description,
+		DataplaneRef:     env.DataplaneRef,
+		IsProduction:     env.IsProduction,
+		CreatedAt:        env.CreatedAt,
+		UpdatedAt:        env.CreatedAt,
+	}, nil
 }
 
+// DeleteEnvironment removes an environment from OpenChoreo and cleans up local DB state.
+//
+// OpenChoreo is the source of truth for "is anything actually deployed here": it refuses
+// Environment deletion while ReleaseBindings or workloads still reference it, so we let
+// the OC API server enforce that and surface whatever it returns.
+//
+// On success: delete the OpenChoreo Environment CR, then delete any gateway↔env mapping rows
 func (s *environmentService) DeleteEnvironment(ctx context.Context, orgName string, envID string) error {
-	s.logger.Warn("DeleteEnvironment: Environments are managed by OpenChoreo and cannot be deleted via Agent Manager")
-	return fmt.Errorf("environments are managed by OpenChoreo platform and cannot be deleted directly")
+	s.logger.Info("Deleting environment", "envID", envID, "orgName", orgName)
+
+	// envID is the environment name (matching OpenChoreo's identifier); resolve the UUID via OC
+	// because the local DB doesn't have its own environments table.
+	env, err := s.ocClient.GetEnvironment(ctx, orgName, envID)
+	if err != nil {
+		s.logger.Error("Failed to look up environment", "orgName", orgName, "envID", envID, "error", err)
+		if errors.Is(err, utils.ErrNotFound) || errors.Is(err, utils.ErrEnvironmentNotFound) {
+			return utils.ErrEnvironmentNotFound
+		}
+		return fmt.Errorf("failed to look up environment: %w", err)
+	}
+
+	envUUID, parseErr := uuid.Parse(env.UUID)
+	if parseErr != nil {
+		s.logger.Error("Invalid env UUID from OpenChoreo", "uuid", env.UUID, "error", parseErr)
+		return fmt.Errorf("invalid environment UUID: %w", parseErr)
+	}
+
+	// Delete in OpenChoreo first. If OC refuses (release bindings still exist, etc.) we surface
+	// that error without having touched local state. A not-found from OC after UUID resolution
+	// is treated as idempotent so we still clean up local gateway↔env mappings.
+	if err := s.ocClient.DeleteEnvironment(ctx, orgName, env.Name); err != nil {
+		s.logger.Error("Failed to delete environment in OpenChoreo", "orgName", orgName, "envID", envID, "error", err)
+		if errors.Is(err, utils.ErrNotFound) || errors.Is(err, utils.ErrEnvironmentNotFound) {
+			s.logger.Warn("Environment already absent in OpenChoreo; continuing local cleanup",
+				"orgName", orgName, "envID", envID, "envUUID", envUUID)
+		} else {
+			return fmt.Errorf("failed to delete environment in OpenChoreo: %w", err)
+		}
+	}
+
+	// Local cleanup: gateway↔env mapping rows. The gateway themselves are unaffected.
+	deleted, err := s.gatewayRepo.DeleteEnvironmentMappingsByEnvironmentID(envUUID.String())
+	if err != nil {
+		s.logger.Error("Environment deleted in OpenChoreo but local gateway-mapping cleanup failed",
+			"envUUID", envUUID, "error", err)
+		return fmt.Errorf("environment deleted but gateway mapping cleanup failed: %w", err)
+	}
+	s.logger.Info("Deleted environment", "envID", envID, "envUUID", envUUID, "gatewayMappingsDeleted", deleted)
+	return nil
 }
 
 func (s *environmentService) GetEnvironmentGateways(ctx context.Context, orgName string, envID string) ([]models.GatewayResponse, error) {
