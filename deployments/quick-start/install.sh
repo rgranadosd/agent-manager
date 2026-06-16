@@ -874,6 +874,7 @@ else
         --version "${OPENCHOREO_VERSION}" \
         --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-cp.yaml" \
         "${CP_HELM_ARGS[@]}" 2>&1); then
+        echo "$CP_INSTALL_OUTPUT"
         if echo "$CP_INSTALL_OUTPUT" | grep -q "no endpoints available for service \"controller-manager-webhook-service\""; then
             log_warning "Control Plane webhook was not ready. Waiting for deployments and retrying once..."
             kubectl wait -n openchoreo-control-plane --for=condition=available --timeout=300s deployment --all || true
