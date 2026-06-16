@@ -54,10 +54,6 @@ func (c *llmDeploymentController) DeployLLMProvider(w http.ResponseWriter, r *ht
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	log.Info("DeployLLMProvider: starting", "orgName", orgName, "providerID", providerID)
@@ -152,10 +148,6 @@ func (c *llmDeploymentController) UndeployLLMProviderDeployment(w http.ResponseW
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	// Parse query parameters
@@ -226,10 +218,6 @@ func (c *llmDeploymentController) RestoreLLMProviderDeployment(w http.ResponseWr
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	// Parse query parameters
@@ -299,10 +287,6 @@ func (c *llmDeploymentController) DeleteLLMProviderDeployment(w http.ResponseWri
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 	deploymentID := r.PathValue(utils.PathParamDeploymentId)
 
@@ -354,10 +338,6 @@ func (c *llmDeploymentController) GetLLMProviderDeployment(w http.ResponseWriter
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 	deploymentID := r.PathValue(utils.PathParamDeploymentId)
 
@@ -405,10 +385,6 @@ func (c *llmDeploymentController) GetLLMProviderDeployments(w http.ResponseWrite
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	// Parse optional query parameters

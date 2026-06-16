@@ -71,10 +71,6 @@ func (c *environmentController) CreateEnvironment(w http.ResponseWriter, r *http
 
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	var req spec.CreateEnvironmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Error("CreateEnvironment: failed to decode request", "error", err)
@@ -115,10 +111,6 @@ func (c *environmentController) GetEnvironment(w http.ResponseWriter, r *http.Re
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	envID := r.PathValue("envID")
 
 	env, err := c.environmentService.GetEnvironment(ctx, orgName, envID)
@@ -137,10 +129,6 @@ func (c *environmentController) ListEnvironments(w http.ResponseWriter, r *http.
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse pagination parameters
 	limit := getIntQueryParam(r, "limit", utils.DefaultLimit)
@@ -177,10 +165,6 @@ func (c *environmentController) UpdateEnvironment(w http.ResponseWriter, r *http
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	envID := r.PathValue("envID")
 
 	var req spec.UpdateEnvironmentRequest
@@ -217,10 +201,6 @@ func (c *environmentController) DeleteEnvironment(w http.ResponseWriter, r *http
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	envID := r.PathValue("envID")
 
 	if err := c.environmentService.DeleteEnvironment(ctx, orgName, envID); err != nil {
@@ -237,10 +217,6 @@ func (c *environmentController) GetEnvironmentGateways(w http.ResponseWriter, r 
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	envID := r.PathValue("envID")
 
 	gatewayList, err := c.environmentService.GetEnvironmentGateways(ctx, orgName, envID)

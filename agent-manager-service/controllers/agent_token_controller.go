@@ -57,10 +57,6 @@ func (c *agentTokenController) GenerateToken(w http.ResponseWriter, r *http.Requ
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	log.Info(
 		"GenerateToken request received",
 		"orgName", orgName,

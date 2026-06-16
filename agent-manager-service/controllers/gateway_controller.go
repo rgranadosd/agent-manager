@@ -124,10 +124,6 @@ func (c *gatewayController) RegisterGateway(w http.ResponseWriter, r *http.Reque
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	var req spec.CreateGatewayRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Error("RegisterGateway: failed to decode request", "error", err)
@@ -207,10 +203,6 @@ func (c *gatewayController) GetGateway(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	// Get gateway from local service
@@ -232,10 +224,6 @@ func (c *gatewayController) ListGateways(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse and validate pagination parameters
 	limit := getIntQueryParam(r, "limit", defaultLimit)
@@ -324,10 +312,6 @@ func (c *gatewayController) UpdateGateway(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	var req spec.UpdateGatewayRequest
@@ -358,10 +342,6 @@ func (c *gatewayController) DeleteGateway(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	if err := c.gatewayService.DeleteGateway(gatewayID, orgName); err != nil {
@@ -377,10 +357,6 @@ func (c *gatewayController) AssignGatewayToEnvironment(w http.ResponseWriter, r 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 	envID := strings.TrimSpace(r.PathValue("envID"))
 
@@ -428,10 +404,6 @@ func (c *gatewayController) RemoveGatewayFromEnvironment(w http.ResponseWriter, 
 func (c *gatewayController) GetGatewayEnvironments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	// Get environments from DB (via OpenChoreo)
@@ -454,10 +426,6 @@ func (c *gatewayController) CheckGatewayHealth(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	// Get gateway to check if it exists
@@ -487,10 +455,6 @@ func (c *gatewayController) ListGatewayTokens(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	log.Info("ListGatewayTokens: starting", "orgName", orgName, "gatewayID", gatewayID)
@@ -522,10 +486,6 @@ func (c *gatewayController) RotateGatewayToken(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 
 	// Call service to rotate the token
@@ -552,10 +512,6 @@ func (c *gatewayController) RevokeGatewayToken(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gatewayID := strings.TrimSpace(r.PathValue("gatewayID"))
 	tokenID := strings.TrimSpace(r.PathValue("tokenID"))
 
@@ -585,10 +541,6 @@ func (c *gatewayController) GetGatewayStatus(w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse optional gatewayID query parameter
 	gatewayIDParam := r.URL.Query().Get("gatewayId")

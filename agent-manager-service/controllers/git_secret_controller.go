@@ -50,10 +50,6 @@ func (c *gitSecretController) CreateGitSecret(w http.ResponseWriter, r *http.Req
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	log.Info("CreateGitSecret: starting", "orgName", orgName)
 
 	var req spec.CreateGitSecretRequest
@@ -90,10 +86,6 @@ func (c *gitSecretController) ListGitSecrets(w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	log.Info("ListGitSecrets: starting", "orgName", orgName)
 
@@ -143,10 +135,6 @@ func (c *gitSecretController) DeleteGitSecret(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	gitSecretName := r.PathValue(utils.PathParamSecretName)
 
 	log.Info("DeleteGitSecret: starting", "orgName", orgName, "gitSecretName", gitSecretName)

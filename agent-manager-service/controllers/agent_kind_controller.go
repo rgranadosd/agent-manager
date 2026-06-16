@@ -53,9 +53,6 @@ func (c *agentKindController) ListKinds(w http.ResponseWriter, r *http.Request) 
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	limitStr := r.URL.Query().Get("limit")
 	if limitStr == "" {
 		limitStr = strconv.Itoa(utils.DefaultLimit)
@@ -88,10 +85,6 @@ func (c *agentKindController) GetKind(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	result, err := c.kindService.GetKind(ctx, orgName, kindName)
@@ -107,10 +100,6 @@ func (c *agentKindController) UpdateKind(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	var payload spec.UpdateAgentKindRequest
@@ -132,10 +121,6 @@ func (c *agentKindController) DeleteKind(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	if err := c.kindService.DeleteKind(ctx, orgName, kindName); err != nil {
@@ -150,10 +135,6 @@ func (c *agentKindController) AddVersion(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	var payload spec.AddAgentKindVersionRequest
@@ -179,10 +160,6 @@ func (c *agentKindController) ListVersions(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	result, err := c.kindService.ListVersions(ctx, orgName, kindName)
@@ -198,10 +175,6 @@ func (c *agentKindController) GetVersion(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 	versionTag := r.PathValue(utils.PathParamVersionTag)
 
@@ -218,10 +191,6 @@ func (c *agentKindController) DeleteVersion(w http.ResponseWriter, r *http.Reque
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 	versionTag := r.PathValue(utils.PathParamVersionTag)
 
@@ -237,10 +206,6 @@ func (c *agentKindController) ListKindAgents(w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	kindName := r.PathValue(utils.PathParamKindName)
 
 	result, err := c.kindService.ListKindAgents(ctx, orgName, kindName)

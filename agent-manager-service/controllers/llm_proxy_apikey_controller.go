@@ -54,10 +54,6 @@ func (c *llmProxyAPIKeyController) CreateAPIKey(w http.ResponseWriter, r *http.R
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	proxyID := r.PathValue("id")
 
 	log.Info("CreateLLMProxyAPIKey: starting", "orgName", orgName, "proxyID", proxyID)
@@ -121,10 +117,6 @@ func (c *llmProxyAPIKeyController) RevokeAPIKey(w http.ResponseWriter, r *http.R
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	proxyID := r.PathValue("id")
 	keyName := r.PathValue("keyName")
 
@@ -158,10 +150,6 @@ func (c *llmProxyAPIKeyController) RotateAPIKey(w http.ResponseWriter, r *http.R
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	proxyID := r.PathValue("id")
 	keyName := r.PathValue("keyName")
 

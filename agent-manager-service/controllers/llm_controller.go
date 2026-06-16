@@ -110,10 +110,6 @@ func (c *llmController) CreateLLMProviderTemplate(w http.ResponseWriter, r *http
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	var req spec.CreateLLMProviderTemplateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Error("CreateLLMProviderTemplate: failed to decode request", "error", err)
@@ -152,10 +148,6 @@ func (c *llmController) ListLLMProviderTemplates(w http.ResponseWriter, r *http.
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse pagination parameters
 	limit := getIntQueryParam(r, "limit", 20)
@@ -198,10 +190,6 @@ func (c *llmController) GetLLMProviderTemplate(w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	templateID := r.PathValue(utils.PathParamTemplateId)
 
 	template, err := c.templateService.Get(orgName, templateID)
@@ -229,10 +217,6 @@ func (c *llmController) UpdateLLMProviderTemplate(w http.ResponseWriter, r *http
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	templateID := r.PathValue(utils.PathParamTemplateId)
 
 	var req spec.UpdateLLMProviderTemplateRequest
@@ -285,10 +269,6 @@ func (c *llmController) DeleteLLMProviderTemplate(w http.ResponseWriter, r *http
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	templateID := r.PathValue(utils.PathParamTemplateId)
 
 	if err := c.templateService.Delete(orgName, templateID); err != nil {
@@ -338,10 +318,6 @@ func (c *llmController) CreateLLMProvider(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	log.Info("CreateLLMProvider: starting", "orgName", orgName)
 
@@ -408,10 +384,6 @@ func (c *llmController) ListLLMProviders(w http.ResponseWriter, r *http.Request)
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	log.Info("ListLLMProviders: starting", "orgName", orgName)
 
 	// Parse pagination parameters
@@ -459,10 +431,6 @@ func (c *llmController) GetLLMProvider(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	log.Info("GetLLMProvider: starting", "orgName", orgName, "providerID", providerID)
@@ -508,10 +476,6 @@ func (c *llmController) UpdateLLMProvider(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	log.Info("UpdateLLMProvider: starting", "orgName", orgName, "providerID", providerID)
@@ -698,10 +662,6 @@ func (c *llmController) DeleteLLMProvider(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	log.Info("DeleteLLMProvider: starting", "orgName", orgName, "providerID", providerID)
@@ -740,10 +700,6 @@ func (c *llmController) CreateLLMProxy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	// Resolve project name to UUID
@@ -805,10 +761,6 @@ func (c *llmController) ListLLMProxies(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	// Resolve project name to UUID
@@ -869,10 +821,6 @@ func (c *llmController) ListLLMProxiesByProvider(w http.ResponseWriter, r *http.
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	// Parse pagination parameters
@@ -925,10 +873,6 @@ func (c *llmController) GetLLMProxy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 	proxyID := r.PathValue(utils.PathParamProxyId)
 
@@ -970,10 +914,6 @@ func (c *llmController) UpdateLLMProxy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 	proxyID := r.PathValue(utils.PathParamProxyId)
 
@@ -1039,10 +979,6 @@ func (c *llmController) DeleteLLMProxy(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 	proxyID := r.PathValue(utils.PathParamProxyId)
 
@@ -1083,10 +1019,6 @@ func (c *llmController) UpdateLLMProviderCatalogStatus(w http.ResponseWriter, r 
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	providerID := r.PathValue(utils.PathParamProviderId)
 
 	// Decode request body

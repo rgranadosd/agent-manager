@@ -61,10 +61,6 @@ func (c *agentConfigurationController) CreateAgentModelConfig(w http.ResponseWri
 	projectName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	createdBy := "system"
 
 	// Bind request body
@@ -144,10 +140,6 @@ func (c *agentConfigurationController) GetAgentModelConfig(w http.ResponseWriter
 	agentName := r.PathValue(utils.PathParamAgentName)
 	configID := r.PathValue(utils.PathParamConfigId)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	configUUID, err := uuid.Parse(configID)
 	if err != nil {
 		log.Error("GetAgentModelConfig: invalid config ID", "configId", configID, "error", err)
@@ -182,10 +174,6 @@ func (c *agentConfigurationController) ListAgentModelConfigs(w http.ResponseWrit
 	limit := getIntQueryParam(r, "limit", 20)
 	offset := getIntQueryParam(r, "offset", 0)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	// Validate and clamp pagination parameters
 	if limit < 1 {
 		limit = 20
@@ -218,10 +206,6 @@ func (c *agentConfigurationController) UpdateAgentModelConfig(w http.ResponseWri
 	projectName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	configID := r.PathValue(utils.PathParamConfigId)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	configUUID, err := uuid.Parse(configID)
 	if err != nil {
@@ -290,10 +274,6 @@ func (c *agentConfigurationController) DeleteAgentModelConfig(w http.ResponseWri
 	projectName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	configID := r.PathValue(utils.PathParamConfigId)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	configUUID, err := uuid.Parse(configID)
 	if err != nil {

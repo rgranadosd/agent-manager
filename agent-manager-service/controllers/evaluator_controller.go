@@ -60,10 +60,6 @@ func (c *evaluatorController) ListEvaluators(w http.ResponseWriter, r *http.Requ
 
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	// Parse query parameters
 	limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
 	if limit <= 0 {
@@ -135,10 +131,6 @@ func (c *evaluatorController) GetEvaluator(w http.ResponseWriter, r *http.Reques
 
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	// Extract and URL-decode evaluator identifier
 	evaluatorID := r.PathValue(utils.PathParamEvaluatorId)
 	if evaluatorID == "" {
@@ -182,10 +174,6 @@ func (c *evaluatorController) CreateCustomEvaluator(w http.ResponseWriter, r *ht
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Limit request body to 1MB to prevent resource exhaustion
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -241,10 +229,6 @@ func (c *evaluatorController) GetCustomEvaluator(w http.ResponseWriter, r *http.
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	identifier := r.PathValue("identifier")
 	if identifier == "" {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Identifier is required")
@@ -284,10 +268,6 @@ func (c *evaluatorController) UpdateCustomEvaluator(w http.ResponseWriter, r *ht
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	identifier := r.PathValue("identifier")
 	if identifier == "" {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Identifier is required")
@@ -346,10 +326,6 @@ func (c *evaluatorController) DeleteCustomEvaluator(w http.ResponseWriter, r *ht
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	identifier := r.PathValue("identifier")
 	if identifier == "" {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Identifier is required")

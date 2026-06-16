@@ -180,15 +180,8 @@ func (c *agentController) GetAgent(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger(ctx)
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	agent, err := c.agentService.GetAgent(ctx, orgName, projName, agentName)
 	if err != nil {
@@ -206,9 +199,6 @@ func (c *agentController) ListAgents(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger(ctx)
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 
 	// Parse query parameters
@@ -260,9 +250,6 @@ func (c *agentController) CreateAgent(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 
 	// Parse and validate request body
@@ -310,9 +297,6 @@ func (c *agentController) UpdateAgentBasicInfo(w http.ResponseWriter, r *http.Re
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -345,9 +329,6 @@ func (c *agentController) UpdateAgentBuildParameters(w http.ResponseWriter, r *h
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -380,9 +361,6 @@ func (c *agentController) GetAgentResourceConfigs(w http.ResponseWriter, r *http
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	environment := r.URL.Query().Get("environment")
@@ -408,9 +386,6 @@ func (c *agentController) UpdateAgentResourceConfigs(w http.ResponseWriter, r *h
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	environment := r.URL.Query().Get("environment")
@@ -447,9 +422,6 @@ func (c *agentController) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -468,9 +440,6 @@ func (c *agentController) BuildAgent(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -494,9 +463,6 @@ func (c *agentController) GetBuildLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	buildName := r.PathValue(utils.PathParamBuildName)
@@ -517,9 +483,6 @@ func (c *agentController) GetAgentRuntimeLogs(w http.ResponseWriter, r *http.Req
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -553,9 +516,6 @@ func (c *agentController) GetAgentMetrics(w http.ResponseWriter, r *http.Request
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -588,9 +548,6 @@ func (c *agentController) DeployAgent(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -630,9 +587,6 @@ func (c *agentController) ListAgentBuilds(w http.ResponseWriter, r *http.Request
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -685,9 +639,6 @@ func (c *agentController) GenerateName(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	// Parse and validate request body
 	var payload spec.ResourceNameRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -724,9 +675,6 @@ func (c *agentController) GetBuild(w http.ResponseWriter, r *http.Request) {
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	buildName := r.PathValue(utils.PathParamBuildName)
@@ -748,9 +696,6 @@ func (c *agentController) GetAgentDeployments(w http.ResponseWriter, r *http.Req
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -771,9 +716,6 @@ func (c *agentController) UpdateDeploymentState(w http.ResponseWriter, r *http.R
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -825,9 +767,6 @@ func (c *agentController) GetAgentEndpoints(w http.ResponseWriter, r *http.Reque
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 	environment := r.URL.Query().Get("environment")
@@ -854,9 +793,6 @@ func (c *agentController) GetAgentConfigurations(w http.ResponseWriter, r *http.
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 
@@ -936,9 +872,6 @@ func (c *agentController) PublishKind(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger(ctx)
 
 	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
 

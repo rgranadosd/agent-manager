@@ -85,11 +85,6 @@ func (c *identityController) ListUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
 		utils.WriteErrorResponse(w, http.StatusForbidden, "missing org context")
@@ -126,12 +121,6 @@ func (c *identityController) ListUsers(w http.ResponseWriter, r *http.Request) {
 func (c *identityController) GetUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	userID := r.PathValue(utils.PathParamUserID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -160,11 +149,6 @@ func (c *identityController) GetUser(w http.ResponseWriter, r *http.Request) {
 func (c *identityController) CreateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
@@ -224,12 +208,6 @@ func (c *identityController) CreateUser(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	userID := r.PathValue(utils.PathParamUserID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -275,12 +253,6 @@ func (c *identityController) UpdateUser(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	userID := r.PathValue(utils.PathParamUserID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -319,12 +291,6 @@ func (c *identityController) DeleteUser(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) GetUserGroups(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	userID := r.PathValue(utils.PathParamUserID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -360,12 +326,6 @@ func (c *identityController) GetUserGroups(w http.ResponseWriter, r *http.Reques
 func (c *identityController) GetUserRoles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	userID := r.PathValue(utils.PathParamUserID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -404,11 +364,6 @@ func (c *identityController) GetUserRoles(w http.ResponseWriter, r *http.Request
 func (c *identityController) InviteUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
@@ -449,11 +404,6 @@ func (c *identityController) ListGroups(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
 		utils.WriteErrorResponse(w, http.StatusForbidden, "missing org context")
@@ -489,12 +439,6 @@ func (c *identityController) ListGroups(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) GetGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -525,11 +469,6 @@ func (c *identityController) CreateGroup(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
 		utils.WriteErrorResponse(w, http.StatusForbidden, "missing org context")
@@ -559,12 +498,6 @@ func (c *identityController) CreateGroup(w http.ResponseWriter, r *http.Request)
 func (c *identityController) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -610,12 +543,6 @@ func (c *identityController) UpdateGroup(w http.ResponseWriter, r *http.Request)
 func (c *identityController) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -654,12 +581,6 @@ func (c *identityController) DeleteGroup(w http.ResponseWriter, r *http.Request)
 func (c *identityController) AddGroupMembers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -706,12 +627,6 @@ func (c *identityController) AddGroupMembers(w http.ResponseWriter, r *http.Requ
 func (c *identityController) RemoveGroupMembers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -758,12 +673,6 @@ func (c *identityController) RemoveGroupMembers(w http.ResponseWriter, r *http.R
 func (c *identityController) GetGroupMembers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -805,12 +714,6 @@ func (c *identityController) GetGroupMembers(w http.ResponseWriter, r *http.Requ
 func (c *identityController) GetGroupRoles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	groupID := r.PathValue(utils.PathParamGroupID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -852,11 +755,6 @@ func (c *identityController) ListRoles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
 		utils.WriteErrorResponse(w, http.StatusForbidden, "missing org context")
@@ -893,12 +791,6 @@ func (c *identityController) ListRoles(w http.ResponseWriter, r *http.Request) {
 func (c *identityController) GetRole(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -930,11 +822,6 @@ func (c *identityController) CreateRole(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
 
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
 	if !ok {
 		utils.WriteErrorResponse(w, http.StatusForbidden, "missing org context")
@@ -965,12 +852,6 @@ func (c *identityController) CreateRole(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) UpdateRole(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1021,12 +902,6 @@ func (c *identityController) UpdateRole(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) DeleteRole(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1069,12 +944,6 @@ func (c *identityController) DeleteRole(w http.ResponseWriter, r *http.Request) 
 func (c *identityController) GetRoleAssignments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1110,12 +979,6 @@ func (c *identityController) GetRoleAssignments(w http.ResponseWriter, r *http.R
 func (c *identityController) AddRolePermissions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1156,12 +1019,6 @@ func (c *identityController) AddRolePermissions(w http.ResponseWriter, r *http.R
 func (c *identityController) RemoveRolePermissions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1202,12 +1059,6 @@ func (c *identityController) RemoveRolePermissions(w http.ResponseWriter, r *htt
 func (c *identityController) AddRoleAssignees(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)
@@ -1248,12 +1099,6 @@ func (c *identityController) AddRoleAssignees(w http.ResponseWriter, r *http.Req
 func (c *identityController) RemoveRoleAssignees(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log := logger.GetLogger(ctx)
-
-	orgName := r.PathValue(utils.PathParamOrgName)
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	roleID := r.PathValue(utils.PathParamRoleID)
 
 	resolvedOrg, ok := middleware.GetResolvedOrg(ctx)

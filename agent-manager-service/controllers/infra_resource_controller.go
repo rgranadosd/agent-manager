@@ -128,10 +128,6 @@ func (c *infraResourceController) GetOrganization(w http.ResponseWriter, r *http
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	org, err := c.infraResourceManager.GetOrganization(ctx, orgName)
 	if err != nil {
 		log.Error("GetOrganization: failed to get organization", "error", err)
@@ -149,10 +145,6 @@ func (c *infraResourceController) ListProjects(w http.ResponseWriter, r *http.Re
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse query parameters
 	limitStr := r.URL.Query().Get("limit")
@@ -201,10 +193,6 @@ func (c *infraResourceController) CreateProject(w http.ResponseWriter, r *http.R
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse and validate request body
 	var payload spec.CreateProjectRequest
@@ -256,10 +244,6 @@ func (c *infraResourceController) UpdateProject(w http.ResponseWriter, r *http.R
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	// Parse and validate request body
@@ -301,10 +285,6 @@ func (c *infraResourceController) DeleteProject(w http.ResponseWriter, r *http.R
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	err := c.infraResourceManager.DeleteProject(ctx, orgName, projectName)
@@ -323,10 +303,6 @@ func (c *infraResourceController) ListOrgDeploymentPipelines(w http.ResponseWrit
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	// Parse query parameters
 	limitStr := r.URL.Query().Get("limit")
@@ -370,10 +346,6 @@ func (c *infraResourceController) GetProject(w http.ResponseWriter, r *http.Requ
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	project, err := c.infraResourceManager.GetProject(ctx, orgName, projectName)
@@ -403,10 +375,6 @@ func (c *infraResourceController) ListOrgEnvironments(w http.ResponseWriter, r *
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
 
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
-
 	environments, err := c.infraResourceManager.ListOrgEnvironments(ctx, orgName)
 	if err != nil {
 		log.Error("ListOrgEnvironments: failed to get environments", "error", err)
@@ -423,10 +391,6 @@ func (c *infraResourceController) GetProjectDeploymentPipeline(w http.ResponseWr
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 	projectName := r.PathValue(utils.PathParamProjName)
 
 	deploymentPipeline, err := c.infraResourceManager.GetProjectDeploymentPipeline(ctx, orgName, projectName)
@@ -446,10 +410,6 @@ func (c *infraResourceController) GetDataplanes(w http.ResponseWriter, r *http.R
 
 	// Extract path parameters
 	orgName := r.PathValue(utils.PathParamOrgName)
-
-	if !validateOrgFromPath(w, ctx, orgName) {
-		return
-	}
 
 	dataplanes, err := c.infraResourceManager.GetDataplanes(ctx, orgName)
 	if err != nil {
