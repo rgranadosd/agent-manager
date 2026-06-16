@@ -17,13 +17,18 @@ set -euo pipefail
 # Configuration
 CLUSTER_NAME="amp-local"
 CLUSTER_CONTEXT="k3d-${CLUSTER_NAME}"
-OPENCHOREO_VERSION="1.0.1"
+OPENCHOREO_VERSION="1.1.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K3D_CONFIG="${K3D_CONFIG:-${SCRIPT_DIR}/k3d-config.yaml}"
 
 # WSO2 API Platform / Gateway Operator versions
 GATEWAY_OPERATOR_VERSION="0.7.0"
 GATEWAY_CHART_VERSION="1.1.0"
+
+# OpenChoreo community module versions compatible with OpenChoreo ${OPENCHOREO_VERSION}
+OBSERVABILITY_LOGS_OPENSEARCH_VERSION="0.4.1"
+OBSERVABILITY_TRACING_OPENSEARCH_VERSION="0.4.1"
+OBSERVABILITY_METRICS_PROMETHEUS_VERSION="0.6.1"
 
 # Source AMP installation helpers
 source "${SCRIPT_DIR}/install-helpers.sh"
@@ -860,14 +865,39 @@ fi
 
 log_step "Step 7/13: Installing OpenChoreo Control Plane"
 
-helm_install_idempotent \
-    "openchoreo-control-plane" \
-    "oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane" \
-    "openchoreo-control-plane" \
-    "${TIMEOUT_CONTROL_PLANE}" \
-    --version "${OPENCHOREO_VERSION}" \
-    --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-cp.yaml" \
-    "${CP_HELM_ARGS[@]}"
+if [[ "$(helm status "openchoreo-control-plane" -n "openchoreo-control-plane" -o json 2>/dev/null | grep -o '"status":"[^"]*"' | grep -o '[^"]*$')" == "deployed" ]]; then
+    log_info "openchoreo-control-plane already installed, skipping..."
+else
+    log_info "Installing openchoreo-control-plane..."
+    log_info "This may take several minutes..."
+    CP_INSTALL_OUTPUT=""
+    if ! CP_INSTALL_OUTPUT=$(helm install "openchoreo-control-plane" \
+        "oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane" \
+        --namespace "openchoreo-control-plane" \
+        --create-namespace \
+        --timeout "${TIMEOUT_CONTROL_PLANE}s" \
+        --version "${OPENCHOREO_VERSION}" \
+        --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-cp.yaml" \
+        "${CP_HELM_ARGS[@]}" 2>&1); then
+        echo "$CP_INSTALL_OUTPUT"
+        if echo "$CP_INSTALL_OUTPUT" | grep -q "no endpoints available for service \"controller-manager-webhook-service\""; then
+            log_warning "Control Plane webhook was not ready. Waiting for deployments and retrying once..."
+            kubectl wait -n openchoreo-control-plane --for=condition=available --timeout=300s deployment --all || true
+            helm upgrade --install "openchoreo-control-plane" \
+                "oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane" \
+                --namespace "openchoreo-control-plane" \
+                --create-namespace \
+                --timeout "${TIMEOUT_CONTROL_PLANE}s" \
+                --version "${OPENCHOREO_VERSION}" \
+                --values "https://raw.githubusercontent.com/wso2/agent-manager/amp/v${VERSION}/deployments/single-cluster/values-cp.yaml" \
+                "${CP_HELM_ARGS[@]}" || { log_error "Failed to install openchoreo-control-plane after retry"; exit 1; }
+        else
+            log_error "Failed to install openchoreo-control-plane"
+            exit 1
+        fi
+    fi
+    log_success "openchoreo-control-plane installed successfully"
+fi
 
 wait_for_pods "openchoreo-control-plane" "${TIMEOUT_CONTROL_PLANE}"
 
@@ -1189,8 +1219,9 @@ if helm upgrade --install observability-logs-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.3.8 \
+    --version "${OBSERVABILITY_LOGS_OPENSEARCH_VERSION}" \
     --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
+    --set adapter.openSearchSecretName="opensearch-admin-credentials" \
     --timeout 10m; then
     log_success "observability-logs-opensearch installed successfully"
 else
@@ -1202,7 +1233,7 @@ log_info "Enabling log collection with fluent-bit..."
 if helm upgrade observability-logs-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
     --namespace openchoreo-observability-plane \
-    --version 0.3.8 \
+    --version "${OBSERVABILITY_LOGS_OPENSEARCH_VERSION}" \
     --reuse-values \
     --set fluent-bit.enabled=true \
     --timeout 10m; then
@@ -1217,8 +1248,7 @@ if helm upgrade --install observability-metrics-prometheus \
     oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.2.4 \
-    --set adapter.image.tag=0.2.4 \
+    --version "${OBSERVABILITY_METRICS_PROMETHEUS_VERSION}" \
     --timeout 10m; then
     log_success "observability-metrics-prometheus installed successfully"
 else
@@ -1231,7 +1261,7 @@ if helm upgrade --install observability-traces-opensearch \
     oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
     --create-namespace \
     --namespace openchoreo-observability-plane \
-    --version 0.3.7 \
+    --version "${OBSERVABILITY_TRACING_OPENSEARCH_VERSION}" \
     --set openSearch.enabled=false \
     --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
     --set opentelemetry-collector.configMap.existingName="amp-opentelemetry-collector-config" \
