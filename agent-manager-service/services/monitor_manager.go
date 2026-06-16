@@ -49,7 +49,7 @@ const (
 type MonitorManagerService interface {
 	CreateMonitor(ctx context.Context, orgName string, req *models.CreateMonitorRequest) (*models.MonitorResponse, error)
 	GetMonitor(ctx context.Context, orgName, projectName, agentName, monitorName string) (*models.MonitorResponse, error)
-	ListMonitors(ctx context.Context, orgName, projectName, agentName string) (*models.MonitorListResponse, error)
+	ListMonitors(ctx context.Context, orgName, projectName, agentName, environmentName string) (*models.MonitorListResponse, error)
 	UpdateMonitor(ctx context.Context, orgName, projectName, agentName, monitorName string, req *models.UpdateMonitorRequest) (*models.MonitorResponse, error)
 	DeleteMonitor(ctx context.Context, orgName, projectName, agentName, monitorName string) error
 	StopMonitor(ctx context.Context, orgName, projectName, agentName, monitorName string) (*models.MonitorResponse, error)
@@ -364,11 +364,18 @@ func (s *monitorManagerService) GetMonitor(ctx context.Context, orgName, project
 	return resp, nil
 }
 
-// ListMonitors lists all monitors for an organization with live status enrichment
-func (s *monitorManagerService) ListMonitors(ctx context.Context, orgName, projectName, agentName string) (*models.MonitorListResponse, error) {
-	s.logger.Debug("Listing monitors", "orgName", orgName, "projectName", projectName, "agentName", agentName)
+// ListMonitors lists all monitors for an organization with live status enrichment.
+// If environmentName is non-empty, only monitors for that environment are returned.
+func (s *monitorManagerService) ListMonitors(ctx context.Context, orgName, projectName, agentName, environmentName string) (*models.MonitorListResponse, error) {
+	s.logger.Debug("Listing monitors", "orgName", orgName, "projectName", projectName, "agentName", agentName, "environmentName", environmentName)
 
-	monitors, err := s.monitorRepo.ListMonitorsByAgent(orgName, projectName, agentName)
+	var monitors []models.Monitor
+	var err error
+	if environmentName != "" {
+		monitors, err = s.monitorRepo.ListMonitorsByAgentEnvironment(orgName, projectName, agentName, environmentName)
+	} else {
+		monitors, err = s.monitorRepo.ListMonitorsByAgent(orgName, projectName, agentName)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list monitors: %w", err)
 	}

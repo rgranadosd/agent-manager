@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -321,9 +322,11 @@ func buildWorkflowParameters(req CreateComponentRequest) (map[string]any, error)
 			params["buildEnv"] = buildEnv
 		} else if req.Build.Docker != nil {
 			// Add docker configs in nested format expected by ClusterWorkflow
+			appPath := normalizePath(req.Repository.AppPath)
+			dockerfilePath := resolveDockerfilePath(appPath, req.Build.Docker.DockerfilePath)
 			dockerParams := map[string]any{
-				"context":  normalizePath(req.Repository.AppPath),
-				"filePath": normalizePath(req.Build.Docker.DockerfilePath),
+				"context":  appPath,
+				"filePath": dockerfilePath,
 			}
 			params["docker"] = dockerParams
 			// Initialize empty buildEnv and buildArgs for docker builds
@@ -475,6 +478,12 @@ func buildFileMounts(req CreateComponentRequest) []map[string]any {
 
 func normalizePath(path string) string {
 	return strings.TrimSuffix(path, "/")
+}
+
+// resolveDockerfilePath prepends appPath to dockerfilePath so the result
+// is relative to the repository root (as expected by the workflow).
+func resolveDockerfilePath(appPath, dockerfilePath string) string {
+	return normalizePath(appPath) + "/" + strings.TrimPrefix(normalizePath(dockerfilePath), "/")
 }
 
 func (c *openChoreoClient) GetComponent(ctx context.Context, namespaceName, projectName, componentName string) (*models.AgentResponse, error) {
@@ -693,35 +702,10 @@ func (c *openChoreoClient) GetEnvResourceConfigs(ctx context.Context, namespaceN
 	}
 
 	// Step 3: Check ReleaseBinding for environment-specific overrides
-	componentFilter := componentName
-	listResp, err := c.ocClient.ListReleaseBindingsWithResponse(ctx, namespaceName, &gen.ListReleaseBindingsParams{
-		Component: &componentFilter,
-		Limit:     &defaultListLimit,
-	})
+	binding, err := c.findReleaseBindingForEnv(ctx, namespaceName, componentName, environment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list release bindings: %w", err)
+		return nil, err
 	}
-	if listResp.StatusCode() != http.StatusOK {
-		return nil, handleErrorResponse(listResp.StatusCode(), ErrorResponses{
-			JSON401: listResp.JSON401,
-			JSON403: listResp.JSON403,
-			JSON404: listResp.JSON404,
-			JSON500: listResp.JSON500,
-		})
-	}
-
-	// Find the binding for the specified environment
-	var binding *gen.ReleaseBinding
-	if listResp.JSON200 != nil {
-		for i := range listResp.JSON200.Items {
-			b := &listResp.JSON200.Items[i]
-			if b.Spec != nil && b.Spec.Environment == environment {
-				binding = b
-				break
-			}
-		}
-	}
-
 	if binding == nil {
 		// No binding found - return ComponentType defaults
 		return response, nil
@@ -1086,7 +1070,7 @@ func (c *openChoreoClient) ListComponentsByKind(ctx context.Context, namespaceNa
 	return components, nil
 }
 
-func (c *openChoreoClient) ComponentExists(ctx context.Context, namespaceName, projectName, componentName string, verifyProject bool) (bool, error) {
+func (c *openChoreoClient) ComponentExists(ctx context.Context, namespaceName, projectName, componentName string) (bool, error) {
 	_, err := c.GetComponent(ctx, namespaceName, projectName, componentName)
 	if err != nil {
 		if errors.Is(err, utils.ErrNotFound) {
@@ -1589,39 +1573,15 @@ func (c *openChoreoClient) ReplaceComponentFileMounts(ctx context.Context, names
 // then sets restartedAt to trigger a pod rollout. If no binding exists for the component+environment yet
 // (agent not deployed), returns nil — the Component CR vars will be picked up on first deploy.
 func (c *openChoreoClient) UpdateReleaseBindingEnvVars(ctx context.Context, namespaceName, projectName, componentName, envName string, envVars []EnvVar) error {
-	componentFilter := componentName
-	listResp, err := c.ocClient.ListReleaseBindingsWithResponse(ctx, namespaceName, &gen.ListReleaseBindingsParams{
-		Component: &componentFilter,
-		Limit:     &defaultListLimit,
-	})
+	binding, err := c.findReleaseBindingForEnv(ctx, namespaceName, componentName, envName)
 	if err != nil {
-		return fmt.Errorf("failed to list release bindings: %w", err)
+		return err
 	}
-	if listResp.StatusCode() != http.StatusOK {
-		return handleErrorResponse(listResp.StatusCode(), ErrorResponses{
-			JSON401: listResp.JSON401,
-			JSON403: listResp.JSON403,
-			JSON404: listResp.JSON404,
-			JSON500: listResp.JSON500,
-		})
-	}
-	if listResp.JSON200 == nil || len(listResp.JSON200.Items) == 0 {
-		// No bindings yet — agent not deployed; skip silently.
-		return nil
-	}
-
-	// Find the binding for the specified environment (client-side filter since the API has no env param).
-	var bindingName string
-	for _, b := range listResp.JSON200.Items {
-		if b.Spec != nil && b.Spec.Environment == envName {
-			bindingName = b.Metadata.Name
-			break
-		}
-	}
-	if bindingName == "" {
+	if binding == nil {
 		// No binding for this environment yet — agent not deployed there; skip silently.
 		return nil
 	}
+	bindingName := binding.Metadata.Name
 
 	getResp, err := c.ocClient.GetReleaseBindingWithResponse(ctx, namespaceName, bindingName)
 	if err != nil {
@@ -1659,25 +1619,8 @@ func (c *openChoreoClient) UpdateReleaseBindingEnvVars(ctx context.Context, name
 			existing[ev.Key] = ev
 		}
 	}
-	for _, newEnv := range envVars {
-		genEnv := gen.EnvVar{Key: newEnv.Key}
-		if newEnv.ValueFrom != nil && newEnv.ValueFrom.SecretKeyRef != nil {
-			name := newEnv.ValueFrom.SecretKeyRef.Name
-			key := newEnv.ValueFrom.SecretKeyRef.Key
-			genEnv.ValueFrom = &gen.EnvVarValueFrom{
-				SecretKeyRef: &struct {
-					Key  *string `json:"key,omitempty"`
-					Name *string `json:"name,omitempty"`
-				}{
-					Name: &name,
-					Key:  &key,
-				},
-			}
-		} else {
-			v := newEnv.Value
-			genEnv.Value = &v
-		}
-		existing[newEnv.Key] = genEnv
+	for _, genEnv := range toGenEnvVars(envVars) {
+		existing[genEnv.Key] = genEnv
 	}
 
 	merged := make([]gen.EnvVar, 0, len(existing))
@@ -1966,25 +1909,8 @@ func (c *openChoreoClient) ReplaceReleaseBindingEnvVars(ctx context.Context, nam
 	}
 
 	// Step 2: Merge new env vars on top.
-	for _, newEnv := range envVarsToAdd {
-		genEnv := gen.EnvVar{Key: newEnv.Key}
-		if newEnv.ValueFrom != nil && newEnv.ValueFrom.SecretKeyRef != nil {
-			name := newEnv.ValueFrom.SecretKeyRef.Name
-			key := newEnv.ValueFrom.SecretKeyRef.Key
-			genEnv.ValueFrom = &gen.EnvVarValueFrom{
-				SecretKeyRef: &struct {
-					Key  *string `json:"key,omitempty"`
-					Name *string `json:"name,omitempty"`
-				}{
-					Name: &name,
-					Key:  &key,
-				},
-			}
-		} else {
-			v := newEnv.Value
-			genEnv.Value = &v
-		}
-		existing[newEnv.Key] = genEnv
+	for _, genEnv := range toGenEnvVars(envVarsToAdd) {
+		existing[genEnv.Key] = genEnv
 	}
 
 	merged := make([]gen.EnvVar, 0, len(existing))
@@ -2082,6 +2008,20 @@ func (c *openChoreoClient) RemoveWorkloadEnvVars(ctx context.Context, namespaceN
 
 // TraitOption allows passing optional parameters when building traits.
 type TraitOption func(map[string]interface{})
+
+// WithInstrumentationEnabled sets the instrumentationEnabled flag for the OTEL instrumentation trait.
+func WithInstrumentationEnabled(enabled bool) TraitOption {
+	return func(params map[string]interface{}) {
+		params["instrumentationEnabled"] = enabled
+	}
+}
+
+// WithEnvInjectionEnabled sets the envInjectionEnabled flag for the env-injection trait.
+func WithEnvInjectionEnabled(enabled bool) TraitOption {
+	return func(params map[string]interface{}) {
+		params["envInjectionEnabled"] = enabled
+	}
+}
 
 // WithUpstreamPort sets the upstream port for the api-configuration trait.
 func WithUpstreamPort(port int32) TraitOption {
@@ -2218,10 +2158,6 @@ func (c *openChoreoClient) buildOTELTraitParameters(ctx context.Context, namespa
 	for _, opt := range opts {
 		opt(params)
 	}
-	agentApiKey, _ := params["agentApiKey"].(string)
-	if agentApiKey == "" {
-		return nil, fmt.Errorf("agent API key is required for OTEL instrumentation trait")
-	}
 
 	// Use the language version passed via WithLanguageVersion if available;
 	// otherwise fall back to fetching the component (legacy path for direct callers).
@@ -2258,14 +2194,16 @@ func (c *openChoreoClient) buildOTELTraitParameters(ctx context.Context, namespa
 		return nil, fmt.Errorf("failed to build instrumentation image: %w", err)
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"instrumentationImage":  instrumentationImage,
 		"sdkVolumeName":         cfg.OTEL.SDKVolumeName,
 		"sdkMountPath":          cfg.OTEL.SDKMountPath,
-		"otelEndpoint":          cfg.OTEL.ExporterEndpoint,
 		"isTraceContentEnabled": utils.BoolAsString(cfg.OTEL.IsTraceContentEnabled),
-		"agentApiKey":           agentApiKey,
-	}, nil
+	}
+	if v, ok := params["instrumentationEnabled"]; ok {
+		result["instrumentationEnabled"] = v
+	}
+	return result, nil
 }
 
 // buildEnvInjectionTraitParameters builds parameters for the env injection trait
@@ -2280,11 +2218,17 @@ func (c *openChoreoClient) buildEnvInjectionTraitParameters(opts ...TraitOption)
 		return nil, fmt.Errorf("agent API key is required for env injection trait")
 	}
 
-	cfg := config.GetConfig()
-	return map[string]interface{}{
-		"otelEndpoint": cfg.OTEL.ExporterEndpoint,
-		"agentApiKey":  agentApiKey,
-	}, nil
+	// otelEndpoint is no longer set here — the env-injection trait derives it from the
+	// apiGatewayName convention ("api-platform-<org>-<env>") + the gateway runtime
+	// in-cluster Service. The trait still honours an explicit override via
+	// environmentConfigs.otelEndpoint / parameters.otelEndpoint when set.
+	result := map[string]interface{}{
+		"agentApiKey": agentApiKey,
+	}
+	if v, ok := params["envInjectionEnabled"]; ok {
+		result["envInjectionEnabled"] = v
+	}
+	return result, nil
 }
 
 // getInstrumentationImage builds the pre-built init-container image reference for
@@ -2597,7 +2541,7 @@ func convertComponentFromTyped(comp *gen.Component) (*models.AgentResponse, erro
 		if comp.Spec.Workflow.Parameters != nil {
 			params := *comp.Spec.Workflow.Parameters
 			language := getLabel(comp.Metadata.Labels, string(LabelKeyAgentLanguage))
-			agent.Build = extractBuildParams(params, language)
+			agent.Build = extractBuildParams(params, language, agent.Provisioning.Repository.AppPath)
 			if inputInterface := extractInputInterface(params); inputInterface != nil {
 				if agent.InputInterface == nil {
 					agent.InputInterface = inputInterface
@@ -2672,13 +2616,18 @@ func extractRepositoryFromTyped(workflow *gen.ComponentWorkflowConfig) models.Re
 	}
 }
 
-// extractBuildParams extracts build configuration (buildpack or docker) from parameters
-func extractBuildParams(params map[string]interface{}, language string) *models.Build {
+// extractBuildParams extracts build configuration (buildpack or docker) from parameters.
+// appPath is used to convert the stored absolute filePath back to a path relative to appPath.
+func extractBuildParams(params map[string]interface{}, language, appPath string) *models.Build {
 	// Check for docker build (has docker object with filePath)
 	if dc, ok := params["docker"].(map[string]interface{}); ok {
+		filePath := path.Clean(getMapString(dc, "filePath"))
+		if appPath != "" {
+			filePath = strings.TrimPrefix(filePath, path.Clean(appPath))
+		}
 		return &models.Build{
 			Type:   BuildTypeDocker,
-			Docker: &models.DockerConfig{DockerfilePath: getMapString(dc, "filePath")},
+			Docker: &models.DockerConfig{DockerfilePath: filePath},
 		}
 	}
 

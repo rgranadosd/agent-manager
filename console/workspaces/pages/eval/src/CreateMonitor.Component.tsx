@@ -22,25 +22,18 @@ import {
   absoluteRouteMap,
   type CreateMonitorRequest,
 } from "@agent-management-platform/types";
-import {
-  useCreateMonitor,
-  useListEnvironments,
-} from "@agent-management-platform/api-client";
+import { useCreateMonitor } from "@agent-management-platform/api-client";
 import { type CreateMonitorFormValues } from "./form/schema";
 import { MonitorFormWizard } from "./subComponents/MonitorFormWizard";
 
 export const CreateMonitorComponent: React.FC = () => {
-  const { agentId, orgId, projectId } = useParams<{
+  const { agentId, orgId, projectId, envId } = useParams<{
     agentId: string;
     orgId: string;
     projectId: string;
+    envId: string;
   }>();
   const navigate = useNavigate();
-  const { data, isLoading: isEnvironmentsLoading } = useListEnvironments({
-    orgName: orgId,
-  });
-
-  const envId = data && data.length > 0 ? data[0].name : undefined;
 
   const {
     mutate: createMonitor,
@@ -77,20 +70,19 @@ export const CreateMonitorComponent: React.FC = () => {
     if (!orgId) return "Organization is required to create a monitor.";
     if (!projectId) return "Project context is required.";
     if (!agentId) return "Select an agent before creating a monitor.";
-    if (!envId && !isEnvironmentsLoading)
-      return "Select an environment before creating a monitor.";
+    if (!envId) return "Select an environment before creating a monitor.";
     return null;
-  }, [agentId, orgId, projectId, envId, isEnvironmentsLoading]);
+  }, [agentId, orgId, projectId, envId]);
   const backHref = useMemo(() => {
-    if (!orgId || !projectId || !agentId) {
+    if (!orgId || !projectId || !agentId || !envId) {
       return "#";
     }
     return generatePath(
       absoluteRouteMap.children.org.children.projects.children.agents.children
-        .evaluation.children.monitor.path,
-      { orgId, projectId, agentId },
+        .environment.children.evaluation.children.monitor.path,
+      { orgId, projectId, agentId, envId },
     );
-  }, [agentId, orgId, projectId]);
+  }, [agentId, orgId, projectId, envId]);
 
   const handleCreateMonitor = useCallback(
     (values: CreateMonitorFormValues) => {

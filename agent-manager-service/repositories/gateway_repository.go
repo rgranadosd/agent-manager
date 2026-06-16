@@ -66,6 +66,9 @@ type GatewayRepository interface {
 	// Gateway-Environment mapping operations
 	CreateEnvironmentMapping(mapping *models.GatewayEnvironmentMapping) error
 	DeleteEnvironmentMapping(gatewayID, environmentID string) error
+	// DeleteEnvironmentMappingsByEnvironmentID removes every gateway↔env mapping for this env.
+	// Returns the number of rows deleted. Used during env deletion to cascade clean the link table.
+	DeleteEnvironmentMappingsByEnvironmentID(environmentID string) (int64, error)
 	GetEnvironmentMappingsByGatewayID(gatewayID string) ([]models.GatewayEnvironmentMapping, error)
 	GetEnvironmentMappingsByGatewayIDs(gatewayIDs []string) (map[string][]models.GatewayEnvironmentMapping, error)
 	GetEnvironmentMappingsByEnvironmentID(environmentID string) ([]models.GatewayEnvironmentMapping, error)
@@ -421,6 +424,13 @@ func (r *GatewayRepo) GetEnvironmentMappingsByEnvironmentID(environmentID string
 	var mappings []models.GatewayEnvironmentMapping
 	err := r.db.Where("environment_uuid = ?", environmentID).Find(&mappings).Error
 	return mappings, err
+}
+
+// DeleteEnvironmentMappingsByEnvironmentID removes every mapping pointing at the given env.
+func (r *GatewayRepo) DeleteEnvironmentMappingsByEnvironmentID(environmentID string) (int64, error) {
+	result := r.db.Where("environment_uuid = ?", environmentID).
+		Delete(&models.GatewayEnvironmentMapping{})
+	return result.RowsAffected, result.Error
 }
 
 // EnvironmentMappingExists checks if a mapping exists between a gateway and an environment

@@ -63,11 +63,31 @@ spec:
       required:
         - apiName
 
+  environmentConfigs:
+    openAPIV3Schema:
+      type: object
+      properties:
+        policies:
+          type: array
+          description: "Environment-specific policies (CORS, API key auth, etc.)"
+          items:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        artifactId:
+          type: string
+          description: "Per-environment artifact UUID override. When set, takes precedence over parameters.artifactId."
+          default: ""
+
   creates:
     # --- Backend: kgateway static backend pointing to WSO2 API Platform router ---
     # This Backend resource tells kgateway to forward traffic to the WSO2 API Platform
     # router instead of directly to the component's Service. The HTTPRoute's backendRef
     # is patched (below) to reference this Backend.
+    #
+    # backendHost is derived from the chart's apiGatewayName helper convention
+    # ("api-platform-<org>-<env>") + the in-cluster Service suffix, and backendPort
+    # is the gateway runtime listener port. Both are platform-wide constants —
+    # the agent-manager-service no longer injects them per-environment.
     - template:
         apiVersion: gateway.kgateway.dev/v1alpha1
         kind: Backend
@@ -78,26 +98,31 @@ spec:
           type: Static
           static:
             hosts:
-              - host: {{ .Values.gateway.backendHost }}
-                port: {{ .Values.gateway.backendPort }}
+              - host: "api-platform-${metadata.componentNamespace}-${metadata.environmentName}-gateway-gateway-runtime.openchoreo-data-plane"
+                port: 22893
 
-    # Create RestApi resource (auto-discovered by gateway via apiSelector scope: Cluster)
+    # Create RestApi resource (discovered by gateway via apiSelector scope: LabelSelector).
+    # The restapi-target label matches the gateway's apiSelector matchLabels (which the chart
+    # sets to the same "api-platform-<org>-<env>" string via the apiGatewayName helper).
     - template:
         apiVersion: gateway.api-platform.wso2.com/v1alpha1
         kind: RestApi
         metadata:
           name: ${metadata.name}
           namespace: ${metadata.namespace}
+          labels:
+            gateway.api-platform.wso2.com/restapi-target: "api-platform-${metadata.componentNamespace}-${metadata.environmentName}"
           annotations:
-            gateway.api-platform.wso2.com/artifact-id: ${parameters.artifactId}
+            gateway.api-platform.wso2.com/artifact-id: "${has(environmentConfigs.artifactId) && environmentConfigs.artifactId != '' ? environmentConfigs.artifactId : parameters.artifactId}"
         spec:
-          displayName: ${parameters.apiName}
+          displayName: ${parameters.apiName}-${metadata.environmentName}
           version: ${parameters.apiVersion}
           context: /${metadata.environmentName}-${metadata.componentNamespace}-${metadata.componentName}
           upstream:
             main:
               url: http://${metadata.componentName}.${metadata.namespace}:${parameters.upstreamPort}${parameters.upstreamBasePath}
-          policies: ${parameters.policies}
+          policies: |
+            ${has(environmentConfigs.policies) ? dyn(environmentConfigs.policies) : dyn(parameters.policies)}
           operations: ${parameters.operations}
 
   patches:

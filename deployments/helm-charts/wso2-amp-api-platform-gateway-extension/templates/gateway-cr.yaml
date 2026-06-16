@@ -16,7 +16,9 @@ metadata:
     app.kubernetes.io/component: api-platform-gateway
 spec:
   apiSelector:
-    {{- toYaml .Values.apiGateway.apiSelector | nindent 4 }}
+    scope: LabelSelector
+    matchLabels:
+      gateway.api-platform.wso2.com/restapi-target: {{ include "wso2-amp-gateway-extension.restApiTarget" . | quote }}
 
   controlPlane:
     host: {{ .Values.apiGateway.controlPlane.host | quote }}

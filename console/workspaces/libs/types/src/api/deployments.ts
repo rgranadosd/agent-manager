@@ -29,6 +29,23 @@ export interface DeployAgentRequest {
   corsConfig?: CorsConfig;
 }
 
+export interface UpdateAgentDeploySettingsRequest {
+  environmentName: string;
+  enableAutoInstrumentation?: boolean;
+  enableApiKeySecurity?: boolean;
+  corsConfig?: CorsConfig;
+}
+
+export type UpdateAgentDeploySettingsPathParams = AgentPathParams;
+
+export interface UpdateAgentConfigurationsRequest {
+  environmentName: string;
+  env?: EnvironmentVariable[];
+  files?: FileMount[];
+}
+
+export type UpdateAgentConfigurationsPathParams = AgentPathParams;
+
 // Responses
 export interface DeploymentResponse {
   agentName: string;
@@ -80,6 +97,7 @@ export interface ConfigurationItem {
   value: string;
   isSensitive?: boolean;
   secretRef?: string;
+  isSystem?: boolean;
 }
 
 export interface ConfigurationData {
@@ -170,3 +188,79 @@ export interface UpdateDeploymentStateResponse {
 }
 
 export type UpdateDeploymentStatePathParams = AgentPathParams;
+
+// Promote Agent
+export interface PromoteAgentRequest {
+  sourceEnvironment: string;
+  targetEnvironment: string;
+  useConfigFromSourceEnv?: boolean;
+  env?: EnvironmentVariable[];
+  files?: FileMount[];
+  enableAutoInstrumentation?: boolean;
+  enableApiKeySecurity?: boolean;
+  corsConfig?: CorsConfig;
+}
+
+export interface PromoteAgentResponse {
+  agentName?: string;
+  projectName?: string;
+  sourceEnvironment?: string;
+  targetEnvironment?: string;
+}
+
+export type PromoteAgentPathParams = AgentPathParams;
+
+// Update Deployment Pipeline
+export interface UpdateDeploymentPipelineRequest {
+  displayName?: string;
+  description?: string;
+  promotionPaths: PromotionPath[];
+}
+
+export type UpdateDeploymentPipelinePathParams = OrgProjPathParams;
+
+// Update DeploymentPipeline (direct — by pipeline name, no project required)
+export type UpdateOrgDeploymentPipelinePathParams = {
+  orgName: string | undefined;
+  pipelineName: string;
+};
+
+// Delete DeploymentPipeline (direct — by pipeline name)
+export type DeleteDeploymentPipelinePathParams = {
+  orgName: string | undefined;
+  pipelineName: string;
+};
+
+// Create DeploymentPipeline
+export interface CreateDeploymentPipelineRequest {
+  displayName: string;
+  description?: string;
+  projectName?: string;
+  promotionPaths: PromotionPath[];
+}
+
+export type CreateDeploymentPipelinePathParams = { orgName: string | undefined };
+
+// Update Environment
+export interface UpdateEnvironmentRequest {
+  displayName?: string;
+  description?: string;
+  isProduction?: boolean;
+}
+
+export interface UpdateEnvironmentPathParams {
+  orgName: string | undefined;
+  envName: string | undefined;
+}
+
+// Create Environment
+export interface CreateEnvironmentRequest {
+  name: string;
+  displayName: string;
+  description?: string;
+  dataplaneRef: string;
+  dnsPrefix: string;
+  isProduction?: boolean;
+}
+
+export type CreateEnvironmentPathParams = { orgName: string | undefined };

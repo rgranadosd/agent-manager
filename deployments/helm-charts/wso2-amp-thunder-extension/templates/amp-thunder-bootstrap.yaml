@@ -380,7 +380,7 @@ data:
 
     log_info "Checking if application '{{ .Values.thunder.bootstrap.ampConsoleClient.name }}' already exists..."
 
-    # Read theme ID and layout ID written by 51b-amp-console-branding.sh
+    # Read theme ID and layout ID written by 52-amp-console-branding.sh
     CONSOLE_THEME_ID=$(cat /tmp/amp-console-theme-id 2>/dev/null || echo "")
     CONSOLE_LAYOUT_ID=$(cat /tmp/amp-console-layout-id 2>/dev/null || echo "{{ .Values.thunder.bootstrap.ampConsoleLayout.id }}")
 
@@ -1369,7 +1369,10 @@ data:
     create_action "$RS_ID" "$R_DP"           "Read"                   "read"                   "View data planes"
 
     # deployment-pipeline actions  → amp:deployment-pipeline:<action>
+    create_action "$RS_ID" "$R_PIPE"         "Create"                 "create"                 "Create a deployment pipeline"
     create_action "$RS_ID" "$R_PIPE"         "Read"                   "read"                   "View deployment pipelines"
+    create_action "$RS_ID" "$R_PIPE"         "Update"                 "update"                 "Update a deployment pipeline"
+    create_action "$RS_ID" "$R_PIPE"         "Delete"                 "delete"                 "Delete a deployment pipeline"
 
     # git-secret actions  → amp:git-secret:<action>
     create_action "$RS_ID" "$R_GIT"          "Create"                 "create"                 "Create a git secret"
@@ -1467,7 +1470,7 @@ data:
     # repository actions  → amp:repository:<action>
     create_action "$RS_ID" "$R_REPO"         "Read"                   "read"                   "Browse repository branches and commits"
 
-    log_info "Agent Manager resource server registration complete (101 permissions registered)."
+    log_info "Agent Manager resource server registration complete (93 permissions registered)."
 
   61-amp-default-roles.sh: |
     #!/bin/bash
@@ -1573,7 +1576,7 @@ data:
     # ===========================================================================
     ADMIN_ID=$(create_or_get_role "admin" "Full administrative access to all AMP resources")
     set_role_permissions "$ADMIN_ID" "admin" "Full administrative access to all AMP resources" \
-      '["org:view","org:modify-settings","org:invite-member","org:remove-member","org:assign-role","org:manage-idp","org:manage-service-account","project:create","project:read","project:update","project:delete","environment:create","environment:read","environment:update","environment:delete","gateway:create","gateway:read","gateway:update","gateway:delete","gateway:token-manage","data-plane:read","deployment-pipeline:read","git-secret:create","git-secret:read","git-secret:delete","llm-provider-template:create","llm-provider-template:read","llm-provider-template:update","llm-provider-template:delete","llm-provider:create","llm-provider:read","llm-provider:update","llm-provider:delete","llm-provider:configure-guardrail","llm-provider:connect","llm-provider:deploy","llm-provider:api-key-manage","mcp-server:create","mcp-server:read","mcp-server:update","mcp-server:delete","mcp-server:configure-guardrail","mcp-server:connect","llm-proxy:create","llm-proxy:read","llm-proxy:update","llm-proxy:delete","llm-proxy:deploy","llm-proxy:api-key-manage","evaluator:create","evaluator:read","evaluator:update","evaluator:delete","agent:create","agent:read","agent:update","agent:delete","agent:build","agent:deploy-non-production","agent:deploy-production","agent:promote","agent:rollback","agent:suspend","agent:token-manage","agent:api-key-manage","agent-kind:read","agent-kind:create","agent-kind:update","agent-kind:delete","monitor:create","monitor:read","monitor:update","monitor:delete","monitor:execute","monitor:score-read","monitor:score-publish","observability:org-dashboard","observability:project-dashboard","observability:guardrail-metric","observability:infra-metric","role:create","role:read","role:update","role:delete","group:create","group:read","group:update","group:delete","catalog:read","repository:read"]'
+      '["org:view","org:modify-settings","org:invite-member","org:remove-member","org:assign-role","org:manage-idp","org:manage-service-account","project:create","project:read","project:update","project:delete","environment:create","environment:read","environment:update","environment:delete","gateway:create","gateway:read","gateway:update","gateway:delete","gateway:token-manage","data-plane:read","deployment-pipeline:create","deployment-pipeline:read","deployment-pipeline:update","deployment-pipeline:delete","git-secret:create","git-secret:read","git-secret:delete","llm-provider-template:create","llm-provider-template:read","llm-provider-template:update","llm-provider-template:delete","llm-provider:create","llm-provider:read","llm-provider:update","llm-provider:delete","llm-provider:configure-guardrail","llm-provider:connect","llm-provider:deploy","llm-provider:api-key-manage","mcp-server:create","mcp-server:read","mcp-server:update","mcp-server:delete","mcp-server:configure-guardrail","mcp-server:connect","llm-proxy:create","llm-proxy:read","llm-proxy:update","llm-proxy:delete","llm-proxy:deploy","llm-proxy:api-key-manage","evaluator:create","evaluator:read","evaluator:update","evaluator:delete","agent:create","agent:read","agent:update","agent:delete","agent:build","agent:deploy-non-production","agent:deploy-production","agent:promote","agent:rollback","agent:suspend","agent:token-manage","agent:api-key-manage","agent-kind:read","agent-kind:create","agent-kind:update","agent-kind:delete","monitor:create","monitor:read","monitor:update","monitor:delete","monitor:execute","monitor:score-read","monitor:score-publish","observability:org-dashboard","observability:project-dashboard","observability:guardrail-metric","observability:infra-metric","role:create","role:read","role:update","role:delete","group:create","group:read","group:update","group:delete","catalog:read","repository:read"]'
 
     # ===========================================================================
     # developer — project-scoped development and deployment
@@ -1594,7 +1597,7 @@ data:
     # ===========================================================================
     PE_ID=$(create_or_get_role "platform-engineer" "Platform engineering: manage environments, gateways, and agent deployments")
     set_role_permissions "$PE_ID" "platform-engineer" "Platform engineering: manage environments, gateways, and agent deployments" \
-      '["org:view","project:read","environment:create","environment:read","environment:update","environment:delete","gateway:create","gateway:read","gateway:update","gateway:delete","gateway:token-manage","data-plane:read","deployment-pipeline:read","llm-provider:read","llm-provider:configure-guardrail","mcp-server:read","mcp-server:configure-guardrail","agent-kind:read","agent:read","agent:build","agent:api-key-manage","agent:deploy-non-production","agent:deploy-production","agent:promote","agent:rollback","agent:suspend","monitor:read","monitor:score-read","observability:org-dashboard","observability:project-dashboard","observability:infra-metric","catalog:read"]'
+      '["org:view","project:read","environment:create","environment:read","environment:update","environment:delete","gateway:create","gateway:read","gateway:update","gateway:delete","gateway:token-manage","data-plane:read","deployment-pipeline:create","deployment-pipeline:read","deployment-pipeline:update","deployment-pipeline:delete","llm-provider:read","llm-provider:configure-guardrail","mcp-server:read","mcp-server:configure-guardrail","agent-kind:read","agent:read","agent:build","agent:api-key-manage","agent:deploy-non-production","agent:deploy-production","agent:promote","agent:rollback","agent:suspend","monitor:read","monitor:score-read","observability:org-dashboard","observability:project-dashboard","observability:infra-metric","catalog:read"]'
 
     log_info "Default role provisioning complete (4 roles created/updated)."
 
@@ -1660,3 +1663,104 @@ data:
     fi
 
     log_info "Default role assignments complete."
+
+  62-amp-default-groups.sh: |
+    #!/bin/bash
+    set -e
+
+    SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
+    source "${SCRIPT_DIR}/common.sh"
+
+    log_info "Creating AMP default groups..."
+
+    # ---------------------------------------------------------------------------
+    # Fetch default OU ID
+    # ---------------------------------------------------------------------------
+    RESPONSE=$(thunder_api_call GET "/organization-units/tree/default")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+    if [[ "$HTTP_CODE" != "200" ]]; then
+      log_error "Failed to fetch default OU (HTTP $HTTP_CODE)"
+      exit 1
+    fi
+    DEFAULT_OU_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$DEFAULT_OU_ID" ]]; then
+      log_error "Could not extract default OU ID"
+      exit 1
+    fi
+    log_info "Using OU ID: $DEFAULT_OU_ID"
+
+    # ---------------------------------------------------------------------------
+    # Helper: create or get group by name; echoes the group ID
+    # ---------------------------------------------------------------------------
+    create_or_get_group() {
+      local name="$1" description="$2"
+      local payload="{\"name\":\"${name}\",\"ouId\":\"${DEFAULT_OU_ID}\",\"description\":\"${description}\"}"
+      local response http_code body id
+
+      response=$(thunder_api_call POST "/groups" "$payload")
+      http_code="${response: -3}"
+      body="${response%???}"
+
+      if [[ "$http_code" == "201" ]] || [[ "$http_code" == "200" ]]; then
+        id=$(echo "$body" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        log_success "Created group '${name}' (id: $id)" >&2
+        echo "$id"
+        return 0
+      fi
+
+      if [[ "$http_code" == "409" ]]; then
+        log_warning "Group '${name}' already exists, retrieving ID..." >&2
+        response=$(thunder_api_call GET "/groups")
+        body="${response%???}"
+        id=$(echo "$body" | sed 's/},{/}\n{/g' | grep "\"name\":\"${name}\"" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ -z "$id" ]]; then
+          log_error "Group '${name}' reported 409 but not found in list" >&2
+          exit 1
+        fi
+        log_success "Found existing group '${name}' (id: $id)" >&2
+        echo "$id"
+        return 0
+      fi
+
+      log_error "Failed to create group '${name}' (HTTP $http_code): $body" >&2
+      exit 1
+    }
+
+    # ===========================================================================
+    # Create default groups
+    # ===========================================================================
+    ADMINS_GROUP_ID=$(create_or_get_group "admins" "Administrative group with full access to all AMP resources")
+
+    # ===========================================================================
+    # Assign admin role to admins group
+    # ===========================================================================
+    log_info "Looking up admin role..."
+    RESPONSE=$(thunder_api_call GET "/roles")
+    HTTP_CODE="${RESPONSE: -3}"
+    BODY="${RESPONSE%???}"
+    if [[ "$HTTP_CODE" != "200" ]]; then
+      log_error "Failed to fetch roles (HTTP $HTTP_CODE)"
+      exit 1
+    fi
+
+    ADMIN_ROLE_ID=$(echo "$BODY" | sed 's/},{/}\n{/g' | grep '"name":"admin"' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$ADMIN_ROLE_ID" ]]; then
+      log_error "Could not find admin role"
+      exit 1
+    fi
+    log_info "Found admin role (id: $ADMIN_ROLE_ID)"
+
+    log_info "Assigning admin role to admins group..."
+    ASSIGN_PAYLOAD='{"assignments":[{"id":"'${ADMINS_GROUP_ID}'","type":"group"}]}'
+    RESPONSE=$(thunder_api_call POST "/roles/$ADMIN_ROLE_ID/assignments/add" "$ASSIGN_PAYLOAD")
+    HTTP_CODE="${RESPONSE: -3}"
+    if [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "201" ]] || [[ "$HTTP_CODE" == "204" ]] || [[ "$HTTP_CODE" == "409" ]]; then
+      log_success "Assigned admin role to admins group"
+    else
+      log_error "Failed to assign admin role to admins group (HTTP $HTTP_CODE)"
+      echo "Response: ${RESPONSE%???}"
+      exit 1
+    fi
+
+    log_info "Default group provisioning complete (1 group created/updated)."

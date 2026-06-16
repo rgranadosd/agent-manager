@@ -530,9 +530,9 @@ func (c *TracingController) GetSpanDetail(ctx context.Context, traceID, spanID s
 }
 
 // ExportTraces fetches complete traces with all spans fully enriched for export.
-// Observer calls: 1 QueryTraces + N QueryTraceSpans + N×M GetSpanDetails.
-// Concurrency is bounded: maxConcurrentTraces outer goroutines, maxConcurrentFetches
-// inner span-detail goroutines. Any single failure aborts the entire export.
+// Observer calls: 1 QueryTraces + N QueryTraceSpans (spans carry attributes
+// inline via includeAttributes). Concurrency is bounded by maxConcurrentTraces
+// outer goroutines. Any single failure aborts the entire export.
 func (c *TracingController) ExportTraces(ctx context.Context, params TraceQueryParams) (*opensearch.TraceExportResponse, error) {
 	log := logger.GetLogger(ctx)
 
@@ -577,7 +577,6 @@ func (c *TracingController) ExportTraces(ctx context.Context, params TraceQueryP
 	var errOnce sync.Once
 
 	outerSem := make(chan struct{}, maxConcurrentTraces)
-	innerSem := make(chan struct{}, maxConcurrentFetches)
 	var wg sync.WaitGroup
 
 	for i, t := range tracesResp.Traces {
@@ -598,9 +597,10 @@ func (c *TracingController) ExportTraces(ctx context.Context, params TraceQueryP
 			}
 
 			spansResp, err := c.observerClient.QueryTraceSpans(ctx, traceInfo.TraceID, observer.TracesQueryRequest{
-				StartTime: params.StartTime,
-				EndTime:   params.EndTime,
-				Limit:     &spanLimit,
+				StartTime:         params.StartTime,
+				EndTime:           params.EndTime,
+				Limit:             &spanLimit,
+				IncludeAttributes: true,
 				SearchScope: observer.ComponentSearchScope{
 					Namespace:   params.Organization,
 					Project:     params.Project,
@@ -620,54 +620,13 @@ func (c *TracingController) ExportTraces(ctx context.Context, params TraceQueryP
 				truncated.Store(true)
 			}
 
-			// Fetch full details for each span in parallel, bounded by innerSem.
-			type spanResult struct {
-				idx  int
-				span *opensearch.Span
-			}
-			spanResults := make([]spanResult, len(spansResp.Spans))
-			var spanWg sync.WaitGroup
-
-		spanLoop:
-			for j, s := range spansResp.Spans {
-				select {
-				case innerSem <- struct{}{}:
-				case <-ctx.Done():
-					break spanLoop
-				}
-				spanWg.Add(1)
-				go func(spanIdx int, spanID string) {
-					defer spanWg.Done()
-					defer func() { <-innerSem }()
-
-					if ctx.Err() != nil {
-						return
-					}
-
-					details, err := c.observerClient.GetSpanDetails(ctx, traceInfo.TraceID, spanID)
-					if err != nil {
-						errOnce.Do(func() {
-							firstErr = fmt.Errorf("trace %s span %s: get details: %w", traceInfo.TraceID, spanID, err)
-							cancel()
-						})
-						return
-					}
-					enriched := opensearch.ProcessSpan(observer.ConvertSpanDetailsToSpan(traceInfo.TraceID, details))
-					spanResults[spanIdx] = spanResult{idx: spanIdx, span: &enriched}
-				}(j, s.SpanID)
-			}
-			spanWg.Wait()
-
-			if ctx.Err() != nil {
-				return
-			}
-
-			// Collect non-nil spans and sort by start time.
-			spans := make([]opensearch.Span, 0, len(spanResults))
-			for _, sr := range spanResults {
-				if sr.span != nil {
-					spans = append(spans, *sr.span)
-				}
+			// Spans already carry attributes/kind/status from the bulk
+			// QueryTraceSpans call (includeAttributes=true), so convert them
+			// directly — no per-span GetSpanDetails round-trips.
+			spans := make([]opensearch.Span, 0, len(spansResp.Spans))
+			for _, s := range spansResp.Spans {
+				enriched := opensearch.ProcessSpan(observer.ConvertSpanInfoToSpan(traceInfo.TraceID, s))
+				spans = append(spans, enriched)
 			}
 			sort.Slice(spans, func(i, j int) bool {
 				return spans[i].StartTime.Before(spans[j].StartTime)

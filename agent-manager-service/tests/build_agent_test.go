@@ -47,7 +47,7 @@ func TestBuildAgent(t *testing.T) {
 
 	t.Run("Triggering build with commitId should return 202", func(t *testing.T) {
 		openChoreoClient := apitestutils.CreateMockOpenChoreoClient()
-		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 			return true, nil
 		}
 		testClients := wiring.TestClients{
@@ -98,7 +98,7 @@ func TestBuildAgent(t *testing.T) {
 
 	t.Run("Triggering build without commitId should return 202", func(t *testing.T) {
 		openChoreoClient := apitestutils.CreateMockOpenChoreoClient()
-		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+		openChoreoClient.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 			return true, nil
 		}
 		testClients := wiring.TestClients{
@@ -169,7 +169,7 @@ func TestBuildAgent(t *testing.T) {
 			wantErrMsg:     "Organization not found",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.GetProjectFunc = func(ctx context.Context, namespaceName string, projectName string) (*models.ProjectResponse, error) {
@@ -190,7 +190,7 @@ func TestBuildAgent(t *testing.T) {
 			wantErrMsg:     "Project not found",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.GetProjectFunc = func(ctx context.Context, namespaceName string, projectName string) (*models.ProjectResponse, error) {
@@ -226,7 +226,7 @@ func TestBuildAgent(t *testing.T) {
 			wantErrMsg:     "Failed to build agent",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				mock.TriggerBuildFunc = func(ctx context.Context, orgName string, projName string, agentName string, commitId string) (*models.BuildResponse, error) {
@@ -251,7 +251,7 @@ func TestBuildAgent(t *testing.T) {
 			wantErrMsg: "missing header: Authorization",
 			setupMock: func() *clientmocks.OpenChoreoClientMock {
 				mock := apitestutils.CreateMockOpenChoreoClient()
-				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string, verifyProject bool) (bool, error) {
+				mock.ComponentExistsFunc = func(ctx context.Context, orgName string, projName string, agentName string) (bool, error) {
 					return true, nil
 				}
 				return mock

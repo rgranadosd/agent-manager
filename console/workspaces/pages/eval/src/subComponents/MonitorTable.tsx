@@ -43,7 +43,6 @@ import {
 } from "@agent-management-platform/types";
 import {
   useDeleteMonitor,
-  useListEnvironments,
   useListMonitors,
 } from "@agent-management-platform/api-client";
 import { MonitorStartStopButton } from "./MonitorStartStopButton";
@@ -76,44 +75,22 @@ export function MonitorTable() {
     data: monitorsList,
     isLoading,
     error,
-  } = useListMonitors({
-    orgName: orgId,
-    projName: projectId,
-    agentName: agentId,
-  });
+  } = useListMonitors(
+    {
+      orgName: orgId,
+      projName: projectId,
+      agentName: agentId,
+    },
+    { environmentName: envId },
+  );
 
   const { mutate: deleteMonitor } = useDeleteMonitor();
-
-  const { data: environmentsList } = useListEnvironments({
-    orgName: orgId ?? "",
-  });
-
-  const environmentDisplayNameMap = useMemo(() => {
-    if (!environmentsList) {
-      return {} as Record<string, string>;
-    }
-    return environmentsList.reduce<Record<string, string>>(
-      (acc, environment) => {
-        const label = environment.displayName ?? environment.name;
-        acc[environment.name] = label;
-        if (environment.id) {
-          acc[environment.id] = label;
-        }
-        return acc;
-      },
-      {},
-    );
-  }, [environmentsList]);
 
   const monitors = useMemo(() => {
     return (monitorsList?.monitors ?? []).map((monitor: MonitorResponse) => ({
       id: monitor.id,
       displayName: monitor.displayName,
       name: monitor.name,
-      environment:
-        environmentDisplayNameMap[monitor.environmentName ?? ""] ??
-        monitor.environmentName ??
-        "-",
       dataSource: monitor.type === "future" ? "Continuous" : "Historical",
       evaluators:
         monitor.evaluators
@@ -122,7 +99,7 @@ export function MonitorTable() {
       type: monitor.type,
       status: monitor.status ?? "Unknown",
     }));
-  }, [environmentDisplayNameMap, monitorsList?.monitors]);
+  }, [monitorsList?.monitors]);
   const filteredMonitors = useMemo(() => {
     const term = searchValue.trim().toLowerCase();
     if (!term) {
@@ -132,7 +109,6 @@ export function MonitorTable() {
       const haystack = [
         monitor.displayName,
         monitor.name,
-        monitor.environment,
         monitor.dataSource,
         ...monitor.evaluators,
         monitor.status,
@@ -243,8 +219,8 @@ export function MonitorTable() {
                 navigate(
                   generatePath(
                     absoluteRouteMap.children.org.children.projects.children
-                      .agents.children.evaluation.children.monitor.children.view
-                      .path,
+                      .agents.children.environment.children.evaluation.children
+                      .monitor.children.view.path,
                     {
                       agentId,
                       orgId,
@@ -301,8 +277,8 @@ export function MonitorTable() {
                       navigate(
                         generatePath(
                           absoluteRouteMap.children.org.children.projects
-                            .children.agents.children.evaluation.children
-                            .monitor.children.edit.path,
+                            .children.agents.children.environment.children
+                            .evaluation.children.monitor.children.edit.path,
                           {
                             agentId,
                             orgId,

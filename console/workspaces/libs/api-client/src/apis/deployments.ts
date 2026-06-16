@@ -16,10 +16,14 @@
  * under the License.
  */
 
-import { httpGET, httpPOST, SERVICE_BASE } from '../utils';
+import { httpGET, httpPOST, httpPUT, httpDELETE, SERVICE_BASE } from '../utils';
 import type {
   DeployAgentPathParams,
   DeployAgentRequest,
+  UpdateAgentDeploySettingsPathParams,
+  UpdateAgentDeploySettingsRequest,
+  UpdateAgentConfigurationsPathParams,
+  UpdateAgentConfigurationsRequest,
   DeploymentListResponse,
   DeploymentResponse,
   ListAgentDeploymentsPathParams,
@@ -40,6 +44,20 @@ import type {
   UpdateDeploymentStatePathParams,
   UpdateDeploymentStateRequest,
   UpdateDeploymentStateResponse,
+  PromoteAgentPathParams,
+  PromoteAgentRequest,
+  PromoteAgentResponse,
+  CreateDeploymentPipelinePathParams,
+  CreateDeploymentPipelineRequest,
+  UpdateOrgDeploymentPipelinePathParams,
+  DeleteDeploymentPipelinePathParams,
+  UpdateDeploymentPipelinePathParams,
+  UpdateDeploymentPipelineRequest,
+  UpdateEnvironmentPathParams,
+  UpdateEnvironmentRequest,
+  Environment,
+  CreateEnvironmentRequest,
+  CreateEnvironmentPathParams,
 } from '@agent-management-platform/types';
 
 
@@ -48,11 +66,11 @@ import type {
 export async function deployAgent(params: DeployAgentPathParams, body: DeployAgentRequest, getToken?: () => Promise<string>)
 : Promise<DeploymentResponse> {
     const { orgName = "default", projName = "default", agentName } = params;
-    
+
     if (!agentName) {
         throw new Error("agentName is required");
     }
-    
+
     const token = getToken ? await getToken() : undefined;
     const res = await httpPOST(
         `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/projects/${encodeURIComponent(projName)}/agents/${encodeURIComponent(agentName)}/deployments`,
@@ -61,6 +79,42 @@ export async function deployAgent(params: DeployAgentPathParams, body: DeployAge
     );
     if (!res.ok) throw await res.json();
     return res.json();
+}
+
+export async function updateAgentDeploySettings(params: UpdateAgentDeploySettingsPathParams,
+     body: UpdateAgentDeploySettingsRequest, getToken?: () => Promise<string>)
+: Promise<void> {
+    const { orgName = "default", projName = "default", agentName } = params;
+
+    if (!agentName) {
+        throw new Error("agentName is required");
+    }
+
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPUT(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/projects/${encodeURIComponent(projName)}/agents/${encodeURIComponent(agentName)}/deploy-settings`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+}
+
+// eslint-disable-next-line max-len
+export async function updateAgentConfigurations(params: UpdateAgentConfigurationsPathParams, body: UpdateAgentConfigurationsRequest, getToken?: () => Promise<string>)
+: Promise<void> {
+    const { orgName = "default", projName = "default", agentName } = params;
+
+    if (!agentName) {
+        throw new Error("agentName is required");
+    }
+
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPUT(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/projects/${encodeURIComponent(projName)}/agents/${encodeURIComponent(agentName)}/configurations`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
 }
 
 // eslint-disable-next-line max-len
@@ -199,4 +253,123 @@ export async function updateDeploymentState(params: UpdateDeploymentStatePathPar
     return res.json();
 }
 
+// eslint-disable-next-line max-len
+export async function promoteAgent(params: PromoteAgentPathParams, body: PromoteAgentRequest, getToken?: () => Promise<string>)
+: Promise<PromoteAgentResponse> {
+    const { orgName = "default", projName = "default", agentName } = params;
 
+    if (!agentName) {
+        throw new Error("agentName is required");
+    }
+
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPOST(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/projects/${encodeURIComponent(projName)}/agents/${encodeURIComponent(agentName)}/promote`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}
+
+// eslint-disable-next-line max-len
+export async function createDeploymentPipeline(params: CreateDeploymentPipelinePathParams, body: CreateDeploymentPipelineRequest, getToken?: () => Promise<string>)
+: Promise<DeploymentPipelineResponse> {
+    const { orgName = "default" } = params;
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPOST(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/deployment-pipelines`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}
+
+export async function updateOrgDeploymentPipeline(
+  params: UpdateOrgDeploymentPipelinePathParams,
+  body: UpdateDeploymentPipelineRequest,
+  getToken?: () => Promise<string>,
+): Promise<DeploymentPipelineResponse> {
+    const { orgName = "default", pipelineName } = params;
+    if (!pipelineName) {
+        throw new Error("pipelineName is required");
+    }
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPUT(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/deployment-pipelines/${encodeURIComponent(pipelineName)}`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}
+
+export async function deleteDeploymentPipeline(
+  params: DeleteDeploymentPipelinePathParams,
+  getToken?: () => Promise<string>,
+): Promise<void> {
+    const { orgName = "default", pipelineName } = params;
+    if (!pipelineName) {
+        throw new Error("pipelineName is required");
+    }
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpDELETE(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/deployment-pipelines/${encodeURIComponent(pipelineName)}`,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    // DELETE may return 204 No Content
+    if (res.status === 204 || res.headers.get('content-length') === '0') {
+        return;
+    }
+}
+
+// eslint-disable-next-line max-len
+export async function updateDeploymentPipeline(params: UpdateDeploymentPipelinePathParams, body: UpdateDeploymentPipelineRequest, getToken?: () => Promise<string>)
+: Promise<DeploymentPipelineResponse> {
+    const { orgName = "default", projName = "default" } = params;
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPUT(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/projects/${encodeURIComponent(projName)}/deployment-pipeline`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}
+
+// eslint-disable-next-line max-len
+export async function updateEnvironment(params: UpdateEnvironmentPathParams, body: UpdateEnvironmentRequest, getToken?: () => Promise<string>)
+: Promise<Environment> {
+    const { orgName = "default", envName } = params;
+
+    if (!envName) {
+        throw new Error("envName is required");
+    }
+
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPUT(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/environments/${encodeURIComponent(envName)}`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}
+
+export async function createEnvironment(
+    params: CreateEnvironmentPathParams,
+    body: CreateEnvironmentRequest,
+    getToken?: () => Promise<string>,
+): Promise<Environment> {
+    const { orgName = "default" } = params;
+    const token = getToken ? await getToken() : undefined;
+    const res = await httpPOST(
+        `${SERVICE_BASE}/orgs/${encodeURIComponent(orgName)}/environments`,
+        body,
+        { token },
+    );
+    if (!res.ok) throw await res.json();
+    return res.json();
+}

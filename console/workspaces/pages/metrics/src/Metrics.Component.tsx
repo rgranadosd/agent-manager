@@ -17,6 +17,7 @@
  */
 
 import React, { useCallback, useMemo } from "react";
+import { EnvironmentSelector } from "@agent-management-platform/shared-component";
 import { NoDataFound, PageLayout, TimeRangeSelector, useTimeRangeParams } from "@agent-management-platform/views";
 import { useParams, useSearchParams } from "react-router-dom";
 import { TraceListTimeRange } from "@agent-management-platform/types";
@@ -109,10 +110,11 @@ export const MetricsComponent: React.FC = () => {
 
   return (
     <PageLayout
-      title="Metrics"
+      title="System Metrics"
       disableIcon
       actions={
         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+          <EnvironmentSelector />
           <TimeRangeSelector
             preset={timeRange}
             customStart={customStartTime}

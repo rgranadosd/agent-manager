@@ -60,7 +60,7 @@ type OpenChoreoClient interface {
 	DeleteComponent(ctx context.Context, namespaceName, projectName, componentName string) error
 	ListComponents(ctx context.Context, namespaceName, projectName string) ([]*models.AgentResponse, error)
 	ListComponentsByKind(ctx context.Context, namespaceName, projectName, kindName string) ([]*models.AgentResponse, error)
-	ComponentExists(ctx context.Context, namespaceName, projectName, componentName string, verifyProject bool) (bool, error)
+	ComponentExists(ctx context.Context, namespaceName, projectName, componentName string) (bool, error)
 	AttachTraits(ctx context.Context, namespaceName, projectName, componentName string, traitRequests []TraitRequest) error
 	DetachTrait(ctx context.Context, namespaceName, projectName, componentName string, traitType TraitType) error
 	HasTrait(ctx context.Context, namespaceName, projectName, componentName string, traitType TraitType) (bool, error)
@@ -91,13 +91,29 @@ type OpenChoreoClient interface {
 	IsDeploymentInProgress(ctx context.Context, namespaceName, componentName, environment string) (bool, error)
 
 	// Environment Operations
+	CreateEnvironment(ctx context.Context, namespaceName string, req CreateEnvironmentRequest) (*models.EnvironmentResponse, error)
 	GetEnvironment(ctx context.Context, namespaceName, environmentName string) (*models.EnvironmentResponse, error)
+	UpdateEnvironment(ctx context.Context, namespaceName, environmentName string, req UpdateEnvironmentRequest) (*models.EnvironmentResponse, error)
+	DeleteEnvironment(ctx context.Context, namespaceName, environmentName string) error
 	ListEnvironments(ctx context.Context, namespaceName string) ([]*models.EnvironmentResponse, error)
+
+	// Release Binding Operations
+	UpdateReleaseBindingTraitConfigs(ctx context.Context, namespaceName, componentName, environment string, traitConfigs map[string]interface{}) error
+	ReplaceReleaseBindingWorkloadOverrides(ctx context.Context, namespaceName, componentName, environment string, envOverrides []EnvVar, fileOverrides []FileVar) error
+
+	// Promotion Operations
+	PromoteComponent(ctx context.Context, namespaceName, projectName, componentName, sourceEnvironment, targetEnvironment string, envOverrides []EnvVar, fileOverrides []FileVar, traitEnvConfigs map[string]interface{}) error
+	// GetSourceEnvWorkloadOverrides fetches the workload overrides (env vars and file mounts)
+	// from the source environment's release binding, converted to client types.
+	GetSourceEnvWorkloadOverrides(ctx context.Context, namespaceName, componentName, sourceEnvironment string) ([]EnvVar, []FileVar, error)
 
 	// Infrastructure Operations
 	GetProjectDeploymentPipeline(ctx context.Context, namespaceName, projectName string) (*models.DeploymentPipelineResponse, error)
+	CreateDeploymentPipeline(ctx context.Context, namespaceName, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error)
+	UpdateDeploymentPipeline(ctx context.Context, namespaceName, pipelineName string, displayName *string, description *string, promotionPaths []models.PromotionPath) (*models.DeploymentPipelineResponse, error)
+	DeleteOrgDeploymentPipeline(ctx context.Context, namespaceName string, pipelineName string) error
 	ListDeploymentPipelines(ctx context.Context, namespaceName string) ([]*models.DeploymentPipelineResponse, error)
-	ListDataPlanes(ctx context.Context, namespaceName string) ([]*models.DataPlaneResponse, error)
+	ListDataPlanes(ctx context.Context) ([]*models.DataPlaneResponse, error)
 
 	// WorkflowRun Operations
 	CreateWorkflowRun(ctx context.Context, namespaceName string, req CreateWorkflowRunRequest) (*WorkflowRunResponse, error)
@@ -126,7 +142,6 @@ type OpenChoreoClient interface {
 }
 
 type openChoreoClient struct {
-	baseURL  string
 	ocClient *gen.ClientWithResponses
 }
 
@@ -180,7 +195,6 @@ func NewOpenChoreoClient(cfg *Config) (OpenChoreoClient, error) {
 	}
 
 	return &openChoreoClient{
-		baseURL:  cfg.BaseURL,
 		ocClient: ocClient,
 	}, nil
 }

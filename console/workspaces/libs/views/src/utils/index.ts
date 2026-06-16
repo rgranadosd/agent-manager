@@ -16,5 +16,6 @@
  * under the License.
  */
 
+export * from './formatTraceWindow';
 export * from './provisionTypes';
 export * from './scoreColor';

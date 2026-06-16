@@ -57,7 +57,7 @@ func CreateMockOpenChoreoClient() *clientmocks.OpenChoreoClientMock {
 				CreatedAt:          time.Now(),
 			}, nil
 		},
-		ComponentExistsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string, verifyProject bool) (bool, error) {
+		ComponentExistsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string) (bool, error) {
 			return false, nil
 		},
 		CreateComponentFunc: func(ctx context.Context, namespaceName string, projectName string, req client.CreateComponentRequest) error {
@@ -172,6 +172,9 @@ func CreateMockOpenChoreoClient() *clientmocks.OpenChoreoClientMock {
 		},
 		GetComponentFileMountsFunc: func(ctx context.Context, namespaceName string, projectName string, componentName string, environment string) ([]models.FileMountEntry, error) {
 			return nil, nil
+		},
+		UpdateReleaseBindingTraitConfigsFunc: func(ctx context.Context, namespaceName, componentName, environment string, traitConfigs map[string]interface{}) error {
+			return nil
 		},
 	}
 }

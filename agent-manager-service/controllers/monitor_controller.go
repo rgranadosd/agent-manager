@@ -172,8 +172,9 @@ func (c *monitorController) ListMonitors(w http.ResponseWriter, r *http.Request)
 	orgName := r.PathValue(utils.PathParamOrgName)
 	projName := r.PathValue(utils.PathParamProjName)
 	agentName := r.PathValue(utils.PathParamAgentName)
+	environmentName := r.URL.Query().Get("environment")
 
-	result, err := c.monitorService.ListMonitors(ctx, orgName, projName, agentName)
+	result, err := c.monitorService.ListMonitors(ctx, orgName, projName, agentName, environmentName)
 	if err != nil {
 		log.Error("Failed to list monitors", "error", err)
 		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to list monitors")
