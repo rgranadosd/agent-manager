@@ -30,7 +30,8 @@ import { EnvironmentVariable } from "../components/EnvironmentVariable";
 import { FileMount } from "../components/FileMount";
 import { GitSecretSelector } from "../components/GitSecretSelector";
 import { LLMProviderSection } from "../components/LLMProviderSection";
-import type { CreateAgentFormValues, LLMProviderFormEntry } from "../form/schema";
+import { MCPProxySection } from "../components/MCPProxySection";
+import type { CreateAgentFormValues, LLMProviderFormEntry, MCPProxyFormEntry } from "../form/schema";
 import { BuildpackIcon, useExternalConfigModules } from "@agent-management-platform/views";
 
 interface InternalAgentFormProps {
@@ -48,6 +49,8 @@ interface InternalAgentFormProps {
   ) => string | undefined;
   llmProviders: LLMProviderFormEntry[];
   setLLMProviders: React.Dispatch<React.SetStateAction<LLMProviderFormEntry[]>>;
+  mcpProxies: MCPProxyFormEntry[];
+  setMCPProxies: React.Dispatch<React.SetStateAction<MCPProxyFormEntry[]>>;
   initialEnvironmentName: string | undefined;
   isInitialEnvironmentLoading?: boolean;
   // When the deployment pipeline has more than one environment, this carries
@@ -73,6 +76,8 @@ export const InternalAgentForm = ({
   validateField,
   llmProviders,
   setLLMProviders,
+  mcpProxies,
+  setMCPProxies,
   initialEnvironmentName,
   isInitialEnvironmentLoading = false,
   firstEnvOnlyNotice,
@@ -608,9 +613,37 @@ export const InternalAgentForm = ({
         agentDisplayName={formData.displayName}
         initialEnvironmentName={initialEnvironmentName}
         isInitialEnvironmentLoading={isInitialEnvironmentLoading}
-        externalEnvKeys={
-          new Set((formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k))
-        }
+        externalEnvKeys={(() => {
+          const agentNameUpper = formData.displayName
+            ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
+            : "AGENT";
+          return new Set([
+            ...(formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k),
+            ...mcpProxies.flatMap((e, i) => [
+              e.urlVarName ?? `${agentNameUpper}_MCP_${i + 1}_URL`,
+              e.apikeyVarName ?? `${agentNameUpper}_MCP_${i + 1}_API_KEY`,
+            ]),
+          ]);
+        })()}
+      />
+      <MCPProxySection
+        mcpProxies={mcpProxies}
+        setMCPProxies={setMCPProxies}
+        agentDisplayName={formData.displayName}
+        initialEnvironmentName={initialEnvironmentName}
+        isInitialEnvironmentLoading={isInitialEnvironmentLoading}
+        externalEnvKeys={(() => {
+          const agentNameUpper = formData.displayName
+            ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
+            : "AGENT";
+          return new Set([
+            ...(formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k),
+            ...llmProviders.flatMap((e, i) => [
+              e.urlVarName ?? `${agentNameUpper}_${i + 1}_URL`,
+              e.apikeyVarName ?? `${agentNameUpper}_${i + 1}_API_KEY`,
+            ]),
+          ]);
+        })()}
       />
       <EnvironmentVariable
         formData={formData}
@@ -619,12 +652,16 @@ export const InternalAgentForm = ({
           const agentNameUpper = formData.displayName
             ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
             : "AGENT";
-          return new Set(
-            llmProviders.flatMap((e, i) => [
+          return new Set([
+            ...llmProviders.flatMap((e, i) => [
               e.urlVarName ?? `${agentNameUpper}_${i + 1}_URL`,
               e.apikeyVarName ?? `${agentNameUpper}_${i + 1}_API_KEY`,
             ]),
-          );
+            ...mcpProxies.flatMap((e, i) => [
+              e.urlVarName ?? `${agentNameUpper}_MCP_${i + 1}_URL`,
+              e.apikeyVarName ?? `${agentNameUpper}_MCP_${i + 1}_API_KEY`,
+            ]),
+          ]);
         })()}
       />
       <FileMount

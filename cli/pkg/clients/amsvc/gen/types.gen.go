@@ -1819,6 +1819,9 @@ type CreateAgentRequest struct {
 	// InputInterface Endpoint configurations
 	InputInterface *InputInterface `json:"inputInterface,omitempty"`
 
+	// McpConfig Optional MCP proxy configurations to create atomically with the agent. Applied to the component's initial (lowest) environment. Name and type are auto-generated.
+	McpConfig *[]MCPConfigRequest `json:"mcpConfig,omitempty"`
+
 	// ModelConfig Optional LLM configurations to create atomically with the agent. Applied to the component's initial (lowest) environment. Name and type are auto-generated.
 	ModelConfig *[]ModelConfigRequest `json:"modelConfig,omitempty"`
 
@@ -3313,6 +3316,15 @@ type LogsResponse struct {
 	Logs       []LogEntry `json:"logs"`
 	TookMs     float32    `json:"tookMs"`
 	TotalCount int        `json:"totalCount"`
+}
+
+// MCPConfigRequest defines model for MCPConfigRequest.
+type MCPConfigRequest struct {
+	// EnvironmentVariables Optional custom environment variable names exposed to the agent
+	EnvironmentVariables *[]EnvironmentVariableConfig `json:"environmentVariables,omitempty"`
+
+	// ProxyName Handle of an already-configured MCP proxy. Applied to the component's initial (lowest) environment.
+	ProxyName string `json:"proxyName"`
 }
 
 // MetricDataPoint A single metric data point with timestamp and value

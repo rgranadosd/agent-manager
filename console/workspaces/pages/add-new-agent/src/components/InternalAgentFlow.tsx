@@ -25,7 +25,7 @@ import {
   OrgProjPathParams,
 } from "@agent-management-platform/types";
 import { useCreateAgent, useGetDeploymentPipeline } from "@agent-management-platform/api-client";
-import { createAgentSchema, type CreateAgentFormValues, type LLMProviderFormEntry } from "../form/schema";
+import { createAgentSchema, type CreateAgentFormValues, type LLMProviderFormEntry, type MCPProxyFormEntry } from "../form/schema";
 import { InternalAgentForm } from "../forms/InternalAgentForm";
 import { CreateButtons } from "./CreateButtons";
 import {
@@ -69,6 +69,7 @@ export const InternalAgentFlow: React.FC = () => {
     useFormValidation<CreateAgentFormValues>(createAgentSchema);
 
   const [llmProviders, setLLMProviders] = useState<LLMProviderFormEntry[]>([]);
+  const [mcpProxies, setMCPProxies] = useState<MCPProxyFormEntry[]>([]);
 
   const { mutate: createAgent, isPending, error } = useCreateAgent();
 
@@ -115,9 +116,9 @@ export const InternalAgentFlow: React.FC = () => {
       setLastSubmittedValidationErrors({});
     }
 
-    if (llmProviders.length > 0 && !initialEnvironmentName) {
+    if ((llmProviders.length > 0 || mcpProxies.length > 0) && !initialEnvironmentName) {
       setLastSubmittedValidationErrors({
-        llmProvider: "Unable to resolve the initial deployment environment for LLM provider configuration.",
+        llmProvider: "Unable to resolve the initial deployment environment for LLM provider / MCP proxy configuration.",
       });
       return;
     }
@@ -127,6 +128,7 @@ export const InternalAgentFlow: React.FC = () => {
       params,
       llmProviders,
       initialEnvironmentName,
+      mcpProxies,
     );
     createAgent(payload, {
       onSuccess: () => {
@@ -154,6 +156,7 @@ export const InternalAgentFlow: React.FC = () => {
     params,
     errors,
     llmProviders,
+    mcpProxies,
     initialEnvironmentName,
   ]);
 
@@ -180,6 +183,8 @@ export const InternalAgentFlow: React.FC = () => {
           validateField={validateField}
           llmProviders={llmProviders}
           setLLMProviders={setLLMProviders}
+          mcpProxies={mcpProxies}
+          setMCPProxies={setMCPProxies}
           initialEnvironmentName={initialEnvironmentName}
           isInitialEnvironmentLoading={isDeploymentPipelineLoading}
           firstEnvOnlyNotice={firstEnvOnlyNotice}
@@ -193,7 +198,10 @@ export const InternalAgentFlow: React.FC = () => {
 
         <CreateButtons
           lastSubmittedValidationErrors={lastSubmittedValidationErrors}
-          isPending={isPending || (llmProviders.length > 0 && isDeploymentPipelineLoading)}
+          isPending={
+            isPending ||
+            ((llmProviders.length > 0 || mcpProxies.length > 0) && isDeploymentPipelineLoading)
+          }
           onCancel={handleCancel}
           onSubmit={handleDeploy}
           isNameEmpty={!formData.name.trim()}
@@ -202,18 +210,24 @@ export const InternalAgentFlow: React.FC = () => {
             const agentNameUpper = formData.displayName
               ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
               : "AGENT";
-            const llmNames = llmProviders.flatMap((e, i) => [
-              e.urlVarName ?? `${agentNameUpper}_${i + 1}_URL`,
-              e.apikeyVarName ?? `${agentNameUpper}_${i + 1}_API_KEY`,
-            ]);
+            const llmNames = [
+              ...llmProviders.flatMap((e, i) => [
+                e.urlVarName ?? `${agentNameUpper}_${i + 1}_URL`,
+                e.apikeyVarName ?? `${agentNameUpper}_${i + 1}_API_KEY`,
+              ]),
+              ...mcpProxies.flatMap((e, i) => [
+                e.urlVarName ?? `${agentNameUpper}_MCP_${i + 1}_URL`,
+                e.apikeyVarName ?? `${agentNameUpper}_MCP_${i + 1}_API_KEY`,
+              ]),
+            ];
             const llmNameSet = new Set(llmNames);
-            // Duplicate LLM names
+            // Duplicate LLM/MCP names
             if (llmNames.length !== llmNameSet.size) return true;
             // Duplicate env keys
             const envKeyList = (formData.env ?? [])
               .map((e) => e.key).filter((k): k is string => !!k);
             if (envKeyList.length !== new Set(envKeyList).size) return true;
-            // Cross-conflict: env key matches an LLM name
+            // Cross-conflict: env key matches an LLM/MCP name
             return envKeyList.some((k) => llmNameSet.has(k));
           })()}
         />

@@ -30,6 +30,15 @@ export interface LLMProviderFormEntry {
   guardrails: Array<{ name: string; version: string; settings?: Record<string, unknown> }>;
 }
 
+// MCPProxyFormEntry is managed as plain state outside the Zod schema, mirroring
+// LLMProviderFormEntry. The selected MCP proxy is keyed by environment name; only
+// the initial environment's selection is sent on create.
+export interface MCPProxyFormEntry {
+  selectedProxyByEnv: Record<string, { id: string; name: string } | null>;
+  urlVarName?: string;
+  apikeyVarName?: string;
+}
+
 // Base fields shared by both flows
 const baseAgentFields = {
   displayName: z

@@ -884,6 +884,18 @@ func (s *agentManagerService) createComponentAgent(ctx context.Context, orgName,
 		}
 	}
 
+	// Preflight: validate referenced MCP proxies before creating any secrets or
+	// the component, so a bad proxy fails fast with no resources to roll back.
+	if len(req.McpConfig) > 0 {
+		handles := make([]string, 0, len(req.McpConfig))
+		for _, mc := range req.McpConfig {
+			handles = append(handles, mc.ProxyName)
+		}
+		if err := s.agentConfigurationService.ValidateMCPProxiesInCatalog(ctx, orgName, handles); err != nil {
+			return err
+		}
+	}
+
 	secretLocation := secretmanagersvc.SecretLocation{
 		OrgName:         orgName,
 		ProjectName:     projectName,
@@ -966,6 +978,14 @@ func (s *agentManagerService) createComponentAgent(ctx context.Context, orgName,
 	}
 
 	rollbackAgentCreate := func(reason string) {
+		// Best-effort cleanup of any LLM/MCP configurations created before the failure.
+		// Each per-config create rolls back only its own in-flight resources, so configs
+		// completed earlier in the loop (and their proxies/mappings/keys/secrets) would
+		// otherwise be orphaned once the component is deleted below. Use a non-cancellable
+		// context so cleanup still runs if the request context was cancelled.
+		isExternalAgent := req.Provisioning.Type == string(utils.ExternalAgent)
+		s.deleteAgentLLMConfigurations(context.WithoutCancel(ctx), orgName, projectName, req.Name, isExternalAgent)
+
 		if hasSecrets {
 			s.cleanupSecretsOnRollback(ctx, secretLocation)
 		}
@@ -984,6 +1004,15 @@ func (s *agentManagerService) createComponentAgent(ctx context.Context, orgName,
 		if err := s.createAgentLLMConfigs(ctx, orgName, projectName, firstEnv, req); err != nil {
 			s.logger.Error("Failed to create LLM configurations for agent", "agentName", req.Name, "error", err)
 			rollbackAgentCreate("LLM config failure")
+			return err
+		}
+	}
+
+	// Create MCP proxy mapping configurations (applies to both internal and external agents)
+	if len(req.McpConfig) > 0 {
+		if err := s.createAgentMCPConfigs(ctx, orgName, projectName, firstEnv, req); err != nil {
+			s.logger.Error("Failed to create MCP configurations for agent", "agentName", req.Name, "error", err)
+			rollbackAgentCreate("MCP config failure")
 			return err
 		}
 	}
@@ -1119,6 +1148,32 @@ func (s *agentManagerService) createAgentLLMConfigs(
 		}
 		if _, err := s.agentConfigurationService.Create(ctx, orgName, projectName, req.Name, createReq, "system"); err != nil {
 			return fmt.Errorf("failed to create LLM configuration %d: %w", i+1, err)
+		}
+	}
+	return nil
+}
+
+func (s *agentManagerService) createAgentMCPConfigs(
+	ctx context.Context, orgName, projectName, firstEnv string, req *spec.CreateAgentRequest,
+) error {
+	for i, mc := range req.McpConfig {
+		configName := fmt.Sprintf("%s-mcp-config", req.Name)
+		if len(req.McpConfig) > 1 {
+			configName = fmt.Sprintf("%s-mcp-config-%d", req.Name, i+1)
+		}
+		createReq := models.CreateAgentModelConfigRequest{
+			Name: configName,
+			Type: models.AgentConfigTypeMCP,
+			EnvMappings: map[string]models.EnvModelConfigRequest{
+				firstEnv: {
+					// createMCPConfig reads the MCP proxy handle from ProviderName.
+					ProviderName: mc.ProxyName,
+				},
+			},
+			EnvironmentVariables: convertEnvVars(mc.EnvironmentVariables),
+		}
+		if _, err := s.agentConfigurationService.Create(ctx, orgName, projectName, req.Name, createReq, "system"); err != nil {
+			return fmt.Errorf("failed to create MCP configuration %d: %w", i+1, err)
 		}
 	}
 	return nil

@@ -22,7 +22,7 @@ import { PageLayout, useFormValidation } from "@agent-management-platform/views"
 import { generatePath, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { absoluteRouteMap, type AgentKindVersionResponse, OrgProjPathParams } from "@agent-management-platform/types";
 import { useCreateAgent, useGetAgentKind, useGetDeploymentPipeline } from "@agent-management-platform/api-client";
-import { createAgentSchema, type CreateAgentFormValues, type LLMProviderFormEntry } from "../form/schema";
+import { createAgentSchema, type CreateAgentFormValues, type LLMProviderFormEntry, type MCPProxyFormEntry } from "../form/schema";
 import { CreateButtons } from "./CreateButtons";
 import {
   buildCatalogAgentPayload,
@@ -31,6 +31,7 @@ import {
 } from "../utils/buildAgentPayload";
 import { CatalogAgentForm } from "../forms/CatalogAgentForm";
 import { LLMProviderSection } from "./LLMProviderSection";
+import { MCPProxySection } from "./MCPProxySection";
 import { EnvironmentVariable } from "./EnvironmentVariable";
 import { FileMount } from "./FileMount";
 
@@ -119,6 +120,7 @@ export const CatalogAgentFlow: React.FC = () => {
   const { mutate: createAgent, isPending, error } = useCreateAgent();
 
   const [llmProviders, setLLMProviders] = useState<LLMProviderFormEntry[]>([]);
+  const [mcpProxies, setMCPProxies] = useState<MCPProxyFormEntry[]>([]);
 
   const params = useMemo<OrgProjPathParams>(
     () => ({
@@ -141,29 +143,27 @@ export const CatalogAgentFlow: React.FC = () => {
   // config applies only to the first environment.
   const firstEnvOnlyNotice = multipleEnvironments ? initialEnvironmentName : undefined;
 
-  const llmReservedNames = useMemo(() => {
-    const agentNameUpper = formData.displayName
-      ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
-      : "AGENT";
-
-    return new Set(
-      llmProviders.flatMap((entry, index) => [
-        entry.urlVarName ?? `${agentNameUpper}_${index + 1}_URL`,
-        entry.apikeyVarName ?? `${agentNameUpper}_${index + 1}_API_KEY`,
-      ]),
-    );
-  }, [formData.displayName, llmProviders]);
-
   const llmGeneratedNames = useMemo(() => {
     const agentNameUpper = formData.displayName
       ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
       : "AGENT";
 
-    return llmProviders.flatMap((entry, index) => [
-      entry.urlVarName ?? `${agentNameUpper}_${index + 1}_URL`,
-      entry.apikeyVarName ?? `${agentNameUpper}_${index + 1}_API_KEY`,
-    ]);
-  }, [formData.displayName, llmProviders]);
+    return [
+      ...llmProviders.flatMap((entry, index) => [
+        entry.urlVarName ?? `${agentNameUpper}_${index + 1}_URL`,
+        entry.apikeyVarName ?? `${agentNameUpper}_${index + 1}_API_KEY`,
+      ]),
+      ...mcpProxies.flatMap((entry, index) => [
+        entry.urlVarName ?? `${agentNameUpper}_MCP_${index + 1}_URL`,
+        entry.apikeyVarName ?? `${agentNameUpper}_MCP_${index + 1}_API_KEY`,
+      ]),
+    ];
+  }, [formData.displayName, llmProviders, mcpProxies]);
+
+  const llmReservedNames = useMemo(
+    () => new Set(llmGeneratedNames),
+    [llmGeneratedNames],
+  );
 
   const handleCancel = useCallback(() => {
     navigate(
@@ -186,9 +186,9 @@ export const CatalogAgentFlow: React.FC = () => {
       setLastSubmittedValidationErrors({});
     }
 
-    if (llmProviders.length > 0 && !initialEnvironmentName) {
+    if ((llmProviders.length > 0 || mcpProxies.length > 0) && !initialEnvironmentName) {
       setLastSubmittedValidationErrors({
-        llmProvider: "Unable to resolve the initial deployment environment for LLM provider configuration.",
+        llmProvider: "Unable to resolve the initial deployment environment for LLM provider / MCP proxy configuration.",
       });
       return;
     }
@@ -200,6 +200,7 @@ export const CatalogAgentFlow: React.FC = () => {
       effectiveVersion,
       llmProviders,
       initialEnvironmentName,
+      mcpProxies,
     );
     createAgent(payload, {
       onSuccess: () => {
@@ -220,7 +221,7 @@ export const CatalogAgentFlow: React.FC = () => {
       },
     });
   }, [validateForm, formData, createAgent, navigate, params, errors, llmProviders, kindId,
-    effectiveVersion, initialEnvironmentName]);
+    mcpProxies, effectiveVersion, initialEnvironmentName]);
 
   const backHref = useMemo(() => {
     return generatePath(
@@ -294,9 +295,38 @@ export const CatalogAgentFlow: React.FC = () => {
           agentDisplayName={formData.displayName}
           initialEnvironmentName={initialEnvironmentName}
           isInitialEnvironmentLoading={isDeploymentPipelineLoading}
-          externalEnvKeys={
-            new Set((formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k))
-          }
+          externalEnvKeys={(() => {
+            const agentNameUpper = formData.displayName
+              ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
+              : "AGENT";
+            return new Set([
+              ...(formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k),
+              ...mcpProxies.flatMap((e, i) => [
+                e.urlVarName ?? `${agentNameUpper}_MCP_${i + 1}_URL`,
+                e.apikeyVarName ?? `${agentNameUpper}_MCP_${i + 1}_API_KEY`,
+              ]),
+            ]);
+          })()}
+        />
+
+        <MCPProxySection
+          mcpProxies={mcpProxies}
+          setMCPProxies={setMCPProxies}
+          agentDisplayName={formData.displayName}
+          initialEnvironmentName={initialEnvironmentName}
+          isInitialEnvironmentLoading={isDeploymentPipelineLoading}
+          externalEnvKeys={(() => {
+            const agentNameUpper = formData.displayName
+              ? formData.displayName.toUpperCase().replace(/[^A-Z0-9]/g, "_")
+              : "AGENT";
+            return new Set([
+              ...(formData.env ?? []).map((e) => e.key).filter((k): k is string => !!k),
+              ...llmProviders.flatMap((e, i) => [
+                e.urlVarName ?? `${agentNameUpper}_${i + 1}_URL`,
+                e.apikeyVarName ?? `${agentNameUpper}_${i + 1}_API_KEY`,
+              ]),
+            ]);
+          })()}
         />
 
         <EnvironmentVariable
@@ -320,7 +350,10 @@ export const CatalogAgentFlow: React.FC = () => {
 
         <CreateButtons
           lastSubmittedValidationErrors={lastSubmittedValidationErrors}
-          isPending={isPending || (llmProviders.length > 0 && isDeploymentPipelineLoading)}
+          isPending={
+            isPending ||
+            ((llmProviders.length > 0 || mcpProxies.length > 0) && isDeploymentPipelineLoading)
+          }
           onCancel={handleCancel}
           onSubmit={handleDeploy}
           isNameEmpty={!formData.name.trim()}
