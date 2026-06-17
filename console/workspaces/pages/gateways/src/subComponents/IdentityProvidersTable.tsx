@@ -110,11 +110,31 @@ export function IdentityProvidersTable() {
     return (
       <Stack spacing={1}>
         <Box display="flex" justifyContent="flex-end">{addButton}</Box>
-        <Stack spacing={1} mt={1}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} variant="rounded" height={56} />
-          ))}
-        </Stack>
+        <ListingTable.Container disablePaper>
+          <Stack spacing={1} mt={1}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Stack
+                key={i}
+                direction="row"
+                alignItems="center"
+                spacing={2}
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 1,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  bgcolor: "background.paper",
+                }}
+              >
+                <Skeleton variant="text" width={160} height={20} />
+                <Skeleton variant="rounded" width={72} height={24} sx={{ flexShrink: 0 }} />
+                <Skeleton variant="text" sx={{ flex: 1 }} height={18} />
+                <Skeleton variant="text" width={100} height={18} sx={{ flexShrink: 0, ml: "auto" }} />
+              </Stack>
+            ))}
+          </Stack>
+        </ListingTable.Container>
         {dialog}
       </Stack>
     );

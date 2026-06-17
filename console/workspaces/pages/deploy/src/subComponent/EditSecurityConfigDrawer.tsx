@@ -306,12 +306,20 @@ export function EditSecurityConfigDrawer({
 
                 <Collapse in={authMode === "oauth"}>
                   <Form.Stack spacing={2} sx={{ mt: 1 }}>
-                    <Alert severity="info">
-                      Callers authenticate with a standard{" "}
-                      <code>Authorization: Bearer &lt;token&gt;</code> header.
-                      Identity providers (token issuers) are managed under{" "}
-                      Security &rarr; Identity Providers and selected below.
-                    </Alert>
+                    {hasIdentityProviders ? (
+                      <Alert severity="info">
+                        Callers authenticate with a standard{" "}
+                        <code>Authorization: Bearer &lt;token&gt;</code> header.
+                        Identity providers (token issuers) are managed under{" "}
+                        Security &rarr; Identity Providers and selected below.
+                      </Alert>
+                    ) : (
+                      <Alert severity="warning">
+                        No identity providers are configured for this environment.
+                        Add one under Security &rarr; Identity Providers before
+                        securing this endpoint with OAuth.
+                      </Alert>
+                    )}
 
                     <FormControl fullWidth>
                       <FormLabel>Identity Providers</FormLabel>
@@ -320,7 +328,7 @@ export function EditSecurityConfigDrawer({
                         options={identityProviderOptions}
                         value={oauthIssuers}
                         onChange={(_, v) => setOauthIssuers(v as string[])}
-                        disabled={isPending}
+                        disabled={isPending || !hasIdentityProviders}
                         renderTags={(vals, getTagProps) =>
                           vals.map((opt, i) => (
                             <Chip label={opt as string} size="small" {...getTagProps({ index: i })} key={opt as string} />
