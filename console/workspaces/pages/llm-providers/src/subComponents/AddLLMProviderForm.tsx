@@ -349,7 +349,7 @@ export const AddLLMProviderForm: React.FC<AddLLMProviderFormProps> = ({
           </Form.Stack>
 
           <FormControl fullWidth error={Boolean(errors.description)}>
-            <FormLabel>Short description</FormLabel>
+            <FormLabel>Description</FormLabel>
             <TextField
               fullWidth
               multiline
