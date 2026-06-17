@@ -208,7 +208,7 @@ export const EvalEvaluatorsOrganization: React.FC = () => {
               displayEmpty
               renderValue={(selected) =>
                 (selected as EvaluatorSource[]).length === 0
-                  ? "All sources"
+                  ? sourceFilterOptions.map((option) => sourceLabel(option.value)).join(", ")
                   : (selected as EvaluatorSource[]).map(sourceLabel).join(", ")
               }
               startAdornment={

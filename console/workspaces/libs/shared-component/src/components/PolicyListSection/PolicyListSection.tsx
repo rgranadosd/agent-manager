@@ -20,12 +20,13 @@ import React, { useCallback, useState } from "react";
 import {
   Box,
   Button,
+  Card,
   Form,
   IconButton,
   Stack,
   Typography,
 } from "@wso2/oxygen-ui";
-import { GripVertical, Plus, X } from "@wso2/oxygen-ui-icons-react";
+import { GripVertical, Plus, Trash } from "@wso2/oxygen-ui-icons-react";
 import type {
   GuardrailDefinition,
   GuardrailsCatalogResponse,
@@ -196,7 +197,7 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
           spacing={2}
         >
           <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
-            <Form.Header>{title}</Form.Header>
+            <Form.Subheader>{title}</Form.Subheader>
             <Typography variant="body2" color="text.secondary">
               {description}
             </Typography>
@@ -218,8 +219,9 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
             const isDragOver =
               dragOverIndex === index && draggingIndex !== index;
             return (
-              <Box
+              <Card
                 key={key}
+                variant="outlined"
                 draggable={reorderEnabled}
                 onDragStart={handleDragStart(index)}
                 onDragOver={handleDragOver(index)}
@@ -232,12 +234,9 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
                   gap: 1,
                   px: 1.5,
                   py: 1.25,
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: isDragOver ? "primary.main" : "divider",
-                  bgcolor: "background.paper",
                   cursor: "pointer",
                   opacity: isDragging ? 0.5 : 1,
+                  borderColor: isDragOver ? "primary.main" : undefined,
                   transition: "border-color 120ms ease, opacity 120ms ease",
                   "&:hover": { bgcolor: "action.hover" },
                 }}
@@ -272,15 +271,16 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
                 </Typography>
                 <IconButton
                   size="small"
+                  color="error"
                   aria-label={`Remove ${policy.displayName || policy.name}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onRemove(policy.name, policy.version);
                   }}
                 >
-                  <X size={16} />
+                  <Trash size={14} />
                 </IconButton>
-              </Box>
+              </Card>
             );
           })}
         </Stack>
