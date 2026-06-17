@@ -537,7 +537,7 @@ func (r *GatewayRepo) ListIdentityProvidersByEnvironment(environmentID string) (
 func (r *GatewayRepo) ListIdentityProvidersByOrg(orgName string) ([]IdentityProviderWithContext, error) {
 	var results []IdentityProviderWithContext
 	err := r.db.Table("gateway_identity_providers").
-		Select("gateway_identity_providers.*, gateways.name AS gateway_name, gateway_environment_mappings.environment_uuid AS environment_uuid").
+		Select("gateway_identity_providers.*, gateways.name AS gateway_name, gateway_environment_mappings.environment_uuid::text AS environment_uuid").
 		Joins("JOIN gateways ON gateways.uuid = gateway_identity_providers.gateway_uuid").
 		Joins("LEFT JOIN gateway_environment_mappings ON gateway_environment_mappings.gateway_uuid = gateway_identity_providers.gateway_uuid").
 		Where("gateways.organization_name = ? AND gateway_identity_providers.name <> ?", orgName, models.ReservedIdentityProviderName).
