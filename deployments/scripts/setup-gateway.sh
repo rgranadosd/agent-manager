@@ -56,14 +56,20 @@ else
     echo "⚠️  Gateway did not become ready in time"
 fi
 
-kubectl apply -f "${SCRIPT_DIR}/../values/otel-collector-rest-api.yaml"
+# The OTEL ingest RestApi is provisioned by the gateway extension chart
+# (templates/gateway-otel-restapi.yaml) with the restapi-target label that
+# binds it to this gateway. Wait for that chart-managed route to program; it
+# carries the jwt-auth claim mappings agents need to export traces. (The
+# standalone values/otel-collector-rest-api.yaml is not applied here: it lacks
+# the restapi-target label, so it can never bind and stays GatewayNotReady.)
+OTEL_RESTAPI="api-platform-${ORG_NAME}-${ENV_NAME}-otel-restapi"
 
-echo "⏳ Waiting for RestApi to be programmed..."
-if kubectl wait --for=condition=Programmed restapi/amp-otel-collector-tracing-rest-api -n openchoreo-data-plane --timeout=300s; then
-    echo "✅ RestApi is programmed"
+echo "⏳ Waiting for OTEL ingest RestApi to be programmed..."
+if kubectl wait --for=condition=Programmed "restapi/${OTEL_RESTAPI}" -n openchoreo-data-plane --timeout=300s; then
+    echo "✅ OTEL ingest RestApi is programmed"
 else
-    echo "❌ RestApi amp-otel-collector-tracing-rest-api did not become Programmed in time"
-    kubectl describe restapi/amp-otel-collector-tracing-rest-api -n openchoreo-data-plane || true
+    echo "❌ RestApi ${OTEL_RESTAPI} did not become Programmed in time"
+    kubectl describe "restapi/${OTEL_RESTAPI}" -n openchoreo-data-plane || true
     exit 1
 fi
 
