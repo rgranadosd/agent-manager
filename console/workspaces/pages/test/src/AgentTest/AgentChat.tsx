@@ -217,9 +217,10 @@ export function AgentChat() {
   if (oauthOnly) {
     return (
       <Alert severity="info">
-        OAuth authentication is enabled for this agent. In-console testing is
-        only available with API key security. Test this endpoint out-of-band
-        with an <code>Authorization: Bearer &lt;token&gt;</code> header.
+        <Typography variant="caption">
+          OAuth is enabled — test this endpoint out-of-band with an{" "}
+          <code>Authorization: Bearer &lt;token&gt;</code> header.
+        </Typography>
       </Alert>
     );
   }
