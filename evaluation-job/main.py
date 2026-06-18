@@ -555,6 +555,13 @@ def main() -> None:
         )
         sys.exit(1)
 
+    if not 0 < args.sampling_rate <= 1:
+        logger.error(
+            "Invalid --sampling-rate: %s. Expected a value in (0, 1]",
+            args.sampling_rate,
+        )
+        sys.exit(1)
+
     # Parse evaluators JSON
     try:
         evaluators_config = json.loads(args.evaluators)
@@ -654,7 +661,11 @@ def main() -> None:
         )
 
         # Run evaluation
-        result = monitor.run(start_time=args.trace_start, end_time=args.trace_end)
+        result = monitor.run(
+            start_time=args.trace_start,
+            end_time=args.trace_end,
+            sample_rate=args.sampling_rate,
+        )
 
         # Fail if there were errors (e.g. trace fetching failed)
         if result.errors:

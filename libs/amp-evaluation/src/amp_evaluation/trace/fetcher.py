@@ -33,10 +33,11 @@ Named with OTEL prefix to avoid collision with evaluation models
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, Callable
+from typing import List, Optional, Dict, Any, Callable, Iterable, Iterator, Tuple
 
 from amp_evaluation.trace.models import ToolDefinition
 from pathlib import Path
+import hashlib
 import json
 import logging
 import requests
@@ -424,18 +425,16 @@ class TraceFetcher:
         token = self.token_provider()
         return {"Authorization": f"Bearer {token}"}
 
-    def fetch_traces(self, start_time: str, end_time: str) -> List[OTELTrace]:
+    def _fetch_page(
+        self, start_time: str, end_time: str, limit: int, sort_order: str = "asc"
+    ) -> Tuple[List[OTELTrace], int]:
         """
-        Fetch traces from the trace service using /traces/export endpoint.
-
-        Args:
-            start_time: Start time in ISO 8601 format (e.g., "2025-12-16T06:58:02.433Z")
-            end_time: End time in ISO 8601 format
+        Fetch a single page from /traces/export.
 
         Returns:
-            List of Trace objects with OTEL/AMP attributes
+            Tuple of (traces in this page, totalCount reported by the API for the
+            full start_time..end_time range).
         """
-
         try:
             headers = self._get_auth_headers()
             response = requests.get(
@@ -447,6 +446,8 @@ class TraceFetcher:
                     "project": self.project,
                     "agent": self.agent,
                     "environment": self.environment,
+                    "limit": str(limit),
+                    "sortOrder": sort_order,
                 },
                 headers=headers,
                 timeout=self.timeout,
@@ -454,13 +455,62 @@ class TraceFetcher:
             response.raise_for_status()
             data = response.json()
 
-            # Parse TraceExportResponse
             traces_data = data.get("traces", [])
-            return [_parse_trace(t) for t in traces_data]
+            return [_parse_trace(t) for t in traces_data], data.get("totalCount", len(traces_data))
 
         except requests.exceptions.RequestException as e:
             logger.error("Failed to fetch traces: %s", _safe_request_error(e))
             raise
+
+    def fetch_traces(
+        self,
+        start_time: str,
+        end_time: str,
+        page_size: int = 1000,
+        max_traces: Optional[int] = None,
+    ) -> Iterator[OTELTrace]:
+        """
+        Fetch traces from the trace service using /traces/export endpoint.
+
+        /traces/export caps each response at `page_size` traces (max 1000) and has no
+        cursor, so this walks the time window in ascending order, re-querying from the
+        last seen trace's startTime until the range is exhausted. Traces are yielded
+        lazily as each page comes in.
+
+        Args:
+            start_time: Start time in ISO 8601 format (e.g., "2025-12-16T06:58:02.433Z")
+            end_time: End time in ISO 8601 format
+            page_size: Max traces to request per page (API max is 1000)
+            max_traces: Optional cap on the total number of traces to yield
+
+        Yields:
+            Trace objects with OTEL/AMP attributes, in ascending startTime order
+        """
+        seen_ids: set = set()
+        cursor_start = start_time
+        yielded = 0
+
+        while True:
+            page, _total_count = self._fetch_page(cursor_start, end_time, limit=page_size, sort_order="asc")
+            if not page:
+                return
+
+            new_traces = [t for t in page if t.traceId not in seen_ids]
+            if not new_traces:
+                # Entire page already seen: a startTime tie spans more than one page.
+                return
+
+            for trace in new_traces:
+                seen_ids.add(trace.traceId)
+                yield trace
+                yielded += 1
+                if max_traces is not None and yielded >= max_traces:
+                    return
+
+            if len(page) < page_size:
+                return
+
+            cursor_start = page[-1].startTime
 
     def fetch_trace_by_id(self, trace_id: str) -> Optional[OTELTrace]:
         """
@@ -530,6 +580,31 @@ class TraceFetcher:
             return response.status_code == 200
         except Exception:
             return False
+
+
+# ============================================================================
+# Sampling
+# ============================================================================
+
+
+def sample_traces(traces: Iterable[OTELTrace], sample_rate: float) -> Iterator[OTELTrace]:
+    """
+    Deterministically sample traces by hashing traceId, so the same trace is always
+    included or excluded for a given sample_rate regardless of fetch order or page
+    boundaries. Composes with any iterable (fetched lazily or already in memory).
+
+    Args:
+        traces: Traces to sample from
+        sample_rate: Fraction to keep, in (0, 1]
+    """
+    if not 0 < sample_rate <= 1:
+        raise ValueError(f"sample_rate must be in (0, 1], got {sample_rate}")
+
+    threshold = int(sample_rate * 10_000)
+    for trace in traces:
+        digest = hashlib.sha256(trace.traceId.encode()).hexdigest()
+        if int(digest, 16) % 10_000 < threshold:
+            yield trace
 
 
 # ============================================================================
