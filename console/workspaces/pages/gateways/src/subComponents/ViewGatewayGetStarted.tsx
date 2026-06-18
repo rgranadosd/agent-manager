@@ -32,10 +32,7 @@ import {
 } from "@wso2/oxygen-ui";
 import { Copy, Computer, Server, Cloud } from "@wso2/oxygen-ui-icons-react";
 import { globalConfig } from "@agent-management-platform/types";
-import {
-  getGatewayVersion,
-  getGatewayVersionHelm,
-} from "@agent-management-platform/shared-component";
+import { getGatewayVersionHelm } from "@agent-management-platform/shared-component";
 
 function getGatewayEnvFile(): string {
   return `wso2apip-ai-gateway-${getGatewayVersionHelm()}/configs/keys.env`;
