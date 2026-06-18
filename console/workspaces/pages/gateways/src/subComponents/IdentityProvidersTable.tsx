@@ -32,7 +32,6 @@ import { AlertTriangle, KeyRound, Plus, Trash } from "@wso2/oxygen-ui-icons-reac
 import { useParams } from "react-router-dom";
 import { useListIdentityProviders } from "@agent-management-platform/api-client";
 import type { IdentityProvider } from "@agent-management-platform/types";
-import { FadeIn } from "@agent-management-platform/views";
 import {
   ManageIdentityProviderDialog,
   type ManageIdentityProviderMode,
@@ -206,17 +205,29 @@ export function IdentityProvidersTable() {
                     <Typography variant="caption">{provider.environmentName || "—"}</Typography>
                   </ListingTable.Cell>
                   <ListingTable.Cell align="right">
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="flex-end">
+                    {/* Fixed-height container so swapping the (possibly wrapping)
+                        gateway name for the delete icon on hover never changes the
+                        row height — the height jump is what caused the flicker. */}
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                      justifyContent="flex-end"
+                      sx={{ minHeight: 32 }}
+                    >
                       {hoveredKey === key && !isSystem ? (
-                        <FadeIn>
-                          <Tooltip title="Remove identity provider">
-                            <IconButton color="error" size="small" onClick={() => openDelete(provider)}>
-                              <Trash size={16} />
-                            </IconButton>
-                          </Tooltip>
-                        </FadeIn>
+                        <Tooltip title="Remove identity provider">
+                          <IconButton color="error" size="small" onClick={() => openDelete(provider)}>
+                            <Trash size={16} />
+                          </IconButton>
+                        </Tooltip>
                       ) : (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                          title={provider.gatewayName || undefined}
+                        >
                           {provider.gatewayName || "—"}
                         </Typography>
                       )}
