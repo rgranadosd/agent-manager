@@ -25,10 +25,6 @@ import { globalConfig } from "@agent-management-platform/types";
  */
 export const DEFAULT_GATEWAY_VERSION = "v0.9.0";
 
-/** Local helm chart path for the gateway extension, relative to a repo clone root. */
-export const LOCAL_GATEWAY_EXTENSION_CHART_REF =
-  "deployments/helm-charts/wso2-amp-api-platform-gateway-extension";
-
 /** The configured gateway version, e.g. "v0.15.0" (carries a leading "v"). */
 export function getGatewayVersion(): string {
   return globalConfig.gatewayVersion?.trim() || DEFAULT_GATEWAY_VERSION;
