@@ -64,6 +64,9 @@ type CorsConfig struct {
 const (
 	DefaultOAuthHeaderName       = "Authorization"
 	DefaultOAuthAuthHeaderPrefix = "Bearer"
+	// DefaultOAuthForwardToken mirrors the gateway jwt-auth policy default: the
+	// validated token header is forwarded to the upstream service unless disabled.
+	DefaultOAuthForwardToken = true
 )
 
 // ReservedIdentityProviderName is the gateway identity provider used internally
@@ -86,11 +89,10 @@ func IsSystemIdentityProvider(name string) bool {
 
 type OAuthConfig struct {
 	Issuers          []string               `json:"issuers,omitempty"`
-	Audiences        []string               `json:"audiences,omitempty"`
-	RequiredScopes   []string               `json:"requiredScopes,omitempty"`
 	RequiredClaims   map[string]interface{} `json:"requiredClaims,omitempty"`
 	HeaderName       string                 `json:"headerName,omitempty"`
 	AuthHeaderPrefix string                 `json:"authHeaderPrefix,omitempty"`
+	ForwardToken     bool                   `json:"forwardToken"`
 }
 
 type AgentType struct {

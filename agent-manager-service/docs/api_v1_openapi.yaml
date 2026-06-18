@@ -8840,16 +8840,6 @@ components:
             Issuer names for token validation, referencing identity provider entries
             configured gateway-side. Must be non-empty when OAuth security is enabled,
             and every name must be one of the environment's configured identity providers.
-        audiences:
-          type: array
-          items:
-            type: string
-          description: Accepted token audiences (aud claim). Empty disables audience validation.
-        requiredScopes:
-          type: array
-          items:
-            type: string
-          description: Scopes the token must contain.
         requiredClaims:
           type: object
           additionalProperties: true
@@ -8862,6 +8852,13 @@ components:
           type: string
           description: Prefix before the token in the header value.
           default: Bearer
+        forwardToken:
+          type: boolean
+          description: >-
+            When true, the original token header is forwarded to the upstream
+            service after successful validation. When false, it is stripped
+            before the request is proxied.
+          default: true
 
     AgentResourceConfigsResponse:
       type: object

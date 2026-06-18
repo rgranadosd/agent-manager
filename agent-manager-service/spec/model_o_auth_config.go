@@ -21,16 +21,14 @@ var _ MappedNullable = &OAuthConfig{}
 type OAuthConfig struct {
 	// Issuer names for token validation, referencing identity provider entries configured gateway-side. Must be non-empty when OAuth security is enabled, and every name must be one of the environment's configured identity providers.
 	Issuers []string `json:"issuers,omitempty"`
-	// Accepted token audiences (aud claim). Empty disables audience validation.
-	Audiences []string `json:"audiences,omitempty"`
-	// Scopes the token must contain.
-	RequiredScopes []string `json:"requiredScopes,omitempty"`
 	// Claims (key/value pairs) the token must contain.
 	RequiredClaims map[string]interface{} `json:"requiredClaims,omitempty"`
 	// Request header carrying the token.
 	HeaderName *string `json:"headerName,omitempty"`
 	// Prefix before the token in the header value.
 	AuthHeaderPrefix *string `json:"authHeaderPrefix,omitempty"`
+	// When true, the original token header is forwarded to the upstream service after successful validation. When false, it is stripped before the request is proxied.
+	ForwardToken *bool `json:"forwardToken,omitempty"`
 }
 
 // NewOAuthConfig instantiates a new OAuthConfig object
@@ -43,6 +41,8 @@ func NewOAuthConfig() *OAuthConfig {
 	this.HeaderName = &headerName
 	var authHeaderPrefix string = "Bearer"
 	this.AuthHeaderPrefix = &authHeaderPrefix
+	var forwardToken bool = true
+	this.ForwardToken = &forwardToken
 	return &this
 }
 
@@ -55,6 +55,8 @@ func NewOAuthConfigWithDefaults() *OAuthConfig {
 	this.HeaderName = &headerName
 	var authHeaderPrefix string = "Bearer"
 	this.AuthHeaderPrefix = &authHeaderPrefix
+	var forwardToken bool = true
+	this.ForwardToken = &forwardToken
 	return &this
 }
 
@@ -88,70 +90,6 @@ func (o *OAuthConfig) HasIssuers() bool {
 // SetIssuers gets a reference to the given []string and assigns it to the Issuers field.
 func (o *OAuthConfig) SetIssuers(v []string) {
 	o.Issuers = v
-}
-
-// GetAudiences returns the Audiences field value if set, zero value otherwise.
-func (o *OAuthConfig) GetAudiences() []string {
-	if o == nil || IsNil(o.Audiences) {
-		var ret []string
-		return ret
-	}
-	return o.Audiences
-}
-
-// GetAudiencesOk returns a tuple with the Audiences field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OAuthConfig) GetAudiencesOk() ([]string, bool) {
-	if o == nil || IsNil(o.Audiences) {
-		return nil, false
-	}
-	return o.Audiences, true
-}
-
-// HasAudiences returns a boolean if a field has been set.
-func (o *OAuthConfig) HasAudiences() bool {
-	if o != nil && !IsNil(o.Audiences) {
-		return true
-	}
-
-	return false
-}
-
-// SetAudiences gets a reference to the given []string and assigns it to the Audiences field.
-func (o *OAuthConfig) SetAudiences(v []string) {
-	o.Audiences = v
-}
-
-// GetRequiredScopes returns the RequiredScopes field value if set, zero value otherwise.
-func (o *OAuthConfig) GetRequiredScopes() []string {
-	if o == nil || IsNil(o.RequiredScopes) {
-		var ret []string
-		return ret
-	}
-	return o.RequiredScopes
-}
-
-// GetRequiredScopesOk returns a tuple with the RequiredScopes field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OAuthConfig) GetRequiredScopesOk() ([]string, bool) {
-	if o == nil || IsNil(o.RequiredScopes) {
-		return nil, false
-	}
-	return o.RequiredScopes, true
-}
-
-// HasRequiredScopes returns a boolean if a field has been set.
-func (o *OAuthConfig) HasRequiredScopes() bool {
-	if o != nil && !IsNil(o.RequiredScopes) {
-		return true
-	}
-
-	return false
-}
-
-// SetRequiredScopes gets a reference to the given []string and assigns it to the RequiredScopes field.
-func (o *OAuthConfig) SetRequiredScopes(v []string) {
-	o.RequiredScopes = v
 }
 
 // GetRequiredClaims returns the RequiredClaims field value if set, zero value otherwise.
@@ -250,6 +188,38 @@ func (o *OAuthConfig) SetAuthHeaderPrefix(v string) {
 	o.AuthHeaderPrefix = &v
 }
 
+// GetForwardToken returns the ForwardToken field value if set, zero value otherwise.
+func (o *OAuthConfig) GetForwardToken() bool {
+	if o == nil || IsNil(o.ForwardToken) {
+		var ret bool
+		return ret
+	}
+	return *o.ForwardToken
+}
+
+// GetForwardTokenOk returns a tuple with the ForwardToken field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OAuthConfig) GetForwardTokenOk() (*bool, bool) {
+	if o == nil || IsNil(o.ForwardToken) {
+		return nil, false
+	}
+	return o.ForwardToken, true
+}
+
+// HasForwardToken returns a boolean if a field has been set.
+func (o *OAuthConfig) HasForwardToken() bool {
+	if o != nil && !IsNil(o.ForwardToken) {
+		return true
+	}
+
+	return false
+}
+
+// SetForwardToken gets a reference to the given bool and assigns it to the ForwardToken field.
+func (o *OAuthConfig) SetForwardToken(v bool) {
+	o.ForwardToken = &v
+}
+
 func (o OAuthConfig) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -263,12 +233,6 @@ func (o OAuthConfig) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Issuers) {
 		toSerialize["issuers"] = o.Issuers
 	}
-	if !IsNil(o.Audiences) {
-		toSerialize["audiences"] = o.Audiences
-	}
-	if !IsNil(o.RequiredScopes) {
-		toSerialize["requiredScopes"] = o.RequiredScopes
-	}
 	if !IsNil(o.RequiredClaims) {
 		toSerialize["requiredClaims"] = o.RequiredClaims
 	}
@@ -277,6 +241,9 @@ func (o OAuthConfig) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AuthHeaderPrefix) {
 		toSerialize["authHeaderPrefix"] = o.AuthHeaderPrefix
+	}
+	if !IsNil(o.ForwardToken) {
+		toSerialize["forwardToken"] = o.ForwardToken
 	}
 	return toSerialize, nil
 }

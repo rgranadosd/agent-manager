@@ -2089,13 +2089,16 @@ const (
 )
 
 // OAuthPolicyParams holds the jwt-auth policy parameters resolved for an agent.
+// The policy is authentication-only: it validates the token issuer and (optionally)
+// required claims. Authorization params (audiences, scopes) are not yet supported.
 type OAuthPolicyParams struct {
 	Issuers          []string
-	Audiences        []string
-	RequiredScopes   []string
 	RequiredClaims   map[string]interface{}
 	HeaderName       string
 	AuthHeaderPrefix string
+	// ForwardToken controls whether the validated token header is forwarded to
+	// the upstream service (true) or stripped before proxying (false).
+	ForwardToken bool
 }
 
 // OAuthPolicy returns the policy map for OAuth (JWT) authentication. Empty
@@ -2104,12 +2107,6 @@ func OAuthPolicy(p OAuthPolicyParams) map[string]interface{} {
 	params := map[string]interface{}{}
 	if len(p.Issuers) > 0 {
 		params["issuers"] = p.Issuers
-	}
-	if len(p.Audiences) > 0 {
-		params["audiences"] = p.Audiences
-	}
-	if len(p.RequiredScopes) > 0 {
-		params["requiredScopes"] = p.RequiredScopes
 	}
 	if len(p.RequiredClaims) > 0 {
 		params["requiredClaims"] = p.RequiredClaims
@@ -2124,6 +2121,7 @@ func OAuthPolicy(p OAuthPolicyParams) map[string]interface{} {
 	}
 	params["headerName"] = headerName
 	params["authHeaderPrefix"] = authHeaderPrefix
+	params["forwardToken"] = p.ForwardToken
 	return map[string]interface{}{
 		"name":    OAuthPolicyName,
 		"version": OAuthPolicyVersion,

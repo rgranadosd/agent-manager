@@ -90,16 +90,18 @@ func TestResolveAPIConfig_OAuthDefaults(t *testing.T) {
 	if cfg.OAuthAuthHeaderPrefix != models.DefaultOAuthAuthHeaderPrefix {
 		t.Errorf("expected header prefix %q, got %q", models.DefaultOAuthAuthHeaderPrefix, cfg.OAuthAuthHeaderPrefix)
 	}
+	if !cfg.OAuthForwardToken {
+		t.Errorf("expected forwardToken to default to true")
+	}
 }
 
 func TestResolveAPIConfig_OAuthFromRequest(t *testing.T) {
 	cfg := resolveAPIConfig(nil, boolPtr(false), nil, boolPtr(true), &spec.OAuthConfig{
 		Issuers:          []string{"CustomKeyManager"},
-		Audiences:        []string{"aud1"},
-		RequiredScopes:   []string{"read", "write"},
 		RequiredClaims:   map[string]interface{}{"role": "admin"},
 		HeaderName:       strPtr("X-Token"),
 		AuthHeaderPrefix: strPtr("Token"),
+		ForwardToken:     boolPtr(false),
 	}, true)
 
 	if cfg.EnableApiKeySecurity {
@@ -111,17 +113,14 @@ func TestResolveAPIConfig_OAuthFromRequest(t *testing.T) {
 	if len(cfg.OAuthIssuers) != 1 || cfg.OAuthIssuers[0] != "CustomKeyManager" {
 		t.Errorf("issuers not resolved from request: %v", cfg.OAuthIssuers)
 	}
-	if len(cfg.OAuthAudiences) != 1 || cfg.OAuthAudiences[0] != "aud1" {
-		t.Errorf("audiences not resolved: %v", cfg.OAuthAudiences)
-	}
-	if len(cfg.OAuthRequiredScopes) != 2 {
-		t.Errorf("scopes not resolved: %v", cfg.OAuthRequiredScopes)
-	}
 	if cfg.OAuthRequiredClaims["role"] != "admin" {
 		t.Errorf("claims not resolved: %v", cfg.OAuthRequiredClaims)
 	}
 	if cfg.OAuthHeaderName != "X-Token" || cfg.OAuthAuthHeaderPrefix != "Token" {
 		t.Errorf("header overrides not resolved: %q / %q", cfg.OAuthHeaderName, cfg.OAuthAuthHeaderPrefix)
+	}
+	if cfg.OAuthForwardToken {
+		t.Errorf("expected forwardToken override to false")
 	}
 }
 
@@ -199,13 +198,12 @@ func TestBuildPolicies_Modes(t *testing.T) {
 		}
 	})
 
-	t.Run("oauth with issuers and full params", func(t *testing.T) {
+	t.Run("oauth with issuers and claims", func(t *testing.T) {
 		cfg := base
 		cfg.EnableOAuthSecurity = true
 		cfg.OAuthIssuers = []string{"MyKeyManager"}
-		cfg.OAuthAudiences = []string{"aud1"}
-		cfg.OAuthRequiredScopes = []string{"read"}
 		cfg.OAuthRequiredClaims = map[string]interface{}{"role": "admin"}
+		cfg.OAuthForwardToken = true
 		p := buildPolicies(cfg)
 		jwt := policyByName(p, "jwt-auth")
 		if jwt == nil {
@@ -219,8 +217,16 @@ func TestBuildPolicies_Modes(t *testing.T) {
 		if len(issuers) != 1 || issuers[0] != "MyKeyManager" {
 			t.Errorf("expected issuers [MyKeyManager], got %v", params["issuers"])
 		}
-		if params["audiences"] == nil || params["requiredScopes"] == nil || params["requiredClaims"] == nil {
-			t.Errorf("expected full param set, got %v", params)
+		if params["requiredClaims"] == nil {
+			t.Errorf("expected requiredClaims, got %v", params)
+		}
+		// audiences/requiredScopes are authorization params the gateway does not
+		// implement — they must never appear in the policy.
+		if params["audiences"] != nil || params["requiredScopes"] != nil {
+			t.Errorf("did not expect audiences/requiredScopes in params, got %v", params)
+		}
+		if params["forwardToken"] != true {
+			t.Errorf("expected forwardToken true, got %v", params["forwardToken"])
 		}
 		if params["headerName"] != models.DefaultOAuthHeaderName || params["authHeaderPrefix"] != models.DefaultOAuthAuthHeaderPrefix {
 			t.Errorf("expected default header params, got %v / %v", params["headerName"], params["authHeaderPrefix"])

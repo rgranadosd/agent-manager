@@ -2387,11 +2387,10 @@ func (s *agentManagerService) DeployAgent(ctx context.Context, orgName string, p
 			CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
 			EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
 			OAuthIssuers:              apiCfg.OAuthIssuers,
-			OAuthAudiences:            apiCfg.OAuthAudiences,
-			OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
 			OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
 			OAuthHeaderName:           apiCfg.OAuthHeaderName,
 			OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
+			OAuthForwardToken:         apiCfg.OAuthForwardToken,
 		}
 		if configErr := s.agentConfigRepo.Upsert(agentConfig); configErr != nil {
 			s.logger.Error("Failed to persist instrumentation config to database", "agentName", agentName, "environment", lowestEnv, "error", configErr)
@@ -2420,11 +2419,10 @@ type resolvedCORSConfig struct {
 	// OAuth security (mutually exclusive with EnableApiKeySecurity).
 	EnableOAuthSecurity   bool
 	OAuthIssuers          []string
-	OAuthAudiences        []string
-	OAuthRequiredScopes   []string
 	OAuthRequiredClaims   map[string]interface{}
 	OAuthHeaderName       string
 	OAuthAuthHeaderPrefix string
+	OAuthForwardToken     bool
 }
 
 // resolveTracingConfig resolves instrumentation config: request > DB > default (true if withDefaults, else false).
@@ -2452,6 +2450,7 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 			CORSAllowHeaders:     strings.Split(defaultCORS.AllowHeaders, ","),
 			CORSAllowCredentials: defaultCORS.AllowCredentials,
 			EnableOAuthSecurity:  false,
+			OAuthForwardToken:    models.DefaultOAuthForwardToken,
 		}
 	}
 
@@ -2470,9 +2469,8 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 		resolved.CORSAllowCredentials = existingConfig.CORSAllowCredentials
 		resolved.EnableOAuthSecurity = existingConfig.EnableOAuthSecurity
 		resolved.OAuthIssuers = existingConfig.OAuthIssuers
-		resolved.OAuthAudiences = existingConfig.OAuthAudiences
-		resolved.OAuthRequiredScopes = existingConfig.OAuthRequiredScopes
 		resolved.OAuthRequiredClaims = existingConfig.OAuthRequiredClaims
+		resolved.OAuthForwardToken = existingConfig.OAuthForwardToken
 		if existingConfig.OAuthHeaderName != "" {
 			resolved.OAuthHeaderName = existingConfig.OAuthHeaderName
 		}
@@ -2509,12 +2507,6 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 		if oauthConfig.Issuers != nil {
 			resolved.OAuthIssuers = oauthConfig.Issuers
 		}
-		if oauthConfig.Audiences != nil {
-			resolved.OAuthAudiences = oauthConfig.Audiences
-		}
-		if oauthConfig.RequiredScopes != nil {
-			resolved.OAuthRequiredScopes = oauthConfig.RequiredScopes
-		}
 		if oauthConfig.RequiredClaims != nil {
 			resolved.OAuthRequiredClaims = oauthConfig.RequiredClaims
 		}
@@ -2523,6 +2515,9 @@ func resolveAPIConfig(existingConfig *models.AgentConfig, enableApiKeySecurity *
 		}
 		if oauthConfig.AuthHeaderPrefix != nil && *oauthConfig.AuthHeaderPrefix != "" {
 			resolved.OAuthAuthHeaderPrefix = *oauthConfig.AuthHeaderPrefix
+		}
+		if oauthConfig.ForwardToken != nil {
+			resolved.OAuthForwardToken = *oauthConfig.ForwardToken
 		}
 	}
 
@@ -2553,11 +2548,10 @@ func oauthConfigFromAgentConfig(cfg *models.AgentConfig) *models.OAuthConfig {
 	}
 	return &models.OAuthConfig{
 		Issuers:          issuers,
-		Audiences:        cfg.OAuthAudiences,
-		RequiredScopes:   cfg.OAuthRequiredScopes,
 		RequiredClaims:   cfg.OAuthRequiredClaims,
 		HeaderName:       headerName,
 		AuthHeaderPrefix: authHeaderPrefix,
+		ForwardToken:     cfg.OAuthForwardToken,
 	}
 }
 
@@ -2625,11 +2619,10 @@ func buildPolicies(cfg resolvedCORSConfig) []map[string]interface{} {
 		// validateOAuthSecurityConfig before reaching here, so no default is invented.
 		policies = append(policies, client.OAuthPolicy(client.OAuthPolicyParams{
 			Issuers:          cfg.OAuthIssuers,
-			Audiences:        cfg.OAuthAudiences,
-			RequiredScopes:   cfg.OAuthRequiredScopes,
 			RequiredClaims:   cfg.OAuthRequiredClaims,
 			HeaderName:       cfg.OAuthHeaderName,
 			AuthHeaderPrefix: cfg.OAuthAuthHeaderPrefix,
+			ForwardToken:     cfg.OAuthForwardToken,
 		}))
 	}
 	return policies
@@ -2888,11 +2881,10 @@ func (s *agentManagerService) PromoteAgent(ctx context.Context, orgName string, 
 			CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
 			EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
 			OAuthIssuers:              apiCfg.OAuthIssuers,
-			OAuthAudiences:            apiCfg.OAuthAudiences,
-			OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
 			OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
 			OAuthHeaderName:           apiCfg.OAuthHeaderName,
 			OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
+			OAuthForwardToken:         apiCfg.OAuthForwardToken,
 		}
 		if upsertErr := s.agentConfigRepo.Upsert(agentConfig); upsertErr != nil {
 			s.logger.Error("Failed to persist agent config for target environment", "agentName", agentName, "environment", req.TargetEnvironment, "error", upsertErr)
@@ -2988,11 +2980,10 @@ func (s *agentManagerService) UpdateAgentDeploySettings(ctx context.Context, org
 		CORSAllowCredentials:      apiCfg.CORSAllowCredentials,
 		EnableOAuthSecurity:       apiCfg.EnableOAuthSecurity,
 		OAuthIssuers:              apiCfg.OAuthIssuers,
-		OAuthAudiences:            apiCfg.OAuthAudiences,
-		OAuthRequiredScopes:       apiCfg.OAuthRequiredScopes,
 		OAuthRequiredClaims:       apiCfg.OAuthRequiredClaims,
 		OAuthHeaderName:           apiCfg.OAuthHeaderName,
 		OAuthAuthHeaderPrefix:     apiCfg.OAuthAuthHeaderPrefix,
+		OAuthForwardToken:         apiCfg.OAuthForwardToken,
 	}
 	if existingConfig != nil {
 		// Preserve any pinned instrumentation_version that wasn't part of this request.

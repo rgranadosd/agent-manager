@@ -140,11 +140,10 @@ func convertToConfigurations(configs *models.Configurations) *spec.Configuration
 	if configs.OAuthConfig != nil {
 		oauthConfig := spec.OAuthConfig{
 			Issuers:          configs.OAuthConfig.Issuers,
-			Audiences:        configs.OAuthConfig.Audiences,
-			RequiredScopes:   configs.OAuthConfig.RequiredScopes,
 			RequiredClaims:   configs.OAuthConfig.RequiredClaims,
 			HeaderName:       &configs.OAuthConfig.HeaderName,
 			AuthHeaderPrefix: &configs.OAuthConfig.AuthHeaderPrefix,
+			ForwardToken:     &configs.OAuthConfig.ForwardToken,
 		}
 		result.OauthConfig = &oauthConfig
 	}
