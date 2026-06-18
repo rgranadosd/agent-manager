@@ -105,7 +105,7 @@ func runSet(ctx context.Context, o *SetOptions) error {
 		return render.Error(o.IO, o.Scope, err)
 	}
 
-	mapping := amsvc.EnvModelConfigRequest{ProviderName: o.Provider}
+	mapping := amsvc.EnvModelConfigRequest{ProviderName: stringPtr(o.Provider)}
 	envVars := buildEnvVars(o)
 
 	var result *amsvc.AgentModelConfigResponse

@@ -53,10 +53,14 @@ const configType = "llm"
 func toEnvModelConfigRequest(m amsvc.EnvProviderConfigMappings) amsvc.EnvModelConfigRequest {
 	req := amsvc.EnvModelConfigRequest{}
 	if m.Configuration != nil {
-		req.ProviderName = m.Configuration.ProviderName
+		req.ProviderName = stringPtr(m.Configuration.ProviderName)
 		req.Configuration = amsvc.EnvProviderConfiguration{Policies: m.Configuration.Policies}
 	}
 	return req
+}
+
+func stringPtr(v string) *string {
+	return &v
 }
 
 // mergeExistingEnvMappings translates the full env-mapping set of an existing

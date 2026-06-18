@@ -47,11 +47,11 @@ func Test_mergeExistingEnvMappings_translatesEveryEnv(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("len(got) = %d, want 2", len(got))
 	}
-	if got["dev"].ProviderName != "openai" {
-		t.Errorf("dev provider = %q, want openai", got["dev"].ProviderName)
+	if got["dev"].ProviderName == nil || *got["dev"].ProviderName != "openai" {
+		t.Errorf("dev provider = %v, want openai", got["dev"].ProviderName)
 	}
-	if got["prod"].ProviderName != "anthropic" {
-		t.Errorf("prod provider = %q, want anthropic", got["prod"].ProviderName)
+	if got["prod"].ProviderName == nil || *got["prod"].ProviderName != "anthropic" {
+		t.Errorf("prod provider = %v, want anthropic", got["prod"].ProviderName)
 	}
 	// Policies must survive the round-trip translation.
 	dp := got["dev"].Configuration.Policies
@@ -62,8 +62,8 @@ func Test_mergeExistingEnvMappings_translatesEveryEnv(t *testing.T) {
 
 func Test_toEnvModelConfigRequest_nilConfiguration(t *testing.T) {
 	got := toEnvModelConfigRequest(amsvc.EnvProviderConfigMappings{EnvironmentName: "dev"})
-	if got.ProviderName != "" {
-		t.Errorf("ProviderName = %q, want empty", got.ProviderName)
+	if got.ProviderName != nil {
+		t.Errorf("ProviderName = %q, want nil", *got.ProviderName)
 	}
 	if got.Configuration.Policies != nil {
 		t.Errorf("Policies = %#v, want nil", got.Configuration.Policies)
