@@ -765,7 +765,10 @@ export function useNavigationItems(): Array<
                   type: "item" as const,
                   icon: <identityProvidersMetadata.icon size={20} />,
                   href: generatePath(securityOrgRoute.children.identityProviders.path, { orgId }),
-                  isActive: !!matchPath(securityOrgRoute.children.identityProviders.wildPath, pathname),
+                  isActive: !!matchPath(
+                    securityOrgRoute.children.identityProviders.wildPath,
+                    pathname,
+                  ),
                 },
               ],
             },
