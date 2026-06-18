@@ -142,6 +142,11 @@ export const ViewMCPServerComponent = () => {
     return ordered.length > 0 ? ordered : configured;
   }, [config, environments]);
 
+  // Tabs and labels should show the human-friendly environment display name,
+  // falling back to the raw name when no display name is set.
+  const envDisplayName = (name: string) =>
+    environments.find((e) => e.name === name)?.displayName ?? name;
+
   const selectedEnvName = envNames[selectedEnvIndex] ?? envNames[0] ?? "";
   const envMapping = config?.envMappings?.[selectedEnvName];
   const providerConfig = envMapping?.configuration;
@@ -265,7 +270,7 @@ export const ViewMCPServerComponent = () => {
     );
   }
 
-  const pageTitle = sourceProxy?.name ?? sourceProxyName ?? config.name;
+  const pageTitle = config.name || sourceProxy?.name || sourceProxyName;
   const mcpProxyHref =
     orgId && sourceProxyName
       ? generatePath(
@@ -428,27 +433,30 @@ export const ViewMCPServerComponent = () => {
       }
     >
       <Stack spacing={3}>
-        {envNames.length > 1 && (
-          <>
-            <Typography variant="body2" color="text.secondary">
-              Each environment uses a separate MCP server mapping.
-            </Typography>
-            <Tabs
-              value={selectedEnvIndex}
-              onChange={(_, value: number) => setSelectedEnvIndex(value)}
-              sx={{ mb: 1 }}
-            >
-              {envNames.map((envName, index) => (
-                <Tab key={envName} label={envName} value={index} />
-              ))}
-            </Tabs>
-          </>
-        )}
-
         <Form.Section>
-          <Form.Header>MCP Server</Form.Header>
+          <Form.Subheader>MCP Server</Form.Subheader>
           <Stack spacing={2.5}>
-            <Card>
+            {envNames.length > 1 && (
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  Each environment uses a separate MCP server mapping.
+                </Typography>
+                <Tabs
+                  value={selectedEnvIndex}
+                  onChange={(_, value: number) => setSelectedEnvIndex(value)}
+                  sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
+                >
+                  {envNames.map((envName, index) => (
+                    <Tab
+                      key={envName}
+                      label={envDisplayName(envName)}
+                      value={index}
+                    />
+                  ))}
+                </Tabs>
+              </>
+            )}
+            <Card variant="outlined">
               <CardContent sx={{ position: "relative" }}>
                 {mcpProxyHref && (
                   <Tooltip title="View MCP proxy" placement="top" arrow>
@@ -463,14 +471,32 @@ export const ViewMCPServerComponent = () => {
                     </IconButton>
                   </Tooltip>
                 )}
-                <Stack direction="row" spacing={2} flexGrow={1} alignItems="center">
-                  <Avatar sx={{ height: 40, width: 40, backgroundColor: "action.selected" }}>
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  flexGrow={1}
+                  alignItems="flex-start"
+                >
+                  <Avatar
+                    sx={{
+                      height: 36,
+                      width: 36,
+                      backgroundColor: "action.selected",
+                    }}
+                  >
                     <Box sx={{ color: "text.secondary", display: "inline-flex" }}>
-                      <MCPLogo size={22} />
+                      <MCPLogo size={20} />
                     </Box>
                   </Avatar>
-                  <Stack spacing={0.25} flexGrow={1}>
-                    <Stack direction="row" spacing={0.25} alignItems="center">
+                  <Stack spacing={0.5} flexGrow={1} sx={{ minWidth: 0 }}>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      alignItems="center"
+                      flexWrap="wrap"
+                      useFlexGap
+                      sx={{ minHeight: 36 }}
+                    >
                       <Typography variant="h6">
                         {sourceProxy?.name ?? sourceProxyName ?? config.name}
                       </Typography>
@@ -478,54 +504,51 @@ export const ViewMCPServerComponent = () => {
                         <Chip label={sourceProxy.version} size="small" variant="outlined" />
                       )}
                     </Stack>
-                    <Divider orientation="vertical" />
-                    <Stack direction="column" spacing={0.5}>
-                      <Typography variant="caption" color="text.secondary">
-                        Context:{" "}
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color={sourceProxy?.context ? "text.primary" : "text.disabled"}
-                        >
-                          {sourceProxy?.context ?? getPathname(providerConfig?.url) ?? "Not configured"}
-                        </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Context:{" "}
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        color={sourceProxy?.context ? "text.primary" : "text.disabled"}
+                      >
+                        {sourceProxy?.context ?? getPathname(providerConfig?.url) ?? "Not configured"}
                       </Typography>
-                      {envMappings.length > 0 ? (
-                        envMappings.map(([envName, mapping]) => (
-                          <Typography
-                            key={envName}
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {`Environment URL (${envName})`}:{" "}
-                            <Typography
-                              component="span"
-                              variant="body2"
-                              color={
-                                mapping.configuration?.url
-                                  ? "text.primary"
-                                  : "text.disabled"
-                              }
-                              sx={{ wordBreak: "break-all" }}
-                            >
-                              {mapping.configuration?.url ?? "Not configured"}
-                            </Typography>
-                          </Typography>
-                        ))
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Environment URL:{" "}
+                    </Typography>
+                    {envMappings.length > 0 ? (
+                      envMappings.map(([envName, mapping]) => (
+                        <Typography
+                          key={envName}
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          {`Environment URL (${envDisplayName(envName)})`}:{" "}
                           <Typography
                             component="span"
-                            variant="body2"
-                            color={providerConfig?.url ? "text.primary" : "text.disabled"}
+                            variant="caption"
+                            color={
+                              mapping.configuration?.url
+                                ? "text.primary"
+                                : "text.disabled"
+                            }
                             sx={{ wordBreak: "break-all" }}
                           >
-                            {providerConfig?.url ?? "Not configured"}
+                            {mapping.configuration?.url ?? "Not configured"}
                           </Typography>
                         </Typography>
-                      )}
-                    </Stack>
+                      ))
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Environment URL:{" "}
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          color={providerConfig?.url ? "text.primary" : "text.disabled"}
+                          sx={{ wordBreak: "break-all" }}
+                        >
+                          {providerConfig?.url ?? "Not configured"}
+                        </Typography>
+                      </Typography>
+                    )}
                   </Stack>
                 </Stack>
               </CardContent>

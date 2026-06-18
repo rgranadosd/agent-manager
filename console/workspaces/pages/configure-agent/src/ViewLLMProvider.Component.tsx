@@ -47,7 +47,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { AlertTriangle, BookOpen, Pencil } from "@wso2/oxygen-ui-icons-react";
+import { AlertTriangle, BookOpen, Edit } from "@wso2/oxygen-ui-icons-react";
 import { generatePath, useLocation, useNavigate, useParams } from "react-router-dom";
 import { absoluteRouteMap } from "@agent-management-platform/types";
 import {
@@ -548,9 +548,8 @@ export const ViewLLMProviderComponent: React.FC = () => {
 
   const apiKeyValue = providerConfig?.authInfo?.value;
 
-  const pageTitle = catalogProvider?.name
-    ?? providerConfig?.providerName
-    ?? config.name;
+  const pageTitle =
+    config.name || catalogProvider?.name || providerConfig?.providerName;
 
   const hasEmptyEnvVarName = (config.environmentVariables ?? []).some(
     (ev) => (envVarNames[ev.key] ?? ev.name).trim() === "",
@@ -804,7 +803,7 @@ export const ViewLLMProviderComponent: React.FC = () => {
         )}
 
         <Form.Section>
-          <Form.Header>Service Provider</Form.Header>
+          <Form.Subheader>Service Provider</Form.Subheader>
           <Stack spacing={3}>
 
             {environments.length > 1 && (
@@ -817,7 +816,7 @@ export const ViewLLMProviderComponent: React.FC = () => {
                 <Tabs
                   value={selectedEnvIndex}
                   onChange={(_, v: number) => setSelectedEnvIndex(v)}
-                  sx={{ mb: 2 }}
+                  sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
                 >
                   {environments.map((enTab, idx) => (
                     <Tab
@@ -866,7 +865,7 @@ export const ViewLLMProviderComponent: React.FC = () => {
                   : null);
 
               return (
-                <Card>
+                <Card variant="outlined">
                   <CardContent sx={{ position: "relative" }}>
                     <Tooltip title="Change provider" placement="top" arrow>
                       <IconButton
@@ -876,7 +875,7 @@ export const ViewLLMProviderComponent: React.FC = () => {
                         onClick={() => setProviderDrawerOpen(true)}
                         aria-label="Change provider"
                       >
-                        <Pencil size={16} />
+                        <Edit size={16} />
                       </IconButton>
                     </Tooltip>
                     <ProviderDisplay

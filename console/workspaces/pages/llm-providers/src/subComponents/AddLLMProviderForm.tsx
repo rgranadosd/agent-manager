@@ -110,6 +110,10 @@ const INITIAL_FORM_VALUES: AddLLMProviderFormValues = {
   gatewayIds: [],
 };
 
+// Provider template cards keep a minimum width so names never truncate; the grid
+// fits as many columns as the container allows and reflows responsively.
+const TEMPLATE_GRID_COLUMNS = "repeat(auto-fill, minmax(min(100%, 240px), 1fr))";
+
 export const AddLLMProviderForm: React.FC<AddLLMProviderFormProps> = ({
   templates,
   isLoadingTemplates,
@@ -389,10 +393,7 @@ export const AddLLMProviderForm: React.FC<AddLLMProviderFormProps> = ({
             sx={{
               display: "grid",
               gap: 1.5,
-              // Fixed minimum card width so provider names never truncate; the
-              // grid reflows by fitting as many columns as the width allows.
-              gridTemplateColumns:
-                "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
+              gridTemplateColumns: TEMPLATE_GRID_COLUMNS,
             }}
           >
             {Array.from({ length: 8 }).map((_, i) => (
@@ -409,10 +410,7 @@ export const AddLLMProviderForm: React.FC<AddLLMProviderFormProps> = ({
             mt: 1.5,
             display: "grid",
             gap: 1.5,
-            // Fixed minimum card width so provider names never truncate; the
-            // grid reflows by fitting as many columns as the width allows.
-            gridTemplateColumns:
-              "repeat(auto-fill, minmax(min(100%, 240px), 1fr))",
+            gridTemplateColumns: TEMPLATE_GRID_COLUMNS,
           }}
         >
             {sortedTemplates.map((template) => {
