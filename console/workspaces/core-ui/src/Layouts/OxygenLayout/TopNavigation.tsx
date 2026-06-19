@@ -16,9 +16,7 @@ import {
   useTheme,
 } from "@wso2/oxygen-ui";
 import {
-  Building2,
   ChevronRight,
-  Package,
   Plus,
   X,
 } from "@wso2/oxygen-ui-icons-react";
@@ -77,7 +75,7 @@ export function TopNavigation() {
   return (
     <>
       <Header.Switchers showDivider={false}>
-        {organizations?.organizations && organizations.organizations.length > 1 && (
+        {organizations?.organizations && (
           <>
             {selectedOrganization && (
               <ComplexSelect
@@ -86,14 +84,9 @@ export function TopNavigation() {
                 sx={{ minWidth: 180 }}
                 label="Organizations"
                 renderValue={() => (
-                  <>
-                    <ComplexSelect.MenuItem.Icon>
-                      <Building2 size={20} />
-                    </ComplexSelect.MenuItem.Icon>
                     <ComplexSelect.MenuItem.Text
                       primary={selectedOrganization?.displayName}
                     />
-                  </>
                 )}
                 onChange={(e) => {
                   const selectedOrgName = e.target.value as string;
@@ -109,9 +102,6 @@ export function TopNavigation() {
                     key={organization.name}
                     value={organization.name}
                   >
-                    <ComplexSelect.MenuItem.Icon>
-                      <Building2 size={20} />
-                    </ComplexSelect.MenuItem.Icon>
                     <ComplexSelect.MenuItem.Text
                       primary={organization.displayName ?? organization.name}
                     />
@@ -133,9 +123,6 @@ export function TopNavigation() {
                   label="Projects"
                   renderValue={() => (
                     <>
-                      <ComplexSelect.MenuItem.Icon>
-                        <Package size={20} />
-                      </ComplexSelect.MenuItem.Icon>
                       <ComplexSelect.MenuItem.Text
                         primary={selectedProject?.displayName}
                       />
@@ -174,9 +161,6 @@ export function TopNavigation() {
                       key={project.name}
                       value={project.name}
                     >
-                      <ComplexSelect.MenuItem.Icon>
-                        <Package size={20} />
-                      </ComplexSelect.MenuItem.Icon>
                       <ComplexSelect.MenuItem.Text
                         primary={project.displayName}
                       />
@@ -249,7 +233,6 @@ export function TopNavigation() {
                         );
                       }}
                     >
-                      <Package size={20} style={{ marginRight: 8 }} />
                       {project.displayName}
                     </MenuItem>
                   ))}
