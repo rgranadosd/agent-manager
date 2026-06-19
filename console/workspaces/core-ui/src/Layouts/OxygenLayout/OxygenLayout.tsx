@@ -40,14 +40,6 @@ const getFlattenedItems = (
 ) => {
   return [...mainItems, ...groupedItems.flatMap((item) => item.items)];
 };
-const getNavItemByKey = (
-  mainItems: NavigationItem[],
-  groupedItems: NavigationSection[],
-  key: string,
-) => {
-  const flattenedItems = getFlattenedItems(mainItems, groupedItems);
-  return flattenedItems.find((item) => item.label === key);
-};
 
 export function OxygenLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -88,13 +80,6 @@ export function OxygenLayout() {
 
   const handleLogout = async () => {
     await logout();
-  };
-
-  const handleNavigationClick = (itemKey: string) => {
-    const item = getNavItemByKey(mainItems, groupedItems, itemKey);
-    if (item?.href) {
-      navigate(item.href);
-    }
   };
 
   return (
@@ -148,7 +133,6 @@ export function OxygenLayout() {
           activeItem={activeItem}
           mainItems={mainItems}
           groupedItems={groupedItems}
-          onNavigationClick={handleNavigationClick}
         />
       </AppShell.Sidebar>
 
