@@ -85,6 +85,7 @@ const sidebars: SidebarsConfig = {
             'reference/cli/agent',
             'reference/cli/skills',
             'reference/cli/version',
+            'reference/cli/api',
           ],
         },
       ],

@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/wso2/agent-manager/cli/pkg/cmd/agent"
+	"github.com/wso2/agent-manager/cli/pkg/cmd/api"
 	amcontext "github.com/wso2/agent-manager/cli/pkg/cmd/context"
 	"github.com/wso2/agent-manager/cli/pkg/cmd/llmprovider"
 	"github.com/wso2/agent-manager/cli/pkg/cmd/project"
@@ -45,6 +46,7 @@ func NewRootCmd(f *cmdutil.Factory) (*cobra.Command, error) {
 
 	cmd.AddCommand(NewLoginCmd(f))
 	cmd.AddCommand(agent.NewAgentCmd(f))
+	cmd.AddCommand(api.NewAPICmd(f))
 	cmd.AddCommand(amcontext.NewContextCmd(f))
 	cmd.AddCommand(llmprovider.NewLLMProviderCmd(f))
 	cmd.AddCommand(project.NewProjectCmd(f))
