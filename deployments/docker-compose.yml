@@ -67,7 +67,7 @@ services:
       - AMP_VERSION=v0.8.0
       - OPEN_CHOREO_BASE_URL=http://api.openchoreo.localhost:8195
       # OpenBao/Vault Secret Management Configuration
-      # NOTE: Run ./deployments/scripts/port-forward.sh to forward OpenBao from k3d cluster
+      # NOTE: Run ./deployments/setup/port-forward.sh to forward OpenBao from k3d cluster
       # Uses the default OpenBao that comes with OpenChoreo for both user and system secrets
       - SECRET_MANAGER_PROVIDER=openbao
       - OPENBAO_URL=http://host.docker.internal:8200
