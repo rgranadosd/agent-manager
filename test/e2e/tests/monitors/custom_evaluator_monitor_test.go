@@ -42,7 +42,7 @@ var _ = Describe("Past Monitor - Custom Evaluator", Ordered, Label("monitors", "
 	)
 
 	BeforeAll(func() {
-		Expect(Shared).NotTo(BeNil(), "shared agent must be available")
+		Expect(SharedITHelpdeskAgent).NotTo(BeNil(), "shared agent must be available")
 
 		suffix = uuid.New().String()[:8]
 		customEvalIdentifier = "e2e-test-mon-evaluator-" + suffix
@@ -50,8 +50,8 @@ var _ = Describe("Past Monitor - Custom Evaluator", Ordered, Label("monitors", "
 
 		By("Invoking shared agent to generate traces")
 		traceStartTime = time.Now().Add(-10 * time.Minute)
-		endpointURL := Shared.EndpointURL + "/chat"
-		agentops.InvokeAgentEndpoint(endpointURL, Shared.InvokeReq, Shared.APIKey)
+		endpointURL := SharedITHelpdeskAgent.EndpointURL + "/chat"
+		agentops.InvokeAgentEndpoint(endpointURL, SharedITHelpdeskAgent.InvokeReq, SharedITHelpdeskAgent.APIKey)
 		traceEndTime = time.Now()
 		GinkgoWriter.Printf("Invocation completed, trace window: %s to %s\n",
 			traceStartTime.Format(time.RFC3339), traceEndTime.Format(time.RFC3339))
@@ -84,8 +84,8 @@ def evaluate(trace: Trace) -> EvalResult:
 		samplingRate := 1.0
 		mon := monitor.CreateMonitor(Default, Client, &monitor.CreateMonitorParams{
 			OrgName:     Cfg.DefaultOrg,
-			ProjectName: Shared.ProjectName,
-			AgentName:   Shared.AgentName,
+			ProjectName: SharedITHelpdeskAgent.ProjectName,
+			AgentName:   SharedITHelpdeskAgent.AgentName,
 			Request: framework.CreateMonitorRequest{
 				Name:            customPastMonitorName,
 				DisplayName:     "E2E Custom Past Monitor",
@@ -110,8 +110,8 @@ def evaluate(trace: Trace) -> EvalResult:
 	It("should have a completed run", func() {
 		run := monitor.WaitForMonitorRun(Client, &monitor.WaitForMonitorRunParams{
 			OrgName:     Cfg.DefaultOrg,
-			ProjectName: Shared.ProjectName,
-			AgentName:   Shared.AgentName,
+			ProjectName: SharedITHelpdeskAgent.ProjectName,
+			AgentName:   SharedITHelpdeskAgent.AgentName,
 			MonitorName: customPastMonitorName,
 			Timeout:     10 * time.Minute,
 		})
@@ -122,8 +122,8 @@ def evaluate(trace: Trace) -> EvalResult:
 	It("should have scores from the custom evaluator", func() {
 		runs := monitor.ListMonitorRuns(Default, Client, &monitor.ListMonitorRunsParams{
 			OrgName:       Cfg.DefaultOrg,
-			ProjectName:   Shared.ProjectName,
-			AgentName:     Shared.AgentName,
+			ProjectName:   SharedITHelpdeskAgent.ProjectName,
+			AgentName:     SharedITHelpdeskAgent.AgentName,
 			MonitorName:   customPastMonitorName,
 			IncludeScores: true,
 		})

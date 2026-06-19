@@ -41,10 +41,10 @@ var _ = Describe("Future Monitor", Ordered, Label("monitors", "future-monitor"),
 	)
 
 	BeforeAll(func() {
-		Expect(Shared).NotTo(BeNil(), "shared agent must be available")
+		Expect(SharedITHelpdeskAgent).NotTo(BeNil(), "shared agent must be available")
 
 		suffix = uuid.New().String()[:8]
-		futureMonitorName = "e2e-test-mon-monitor-" + suffix
+		futureMonitorName = framework.E2EMonitorPrefix + suffix
 
 		By("Finding built-in length_compliance evaluator")
 		evals := evaluator.ListEvaluators(Default, Client, Cfg.DefaultOrg)
@@ -63,8 +63,8 @@ var _ = Describe("Future Monitor", Ordered, Label("monitors", "future-monitor"),
 		samplingRate := 1.0
 		mon := monitor.CreateMonitor(Default, Client, &monitor.CreateMonitorParams{
 			OrgName:     Cfg.DefaultOrg,
-			ProjectName: Shared.ProjectName,
-			AgentName:   Shared.AgentName,
+			ProjectName: SharedITHelpdeskAgent.ProjectName,
+			AgentName:   SharedITHelpdeskAgent.AgentName,
 			Request: framework.CreateMonitorRequest{
 				Name:            futureMonitorName,
 				DisplayName:     "E2E Future Monitor",
@@ -86,8 +86,8 @@ var _ = Describe("Future Monitor", Ordered, Label("monitors", "future-monitor"),
 	})
 
 	It("should invoke agent to generate traces", func() {
-		endpointURL := Shared.EndpointURL + "/chat"
-		agentops.InvokeAgentEndpoint(endpointURL, Shared.InvokeReq, Shared.APIKey)
+		endpointURL := SharedITHelpdeskAgent.EndpointURL + "/chat"
+		agentops.InvokeAgentEndpoint(endpointURL, SharedITHelpdeskAgent.InvokeReq, SharedITHelpdeskAgent.APIKey)
 		GinkgoWriter.Println("Agent invoked to generate traces for future monitor")
 	})
 
@@ -95,8 +95,8 @@ var _ = Describe("Future Monitor", Ordered, Label("monitors", "future-monitor"),
 		By(fmt.Sprintf("Waiting for future monitor %q to complete a run", futureMonitorName))
 		run := monitor.WaitForMonitorRun(Client, &monitor.WaitForMonitorRunParams{
 			OrgName:     Cfg.DefaultOrg,
-			ProjectName: Shared.ProjectName,
-			AgentName:   Shared.AgentName,
+			ProjectName: SharedITHelpdeskAgent.ProjectName,
+			AgentName:   SharedITHelpdeskAgent.AgentName,
 			MonitorName: futureMonitorName,
 			Timeout:     8 * time.Minute,
 		})
@@ -106,7 +106,7 @@ var _ = Describe("Future Monitor", Ordered, Label("monitors", "future-monitor"),
 	})
 
 	It("should delete the future monitor", func() {
-		monitor.DeleteMonitor(Default, Client, Cfg.DefaultOrg, Shared.ProjectName, Shared.AgentName, futureMonitorName)
+		monitor.DeleteMonitor(Default, Client, Cfg.DefaultOrg, SharedITHelpdeskAgent.ProjectName, SharedITHelpdeskAgent.AgentName, futureMonitorName)
 		GinkgoWriter.Printf("Future monitor deleted: %s\n", futureMonitorName)
 	})
 })

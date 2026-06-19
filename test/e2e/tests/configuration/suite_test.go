@@ -14,7 +14,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package traces
+// Package configuration holds e2e tests for the agent configuration domain:
+// redeploying with modified environment variables, verifying non-secret config
+// changes, and detecting invalid secrets. It reuses the shared single-env IT
+// helpdesk agent rather than building its own.
+
+package configuration
 
 import (
 	"testing"
@@ -26,15 +31,18 @@ import (
 	"github.com/wso2/agent-manager/test/e2e/testsetup"
 )
 
-var (
-	Client                *framework.AMPClient
-	Cfg                   *framework.Config
-	SharedITHelpdeskAgent *framework.SharedITHelpdeskAgent
-)
+// Client is the shared API client used by all configuration tests.
+var Client *framework.AMPClient
 
-func TestTraces(t *testing.T) {
+// Cfg is the shared test configuration.
+var Cfg *framework.Config
+
+// SharedITHelpdeskAgent is the shared single-environment IT helpdesk agent.
+var SharedITHelpdeskAgent *framework.SharedITHelpdeskAgent
+
+func TestConfiguration(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Traces Suite")
+	RunSpecs(t, "Configuration Suite")
 }
 
 var _ = BeforeSuite(func() {

@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package traces
+package catalog
 
 import (
 	"testing"
@@ -23,18 +23,17 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/wso2/agent-manager/test/e2e/framework"
-	"github.com/wso2/agent-manager/test/e2e/testsetup"
 )
 
-var (
-	Client                *framework.AMPClient
-	Cfg                   *framework.Config
-	SharedITHelpdeskAgent *framework.SharedITHelpdeskAgent
-)
+// Client is the shared API client used by the catalog suite.
+var Client *framework.AMPClient
 
-func TestTraces(t *testing.T) {
+// Cfg is the shared test configuration.
+var Cfg *framework.Config
+
+func TestCatalog(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Traces Suite")
+	RunSpecs(t, "Catalog Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -50,7 +49,4 @@ var _ = BeforeSuite(func() {
 
 	By("Verifying default organization")
 	framework.VerifyDefaultOrg(Client, Cfg.DefaultOrg)
-
-	By("Reusing shared single-env IT helpdesk agent")
-	SharedITHelpdeskAgent = testsetup.SetupSharedITHelpdeskAgent(Client, Cfg)
 })

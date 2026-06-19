@@ -14,12 +14,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Validates LLM provider integration with an internal agent: provider creation,
-// agent deployment with model config, and LLM env var injection.
+// Validates LLM provider integration with the IT helpdesk agent: provider creation,
+// agent deployment with USE_LLM_PROVIDER=true, and LLM env var injection.
 
 package llmprovider
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,30 +40,30 @@ var _ = Describe("Internal Agent with LLM Provider Config", Label("llm-provider"
 	var (
 		agentName string
 		suffix    string
-		envVars   map[string]string
 
 		providerID  string
 		gatewayUUID string
+
+		endpointURL string
+		invokeReq   json.RawMessage
 
 		createReq framework.CreateAgentRequest
 	)
 
 	BeforeAll(func() {
 		suffix = uuid.New().String()[:8]
-		agentName = "e2e-test-agent-" + suffix
-		providerID = "e2e-test-llm-provider-" + suffix
+		agentName = framework.E2EAgentPrefix + suffix
+		providerID = framework.E2ELLMProviderPrefix + suffix
 
-		envVars = map[string]string{
-			"TAVILY_API_KEY": Cfg.TavilyAPIKey,
-			"OPENAI_API_KEY": Cfg.OpenAIAPIKey,
-			"DATABASE_URL":   "http://localhost:5000",
-		}
-
-		createReq = framework.NewInternalChatAgentRequest(agentName, "Internal agent for e2e LLM provider config test", envVars)
+		createReq = framework.NewITHelpdeskAgentRequest(
+			agentName,
+			"IT helpdesk agent for e2e LLM provider config test",
+			map[string]string{"USE_LLM_PROVIDER": "true"},
+		)
 	})
 
 	It("should have a running AI gateway", func() {
-		gatewayUUID = gateway.WaitForActiveAIGateway(Client, Cfg.DefaultOrg, "api-platform-default-default", 3*time.Minute)
+		gatewayUUID = gateway.WaitForActiveGatewayForEnv(Client, Cfg.DefaultOrg, Cfg.DefaultEnv, 3*time.Minute)
 	})
 
 	It("should create an LLM provider using the OpenAI template", func() {
@@ -111,13 +112,12 @@ var _ = Describe("Internal Agent with LLM Provider Config", Label("llm-provider"
 	})
 
 	It("should create an internal agent with model config", func() {
-		// Add model config referencing the LLM provider with custom env var names
 		createReq.ModelConfig = []framework.ModelConfigRequest{
 			{
 				ProviderName: providerID,
 				EnvironmentVariables: []framework.EnvironmentVariableConfig{
-					{Key: "apikey", Name: "LLM_API_KEY"},
-					{Key: "url", Name: "LLM_BASE_URL"},
+					{Key: "url", Name: "LLM_PROVIDER_URL"},
+					{Key: "apikey", Name: "LLM_PROVIDER_KEY"},
 				},
 			},
 		}
@@ -150,26 +150,57 @@ var _ = Describe("Internal Agent with LLM Provider Config", Label("llm-provider"
 		})
 	})
 
+	It("should become ready", func() {
+		deployment.WaitForReadiness(Client, Cfg.DefaultOrg, framework.E2ESharedProjectName, agentName, Cfg.DefaultEnv, 10*time.Minute)
+
+		endpoints := deployment.GetEndpoints(Default, Client,
+			Cfg.DefaultOrg, framework.E2ESharedProjectName, agentName, Cfg.DefaultEnv)
+		for _, ep := range endpoints {
+			if ep.URL != "" {
+				endpointURL = ep.URL
+				break
+			}
+		}
+		Expect(endpointURL).NotTo(BeEmpty(), "agent endpoint URL should not be empty")
+
+		invokeReq = framework.DefaultInvokeRequest()
+		GinkgoWriter.Printf("Agent ready: endpoint=%s\n", endpointURL)
+	})
+
+	It("should respond to invocation via LLM provider", func() {
+		// Create the API key in the same It as the invocation so its DeferCleanup
+		// revoke runs only after the invocation completes (keeps key count bounded).
+		apiKeyResp := agentops.CreateAgentAPIKey(Default, Client,
+			Cfg.DefaultOrg, framework.E2ESharedProjectName, agentName, Cfg.DefaultEnv,
+			framework.CreateAgentAPIKeyRequest{
+				DisplayName: "e2e-llm-provider-key",
+				ExpiresAt:   time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+			})
+		Expect(apiKeyResp.ApiKey).NotTo(BeEmpty(), "agent API key should not be empty")
+
+		endpoint := endpointURL + "/chat"
+		GinkgoWriter.Printf("Endpoint: %s\n", endpoint)
+		agentops.InvokeAgentEndpoint(endpoint, invokeReq, apiKeyResp.ApiKey)
+	})
+
 	It("should have LLM provider env vars in configurations", func() {
 		By("Verifying configurations include LLM provider variables")
 		configs := configuration.GetAgentConfigurations(Default, Client,
 			Cfg.DefaultOrg, framework.E2ESharedProjectName, agentName, Cfg.DefaultEnv)
 
-		GinkgoWriter.Printf("Agent configurations (%d items):\n", len(configs.Configurations))
-		for _, c := range configs.Configurations {
+		GinkgoWriter.Printf("Agent configurations (%d items):\n", len(configs.Configurations.Env))
+		for _, c := range configs.Configurations.Env {
 			GinkgoWriter.Printf("  %s (sensitive: %v)\n", c.Key, c.IsSensitive)
 		}
 
-		// Verify the model config env vars are injected
 		configKeys := make(map[string]bool)
-		for _, c := range configs.Configurations {
+		for _, c := range configs.Configurations.Env {
 			configKeys[c.Key] = true
 		}
 
-		// The LLM provider env vars (LLM_API_KEY, LLM_BASE_URL) should be present
-		Expect(configKeys).To(HaveKey("LLM_API_KEY"),
-			"LLM_API_KEY from model config should be in configurations")
-		Expect(configKeys).To(HaveKey("LLM_BASE_URL"),
-			"LLM_BASE_URL from model config should be in configurations")
+		Expect(configKeys).To(HaveKey("LLM_PROVIDER_URL"),
+			"LLM_PROVIDER_URL from model config should be in configurations")
+		Expect(configKeys).To(HaveKey("LLM_PROVIDER_KEY"),
+			"LLM_PROVIDER_KEY from model config should be in configurations")
 	})
 })

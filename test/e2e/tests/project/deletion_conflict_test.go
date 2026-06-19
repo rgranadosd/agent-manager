@@ -43,9 +43,9 @@ var _ = Describe("Project Deletion Conflict", Label("project", "deletion-conflic
 	BeforeAll(func() {
 		suffix := uuid.New().String()[:8]
 		projName = framework.E2EProjectPrefix + suffix
-		agentName = "e2e-test-agent-" + suffix
+		agentName = framework.E2EAgentPrefix + suffix
 
-		createProjReq = framework.NewCreateProjectRequest(projName, "E2E Deletion Conflict Project", "Project for testing deletion conflict scenarios")
+		createProjReq = framework.NewCreateProjectRequest(projName, "E2E Deletion Conflict Project", "Project for testing deletion conflict scenarios", "default")
 		createReq = framework.NewExternalAgentRequest(agentName, "External agent for e2e project deletion conflict test")
 	})
 

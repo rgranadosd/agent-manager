@@ -19,12 +19,14 @@ package deployment
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/wso2/agent-manager/test/e2e/framework"
+	agentops "github.com/wso2/agent-manager/test/e2e/operations/agent"
 )
 
 // WaitForDeploymentParams holds parameters for waiting on a deployment.
@@ -40,6 +42,22 @@ type WaitForDeploymentParams struct {
 	// This prevents falsely passing when a previous deployment is still
 	// "active" and the new one hasn't started yet.
 	DeployedAfter time.Time
+}
+
+// WaitForReadiness verifies that the agent's runtime is up and serving in the
+// given environment.
+//
+// Temporarily hack added to verify that agent is up and running, replace this
+// with readiness probe check once its available.
+func WaitForReadiness(client *framework.AMPClient, orgName, projName, agentName, envName string, timeout time.Duration) {
+	agentops.WaitForRuntimeLog(client, &agentops.WaitForRuntimeLogParams{
+		OrgName:     orgName,
+		ProjectName: projName,
+		AgentName:   agentName,
+		Environment: envName,
+		SearchText:  "Uvicorn running on",
+		Timeout:     timeout,
+	})
 }
 
 // WaitForDeployed polls the deployments API until the agent is "active" in
@@ -68,6 +86,13 @@ func WaitForDeployed(client *framework.AMPClient, params *WaitForDeploymentParam
 		g.Expect(exists).To(BeTrue(), "environment %q not found in deployments", params.Environment)
 
 		ginkgo.GinkgoWriter.Printf("Deployment status: %s, lastDeployed: %s\n", dep.Status, dep.LastDeployed.Format(time.RFC3339))
+
+		// Fail fast on a terminal failure status rather than polling until timeout.
+		switch strings.ToLower(dep.Status) {
+		case "error", "failed":
+			StopTrying(fmt.Sprintf("deployment for env %q is in terminal %q state", params.Environment, dep.Status)).Now()
+		}
+
 		g.Expect(dep.Status).To(Equal("active"), "deployment not yet active")
 
 		if !params.DeployedAfter.IsZero() {
