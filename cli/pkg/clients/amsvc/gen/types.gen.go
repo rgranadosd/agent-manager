@@ -3626,6 +3626,9 @@ type MonitorScoresResponse struct {
 
 // OAuthConfig OAuth security configuration for the agent endpoint. Callers authenticate with a standard Authorization Bearer token validated by the gateway.
 type OAuthConfig struct {
+	// Audiences Accepted token audiences (aud claim). Validation succeeds only when at least one configured audience is present in the token. Empty disables audience validation.
+	Audiences *[]string `json:"audiences,omitempty"`
+
 	// AuthHeaderPrefix Prefix before the token in the header value.
 	AuthHeaderPrefix *string `json:"authHeaderPrefix,omitempty"`
 
@@ -3637,9 +3640,6 @@ type OAuthConfig struct {
 
 	// Issuers Issuer names for token validation, referencing identity provider entries configured gateway-side. Must be non-empty when OAuth security is enabled, and every name must be one of the environment's configured identity providers.
 	Issuers *[]string `json:"issuers,omitempty"`
-
-	// RequiredClaims Claims (key/value pairs) the token must contain.
-	RequiredClaims *map[string]interface{} `json:"requiredClaims,omitempty"`
 }
 
 // OrganizationListItem defines model for OrganizationListItem.
