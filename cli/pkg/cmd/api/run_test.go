@@ -261,6 +261,47 @@ func TestApplyHeaders_Malformed(t *testing.T) {
 	}
 }
 
+// A user-supplied Authorization header is preserved and token resolution is
+// skipped entirely (so it works even when not logged in).
+func TestRunAPI_AuthHeaderSkipsTokenResolution(t *testing.T) {
+	_, captured, o, _ := newTestServer(t, http.StatusOK, nil, `{}`)
+	o.RequestPath = "/agents"
+	o.RequestMethod = "GET"
+	o.RequestHeaders = []string{"Authorization: Bearer mine"}
+	o.Token = func(context.Context) (string, error) {
+		t.Fatal("Token must not be called when an Authorization header is supplied")
+		return "", nil
+	}
+
+	if err := runAPI(context.Background(), o); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := captured.headers.Get("Authorization"); got != "Bearer mine" {
+		t.Errorf("Authorization = %q, want Bearer mine", got)
+	}
+}
+
+// --input - and an @- field both read stdin; requesting both must error before
+// any HTTP request rather than silently sending malformed data.
+func TestRunAPI_RejectsDoubleStdin(t *testing.T) {
+	srv, captured, o, ios := newTestServer(t, http.StatusOK, nil, `{}`)
+	_ = srv
+	ios.In = strings.NewReader(`payload`)
+	o.RequestPath = "/agents"
+	o.RequestMethod = "POST"
+	o.RequestMethodPassed = true
+	o.RequestInputFile = "-"
+	o.MagicFields = []string{"data=@-"}
+
+	err := runAPI(context.Background(), o)
+	if err == nil {
+		t.Fatal("expected an error when --input - and an @- field both consume stdin")
+	}
+	if captured.method != "" {
+		t.Errorf("no HTTP request should be made; got method %q", captured.method)
+	}
+}
+
 func TestRunAPI_InputFromStdin(t *testing.T) {
 	srv, captured, o, ios := newTestServer(t, http.StatusOK, nil, `{}`)
 	_ = srv

@@ -96,6 +96,9 @@ func textError(ios *iostreams.IOStreams, err error) error {
 // return Rendered(err) so the top-level runner exits non-zero but does not
 // re-print the error or append usage.
 func Rendered(err error) error {
+	if err == nil {
+		return nil
+	}
 	return &renderedError{err: err}
 }
 

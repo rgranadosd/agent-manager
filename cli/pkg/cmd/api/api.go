@@ -178,6 +178,10 @@ func runAPI(ctx context.Context, o *APIOptions) error {
 		return render.Error(o.IO, render.Scope{}, clierr.Newf(code, format, args...))
 	}
 
+	if o.RequestInputFile == "-" && fieldReadsStdin(o.MagicFields) {
+		return bail(clierr.InvalidFlag, "cannot read stdin for both --input - and an @- field")
+	}
+
 	params, err := parseFields(o.RawFields, o.MagicFields, o.IO.In)
 	if err != nil {
 		return bail(clierr.InvalidFlag, "%v", err)
@@ -232,15 +236,15 @@ func runAPI(ctx context.Context, o *APIOptions) error {
 		return bail(clierr.Transport, "build request: %v", err)
 	}
 
-	token, err := o.Token(ctx)
-	if err != nil {
-		return render.Error(o.IO, render.Scope{}, err)
-	}
-
 	if err := applyHeaders(req, o.RequestHeaders); err != nil {
 		return bail(clierr.InvalidFlag, "%v", err)
 	}
+	// Only resolve a token when the user gave no Authorization header.
 	if req.Header.Get("Authorization") == "" {
+		token, err := o.Token(ctx)
+		if err != nil {
+			return render.Error(o.IO, render.Scope{}, err)
+		}
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if bodyIsJSON && req.Header.Get("Content-Type") == "" {
@@ -436,6 +440,9 @@ func parseField(raw string, magic bool, stdin io.Reader) (string, any, error) {
 	if !found {
 		return "", nil, fmt.Errorf("field %q requires a value separated by '='", raw)
 	}
+	if strings.TrimSpace(key) == "" {
+		return "", nil, fmt.Errorf("field %q has an empty key", raw)
+	}
 	if magic {
 		v, err := magicFieldValue(val, stdin)
 		if err != nil {
@@ -444,6 +451,17 @@ func parseField(raw string, magic bool, stdin io.Reader) (string, any, error) {
 		return key, v, nil
 	}
 	return key, val, nil
+}
+
+// fieldReadsStdin reports whether any -F field reads its value from stdin (a
+// value of exactly "@-"). Raw -f fields are literal, so they never read stdin.
+func fieldReadsStdin(magicFields []string) bool {
+	for _, f := range magicFields {
+		if _, val, found := strings.Cut(f, "="); found && val == "@-" {
+			return true
+		}
+	}
+	return false
 }
 
 // parseFields collects raw (-f) and magic (-F) fields into a single map.

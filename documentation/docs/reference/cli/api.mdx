@@ -39,7 +39,7 @@ The current instance's access token is attached automatically, and the response 
 
 ## Org and project placeholders
 
-The Agent Manager API has no flat top-level resources — everything lives under `/orgs/{org}/projects/{project}/...`. The literal tokens `{org}` and `{project}` in the endpoint are substituted from the current context, using the same precedence as other commands:
+Most Agent Manager resources are scoped to an organization and project, under paths like `/orgs/{org}/projects/{project}/...`. For endpoints that include the literal `{org}` and `{project}` tokens, those placeholders are substituted from the current context, using the same precedence as other commands:
 
 1. The `--org` / `--project` flags.
 2. The linked project for the working directory.

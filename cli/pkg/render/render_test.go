@@ -74,6 +74,12 @@ func TestRendered_MarksWithoutWriting(t *testing.T) {
 	}
 }
 
+func TestRendered_NilReturnsNil(t *testing.T) {
+	if err := Rendered(nil); err != nil {
+		t.Errorf("Rendered(nil) = %v, want nil", err)
+	}
+}
+
 func TestError_DispatchesJSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	ios.JSON = true

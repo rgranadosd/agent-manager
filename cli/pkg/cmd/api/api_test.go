@@ -164,6 +164,15 @@ func TestParseFields_MissingEquals(t *testing.T) {
 	}
 }
 
+func TestParseFields_EmptyKey(t *testing.T) {
+	if _, err := parseFields([]string{"=value"}, nil, nil); err == nil {
+		t.Error("expected error for field with an empty key")
+	}
+	if _, err := parseFields(nil, []string{"  =true"}, nil); err == nil {
+		t.Error("expected error for field with a whitespace-only key")
+	}
+}
+
 func TestHasPlaceholders(t *testing.T) {
 	if !hasPlaceholders("/orgs/{org}/projects/{project}/agents") {
 		t.Error("expected placeholders to be detected")
