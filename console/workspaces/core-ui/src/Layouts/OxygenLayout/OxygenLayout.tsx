@@ -107,7 +107,7 @@ export function OxygenLayout() {
           />
           <Header.Brand onClick={() => navigate(homePath)}>
             <Header.BrandLogo>
-              <Logo  />
+              <Logo width={190}/>
               {externalLogoComponentModules?.map((module) => (
                 <div key={module.moduleName}>
                   <module.component />
