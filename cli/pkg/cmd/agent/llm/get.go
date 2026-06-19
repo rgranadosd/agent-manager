@@ -107,11 +107,10 @@ func runGet(ctx context.Context, o *GetOptions) error {
 		return render.JSONSuccess(o.IO, o.Scope, resp.JSON200)
 	}
 
-	printConfig(o.IO, resp.JSON200)
-	return nil
+	return printConfig(o.IO, resp.JSON200)
 }
 
-func printConfig(io *iostreams.IOStreams, c *amsvc.AgentModelConfigResponse) {
+func printConfig(io *iostreams.IOStreams, c *amsvc.AgentModelConfigResponse) error {
 	cs := io.ColorScheme()
 	desc := "-"
 	if c.Description != nil && *c.Description != "" {
@@ -150,7 +149,9 @@ func printConfig(io *iostreams.IOStreams, c *amsvc.AgentModelConfigResponse) {
 			tp.AddField(status)
 			tp.EndRow()
 		}
-		_ = tp.Render()
+		if err := tp.Render(); err != nil {
+			return err
+		}
 	}
 
 	if len(c.EnvironmentVariables) > 0 {
@@ -159,4 +160,6 @@ func printConfig(io *iostreams.IOStreams, c *amsvc.AgentModelConfigResponse) {
 			fmt.Fprintf(io.Out, "  %-8s %s\n", ev.Key, ev.Name)
 		}
 	}
+
+	return nil
 }
