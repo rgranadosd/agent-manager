@@ -25,12 +25,10 @@ import React, {
 import {
   PageLayout,
   SelectionDrawer,
-  SelectionIndicator,
   TextInput,
 } from "@agent-management-platform/views";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Form,
@@ -47,7 +45,6 @@ import { generatePath, useNavigate, useParams } from "react-router-dom";
 import {
   absoluteRouteMap,
   type AgentMCPConfigResponse,
-  type MCPProxyListItem,
 } from "@agent-management-platform/types";
 import {
   useCreateAgentMCPConfig,
@@ -56,8 +53,8 @@ import {
   useListMCPProxies,
 } from "@agent-management-platform/api-client";
 import { usePipelineEnvironmentsState } from "@agent-management-platform/shared-component";
-import { MCPLogo } from "@agent-management-platform/mcp-proxies";
 import { ConfigNameSection } from "./Configure/subComponents/ConfigNameSection";
+import { MCPServerDisplay } from "./Configure/subComponents/MCPServerDisplay";
 import {
   ENV_VAR_KEYS,
   generateEnvVarNames,
@@ -69,60 +66,6 @@ const ENV_VAR_DESCRIPTIONS: Record<EnvVarKey, string> = {
   url: "Base URL of the MCP server endpoint",
   apikey: "API key for authenticating with the MCP server endpoint",
 };
-
-function MCPServerDisplay({
-  server,
-  isSelected,
-  hideCheckbox,
-}: {
-  server: MCPProxyListItem | null;
-  isSelected: boolean;
-  /** Show the MCP logo instead of the selection indicator (e.g. the selected card). */
-  hideCheckbox?: boolean;
-}) {
-  if (!server) return null;
-  const avatarSize = hideCheckbox ? 36 : 32;
-  return (
-    <Stack direction="row" spacing={2} flexGrow={1} alignItems="flex-start">
-      {!hideCheckbox && <SelectionIndicator selected={isSelected} />}
-      {hideCheckbox && (
-        <Avatar
-          sx={{
-            height: avatarSize,
-            width: avatarSize,
-            backgroundColor: "action.selected",
-          }}
-        >
-          <Box sx={{ color: "text.secondary", display: "inline-flex" }}>
-            <MCPLogo size={20} />
-          </Box>
-        </Avatar>
-      )}
-      <Stack spacing={0.25} flexGrow={1} sx={{ minWidth: 0 }}>
-        <Stack direction="row" alignItems="center" sx={{ minHeight: avatarSize }}>
-          <Typography variant="h6">{server.name}</Typography>
-        </Stack>
-        {server.description && (
-          <Typography variant="caption" color="text.secondary">
-            {server.description}
-          </Typography>
-        )}
-        <Stack direction="row" spacing={2} flexWrap="wrap">
-          {server.context && (
-            <Typography variant="caption" color="text.secondary">
-              Context: {server.context}
-            </Typography>
-          )}
-          {server.version && (
-            <Typography variant="caption" color="text.secondary">
-              Version: {server.version}
-            </Typography>
-          )}
-        </Stack>
-      </Stack>
-    </Stack>
-  );
-}
 
 export const AddMCPServerComponent: React.FC = () => {
   const { orgId, projectId, agentId } = useParams<{
@@ -546,7 +489,7 @@ export const AddMCPServerComponent: React.FC = () => {
               configNameEditedRef.current = true;
               setConfigName(value);
             }}
-            description="A name for this MCP configuration. We auto-generate one from the selected server — rename it if you like (useful when environments use different servers)."
+            description="A name for this MCP configuration."
             placeholder="my-mcp-configuration"
           />
         )}

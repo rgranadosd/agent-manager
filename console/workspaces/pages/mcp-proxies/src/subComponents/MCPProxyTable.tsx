@@ -18,6 +18,7 @@
 import { useMemo, useState } from "react";
 import {
   Avatar,
+  Chip,
   IconButton,
   ListingTable,
   Stack,
@@ -38,6 +39,15 @@ import {
   type MCPProxyListItem,
 } from "@agent-management-platform/types";
 import { MCPLogo } from "../components/MCPLogo";
+
+const STATUS_DISPLAY: Record<
+  NonNullable<MCPProxyListItem["status"]>,
+  { label: string; color: "success" | "warning" | "error" }
+> = {
+  deployed: { label: "Deployed", color: "success" },
+  pending: { label: "Pending", color: "warning" },
+  failed: { label: "Failed", color: "error" },
+};
 
 export function MCPProxyTable() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -99,8 +109,8 @@ export function MCPProxyTable() {
       <ListingTable variant="card">
         <ListingTable.Head>
           <ListingTable.Row>
-            <ListingTable.Cell width="300px">Name</ListingTable.Cell>
-            <ListingTable.Cell>Description</ListingTable.Cell>
+            <ListingTable.Cell>Name</ListingTable.Cell>
+            <ListingTable.Cell width="160px">Status</ListingTable.Cell>
             <ListingTable.Cell width="160px">Version</ListingTable.Cell>
             <ListingTable.Cell width="140px" align="right">
               Last Updated
@@ -145,15 +155,25 @@ export function MCPProxyTable() {
                     >
                       {getAvatarInitials(displayName, { fallback: "MP" })}
                     </Avatar>
-                    <Typography variant="body2" fontWeight={500}>
+                    <Typography variant="body2" fontWeight={500} noWrap>
                       {displayName}
                     </Typography>
                   </Stack>
                 </ListingTable.Cell>
                 <ListingTable.Cell>
-                  <Typography variant="body2" color="text.secondary">
-                    {proxy.description ?? "-"}
-                  </Typography>
+                  {proxy.status ? (
+                    <Chip
+                      label={STATUS_DISPLAY[proxy.status].label}
+                      color={STATUS_DISPLAY[proxy.status].color}
+                      size="small"
+                      variant="outlined"
+                      sx={{ width: "fit-content" }}
+                    />
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      -
+                    </Typography>
+                  )}
                 </ListingTable.Cell>
                 <ListingTable.Cell>
                   <Typography variant="body2">

@@ -24,9 +24,11 @@ import {
   Form,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { GripVertical, Plus, Trash } from "@wso2/oxygen-ui-icons-react";
+import { Plus, ShieldCheck, Trash } from "@wso2/oxygen-ui-icons-react";
+import { NoDataFound } from "@agent-management-platform/views";
 import type {
   GuardrailDefinition,
   GuardrailsCatalogResponse,
@@ -203,7 +205,7 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
             </Typography>
           </Stack>
           <Button
-            variant="contained"
+            variant="outlined"
             size="small"
             startIcon={<Plus size={16} />}
             onClick={() => setDrawerOpen(true)}
@@ -212,78 +214,114 @@ export const PolicyListSection: React.FC<PolicyListSectionProps> = ({
           </Button>
         </Stack>
 
-        <Stack spacing={1.25} mt={2}>
-          {policies.map((policy, index) => {
-            const key = `${policy.name}@${policy.version}`;
-            const isDragging = draggingIndex === index;
-            const isDragOver =
-              dragOverIndex === index && draggingIndex !== index;
-            return (
-              <Card
-                key={key}
-                variant="outlined"
-                draggable={reorderEnabled}
-                onDragStart={handleDragStart(index)}
-                onDragOver={handleDragOver(index)}
-                onDrop={handleDrop(index)}
-                onDragEnd={handleDragEnd}
-                onClick={() => handleRowClick(policy)}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  px: 1.5,
-                  py: 1.25,
-                  cursor: "pointer",
-                  opacity: isDragging ? 0.5 : 1,
-                  borderColor: isDragOver ? "primary.main" : undefined,
-                  transition: "border-color 120ms ease, opacity 120ms ease",
-                  "&:hover": { bgcolor: "action.hover" },
-                }}
-              >
-                {reorderEnabled && (
-                  <Box
-                    aria-label="Drag to reorder"
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      color: "text.secondary",
-                      cursor: "grab",
-                      "&:active": { cursor: "grabbing" },
-                    }}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <GripVertical size={18} />
-                  </Box>
-                )}
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
+        {policies.length === 0 ? (
+          <Box
+            sx={{
+              mt: 2,
+              border: "1px dashed",
+              borderColor: "divider",
+              borderRadius: 1,
+            }}
+          >
+            <NoDataFound
+              disableBackground
+              icon={<ShieldCheck size={48} />}
+              message={`No ${title.toLowerCase()} added yet`}
+            />
+          </Box>
+        ) : (
+          <Stack spacing={1.25} mt={2}>
+            {policies.map((policy, index) => {
+              const key = `${policy.name}@${policy.version}`;
+              const label = policy.displayName || policy.name;
+              const isDragging = draggingIndex === index;
+              const isDragOver =
+                dragOverIndex === index && draggingIndex !== index;
+              return (
+                <Card
+                  key={key}
+                  variant="outlined"
+                  draggable={reorderEnabled}
+                  onDragStart={handleDragStart(index)}
+                  onDragOver={handleDragOver(index)}
+                  onDrop={handleDrop(index)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => handleRowClick(policy)}
                   sx={{
-                    flex: 1,
-                    minWidth: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    px: 1.5,
+                    py: 1.25,
+                    cursor: "pointer",
+                    opacity: isDragging ? 0.5 : 1,
+                    borderColor: isDragOver ? "primary.main" : undefined,
+                    transition: "border-color 120ms ease, opacity 120ms ease",
+                    "&:hover": { bgcolor: "action.hover" },
                   }}
                 >
-                  {policy.displayName || policy.name}
-                </Typography>
-                <IconButton
-                  size="small"
-                  color="error"
-                  aria-label={`Remove ${policy.displayName || policy.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemove(policy.name, policy.version);
-                  }}
-                >
-                  <Trash size={14} />
-                </IconButton>
-              </Card>
-            );
-          })}
-        </Stack>
+                  {reorderEnabled && (
+                    // The position is the enforcement order, and the badge
+                    // doubles as the drag handle.
+                    <Tooltip title="Drag to reorder" placement="top" arrow>
+                      <Box
+                        aria-label={`Position ${index + 1}. Drag to reorder.`}
+                        onClick={(event) => event.stopPropagation()}
+                        sx={{
+                          flexShrink: 0,
+                          width: 24,
+                          height: 24,
+                          borderRadius: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: "action.selected",
+                          color: "text.secondary",
+                          cursor: "grab",
+                          "&:active": { cursor: "grabbing" },
+                        }}
+                      >
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          sx={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {index + 1}
+                        </Typography>
+                      </Box>
+                    </Tooltip>
+                  )}
+                  <Typography
+                    variant="body2"
+                    fontWeight={600}
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </Typography>
+                  <Tooltip title="Remove" placement="top" arrow>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label={`Remove ${label}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemove(policy.name, policy.version);
+                      }}
+                    >
+                      <Trash size={14} />
+                    </IconButton>
+                  </Tooltip>
+                </Card>
+              );
+            })}
+          </Stack>
+        )}
       </Form.Section>
 
       <PolicySelectorDrawer

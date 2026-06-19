@@ -823,7 +823,7 @@ export const AddLLMProviderComponent: React.FC = () => {
           {environments.length > 1 && (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Select which catalog provider to use in each environment.
+                Select which LLM Service provider to use in each environment.
               </Typography>
               <Tabs
                 value={selectedEnvIndex}
@@ -1018,7 +1018,7 @@ export const AddLLMProviderComponent: React.FC = () => {
               configNameEditedRef.current = true;
               setConfigName(value);
             }}
-            description="A name for this LLM configuration. We auto-generate one from the selected provider — rename it if you like (useful when environments use different providers)."
+            description="A name for this LLM configuration."
             placeholder="my-llm-configuration"
           />
         )}
