@@ -277,6 +277,20 @@ echo ""
 
 echo "All core OpenChoreo planes are installed and registered!"
 
+# ============================================================================
+# Step 4.5: agent-manager-host Service + CoreDNS override for host.docker.internal
+# Must run BEFORE step 5 (Thunder bootstrap job calls host.docker.internal:9000).
+# Requires openchoreo-data-plane namespace (created in step 2).
+# ============================================================================
+echo "4️⃣ .5  agent-manager-host Service (routes host.docker.internal → docker-compose)"
+if ! ensure_agent_manager_host_service; then
+    echo "❌ agent-manager-host setup failed — Thunder and Gateway bootstraps will fail without it"
+    exit 1
+fi
+# Restart CoreDNS so the new NodeHosts entry is picked up immediately.
+kubectl rollout restart deployment/coredns -n kube-system --context "${CLUSTER_CONTEXT}"
+kubectl rollout status deployment/coredns -n kube-system --context "${CLUSTER_CONTEXT}" --timeout=60s
+echo ""
 
 # ============================================================================
 # Step 5: Install AMP Extensions IN PARALLEL
@@ -292,9 +306,13 @@ echo ""
 # Define installation functions for parallel execution
 install_thunder_extension() {
     echo "📦 Installing/Upgrading WSO2 AMP Thunder Extension..."
+    # --no-hooks: the pre-install hooks (PVC, SA, Secret, bootstrap Job) are applied
+    # manually by patch_and_bootstrap_thunder (step 5.5) after the Deployment exists.
+    # On ARM64 the hook orchestration times out before Thunder can start.
     helm upgrade --install amp-thunder-extension "${SCRIPT_DIR}/../helm-charts/wso2-amp-thunder-extension" \
-        --namespace amp-thunder --create-namespace
-    echo "✅ AMP Thunder Extension installed/upgraded successfully"
+        --namespace amp-thunder --create-namespace \
+        --no-hooks
+    echo "✅ AMP Thunder Extension installed (hooks deferred to step 5.5)"
 }
 
 install_evaluation_workflows() {
@@ -311,8 +329,14 @@ install_evaluation_workflows() {
 install_platform_resources() {
     echo "📦 Installing/Upgrading Default Platform Resources..."
     echo "   Creating default Organization, Project, Environment, and DeploymentPipeline..."
+    # --no-hooks: the chart's hook uses bitnami/kubectl which is AMD64-only and
+    # fails with "exec format error" on ARM64 (Apple Silicon).  We apply the
+    # label the hook would have set manually instead.
     helm upgrade --install amp-default-platform-resources "${SCRIPT_DIR}/../helm-charts/wso2-amp-platform-resources-extension" \
-        --namespace default
+        --namespace default \
+        --no-hooks
+    kubectl label namespace default openchoreo.dev/control-plane=true --overwrite \
+        --context "${CLUSTER_CONTEXT}"
     echo "✅ Default Platform Resources installed/upgraded successfully"
 }
 
@@ -326,6 +350,18 @@ run_parallel_tasks \
     || exit 1
 
 echo "✅ All AMP extensions installed successfully"
+echo ""
+
+# ============================================================================
+# Step 5.5: Patch Thunder + run bootstrap Job
+# Runs AFTER all three extensions (Thunder Deployment exists), BEFORE anything
+# that needs authenticated calls to Thunder (e.g. the Gateway bootstrap).
+# ============================================================================
+echo "5️⃣ .5  Thunder: seed PVC + bootstrap"
+if ! patch_and_bootstrap_thunder; then
+    echo "❌ Thunder bootstrap failed — Gateway registration will fail without it"
+    exit 1
+fi
 echo ""
 
 # ============================================================================

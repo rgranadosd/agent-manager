@@ -1,0 +1,44 @@
+# Service + Endpoints that expose the docker-compose agent-manager-service
+# to pods running inside the k3d cluster.
+#
+# Why a manual Endpoints (not a selector-based Service):
+#   agent-manager-service runs in docker-compose, not as a k8s Pod, so there
+#   is no selector to match. The Endpoints IP is hardcoded to 10.89.0.20,
+#   which is the static IP assigned to the agent-manager-service container on
+#   the k3d-openchoreo-local-setup network (see docker-compose.yml).
+#
+# CoreDNS NodeHosts is patched by ensure_agent_manager_host_service() in
+# utils.sh to map host.docker.internal → this Service's ClusterIP, so
+# in-cluster code that calls host.docker.internal:9000 routes here and then
+# to the container at 10.89.0.20:8080 via kube-proxy.
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-manager-host
+  namespace: openchoreo-data-plane
+spec:
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 8080
+      protocol: TCP
+    - name: cp
+      port: 9243
+      targetPort: 9243
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: agent-manager-host
+  namespace: openchoreo-data-plane
+subsets:
+  - addresses:
+      - ip: 10.89.0.20
+    ports:
+      - name: api
+        port: 8080
+        protocol: TCP
+      - name: cp
+        port: 9243
+        protocol: TCP

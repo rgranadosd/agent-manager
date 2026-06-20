@@ -167,11 +167,16 @@ generate_machine_ids() {
 # rollout times out. Writing the key here guarantees it exists before the
 # subsequent `kubectl rollout restart deployment/coredns`.
 ensure_coredns_host_aliases() {
-    echo "🔧 Ensuring host.k3d.internal / host.docker.internal resolve in-cluster..."
+    echo "🔧 Ensuring host.k3d.internal resolves in-cluster..."
 
     local host_ip
     host_ip=$(docker network inspect "k3d-${CLUSTER_NAME}" \
         --format '{{ (index .IPAM.Config 0).Gateway }}' 2>/dev/null)
+    # Podman exposes the gateway under subnets[0].gateway, not IPAM.Config
+    if [[ -z "$host_ip" ]]; then
+        host_ip=$(podman network inspect "k3d-${CLUSTER_NAME}" 2>/dev/null \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); n=d[0] if isinstance(d,list) else d; print(n.get('subnets',[{}])[0].get('gateway',''))" 2>/dev/null)
+    fi
     if [[ -z "$host_ip" ]]; then
         echo "❌ Could not determine k3d host gateway IP for network k3d-${CLUSTER_NAME}"
         return 1
@@ -185,14 +190,16 @@ ensure_coredns_host_aliases() {
         --context "${CLUSTER_CONTEXT}" -o jsonpath='{.data.NodeHosts}' 2>/dev/null)
 
     # Drop any alias lines from a previous run so re-runs stay idempotent.
+    # host.docker.internal is managed separately by ensure_agent_manager_host_service()
+    # (maps to the agent-manager-host Service ClusterIP, not the gateway).
     local node_lines
     node_lines=$(printf '%s\n' "$existing" \
-        | grep -vE '[[:space:]](host\.k3d\.internal|host\.docker\.internal)$' \
+        | grep -vE '[[:space:]]host\.k3d\.internal$' \
         | sed '/^[[:space:]]*$/d' || true)
 
     local desired
-    desired=$(printf '%s\n%s host.k3d.internal\n%s host.docker.internal\n' \
-        "$node_lines" "$host_ip" "$host_ip" \
+    desired=$(printf '%s\n%s host.k3d.internal\n' \
+        "$node_lines" "$host_ip" \
         | sed '/^[[:space:]]*$/d')
 
     # Escape each line into a literal \n for the JSON merge patch (awk keeps
@@ -206,7 +213,60 @@ ensure_coredns_host_aliases() {
         echo "❌ Failed to patch CoreDNS NodeHosts"
         return 1
     fi
-    echo "✅ CoreDNS NodeHosts updated (host.k3d.internal, host.docker.internal -> ${host_ip})"
+    echo "✅ CoreDNS NodeHosts updated (host.k3d.internal -> ${host_ip})"
+}
+
+# Apply the agent-manager-host Service+Endpoints and override host.docker.internal
+# in CoreDNS NodeHosts to point to the Service's ClusterIP.
+#
+# This routes in-cluster calls to host.docker.internal:9000 (Thunder bootstrap,
+# Gateway bootstrap) through kube-proxy to the docker-compose agent-manager-service
+# container at its static k3d IP (10.89.0.20, defined in docker-compose.yml).
+#
+# Must run after the openchoreo-data-plane namespace exists (after step 2).
+ensure_agent_manager_host_service() {
+    echo "🔧 Applying agent-manager-host Service + Endpoints (static IP 10.89.0.20)..."
+    local manifest="${SCRIPT_DIR}/../k8s/agent-manager-host.yaml"
+    if [[ ! -f "$manifest" ]]; then
+        echo "❌ agent-manager-host.yaml not found at ${manifest}"
+        return 1
+    fi
+    if ! kubectl apply --context "${CLUSTER_CONTEXT}" -f "$manifest"; then
+        echo "❌ Failed to apply agent-manager-host Service+Endpoints"
+        return 1
+    fi
+
+    local clusterip
+    clusterip=$(kubectl get svc agent-manager-host -n openchoreo-data-plane \
+        --context "${CLUSTER_CONTEXT}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
+    if [[ -z "$clusterip" ]]; then
+        echo "❌ Could not read ClusterIP for agent-manager-host Service"
+        return 1
+    fi
+
+    echo "🔧 Overriding CoreDNS host.docker.internal → ${clusterip} (agent-manager-host)..."
+    local existing
+    existing=$(kubectl get configmap coredns -n kube-system \
+        --context "${CLUSTER_CONTEXT}" -o jsonpath='{.data.NodeHosts}' 2>/dev/null)
+
+    local node_lines
+    node_lines=$(printf '%s\n' "$existing" \
+        | grep -vE '[[:space:]]host\.docker\.internal$' \
+        | sed '/^[[:space:]]*$/d' || true)
+
+    local desired
+    desired=$(printf '%s\n%s host.docker.internal\n' "$node_lines" "$clusterip" \
+        | sed '/^[[:space:]]*$/d')
+
+    local patch_value
+    patch_value=$(printf '%s\n' "$desired" | awk '{ out = out $0 "\\n" } END { printf "%s", out }')
+
+    if ! kubectl patch configmap coredns -n kube-system --context "${CLUSTER_CONTEXT}" \
+        --type merge -p "{\"data\":{\"NodeHosts\":\"${patch_value}\"}}"; then
+        echo "❌ Failed to patch CoreDNS NodeHosts for host.docker.internal"
+        return 1
+    fi
+    echo "✅ agent-manager-host ready: host.docker.internal → ${clusterip} → 10.89.0.20:8080"
 }
 
 # Util: Refresh kubeconfig for k3d cluster
@@ -556,4 +616,157 @@ wait_for_secret() {
 
     echo "❌ Timeout waiting for secret '$secret_name' in namespace '$namespace'"
     return 1
+}
+
+# Patch the Thunder Deployment with a seed-db initContainer, then run the bootstrap Job.
+# Call this AFTER 'helm install amp-thunder-extension --no-hooks' so the Deployment
+# exists but the PVC is empty and the bootstrap Job hasn't run yet.
+#
+# Why --no-hooks:
+#   The pre-install hooks include PVC, SA, Secret, ConfigMaps, and a Job.
+#   The Job runs Thunder itself in setup/bootstrap mode.  On ARM64 the overall
+#   hook orchestration times-out before the Deployment ever starts (the PVC that
+#   the Deployment needs is also a hook).  We break the cycle by:
+#     1. Applying the PVC / SA / Secret manually so the Deployment can schedule.
+#     2. Patching the Deployment to seed the PVC via an initContainer.
+#     3. Waiting for Thunder to be healthy.
+#     4. Applying the bootstrap ConfigMaps + Job manually (renamed to avoid
+#        conflicts with future helm upgrades).
+#     5. Restarting Thunder so it picks up the bootstrapped configdb.db.
+patch_and_bootstrap_thunder() {
+    local chart="${SCRIPT_DIR}/../helm-charts/wso2-amp-thunder-extension"
+    local ns="amp-thunder"
+    local deploy="amp-thunder-extension-deployment"
+    local job_name="amp-thunder-bootstrap-init"
+
+    # ── 0. Apply hook resources the Deployment needs (PVC, SA, Secret) ───────
+    echo "🔧 Applying Thunder pre-req hooks (PVC, ServiceAccount, Secret)..."
+    local py_prereq
+    py_prereq=$(mktemp /tmp/amp-prereq-XXXXXX.py)
+    cat > "$py_prereq" << 'PYEOF'
+import sys, re
+content = sys.stdin.read()
+docs = re.split(r'(?m)^---[ \t]*$', content)
+for doc in docs:
+    if not doc.strip():
+        continue
+    if 'helm.sh/hook' not in doc:
+        continue
+    # Skip Job and ConfigMap — those come later (after Thunder is running)
+    if re.search(r'^kind: (Job|ConfigMap)', doc, re.M):
+        continue
+    doc = re.sub(r'(?m)^[ \t]+"?helm\.sh/hook[^\n]*\n', '', doc)
+    print('---')
+    print(doc.strip())
+PYEOF
+    helm template amp-thunder-extension "$chart" --namespace "$ns" 2>/dev/null \
+        | python3 "$py_prereq" \
+        | kubectl apply -n "$ns" --context "${CLUSTER_CONTEXT}" -f -
+    rm -f "$py_prereq"
+    echo "✅ Pre-req resources applied"
+
+    # ── 1. Patch Deployment: add seed-db initContainer ───────────────────────
+    # The initContainer copies the SQLite seed DBs from the image into the
+    # (empty) PVC so Thunder has a valid database on first start.
+    # Uses .initialized sentinel to stay idempotent across pod restarts.
+    echo "🔧 Patching Thunder Deployment: seed-db initContainer..."
+    local patch_tmp
+    patch_tmp=$(mktemp /tmp/amp-thunder-patch-XXXXXX.yaml)
+    cat > "$patch_tmp" << PATCHEOF
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: seed-db
+        image: ${THUNDER_IMAGE}
+        command: [sh, -c]
+        args:
+        - |
+          if [ ! -f /pvcroot/.initialized ]; then
+            S=/opt/thunder/repository/database
+            cp \$S/configdb.db /pvcroot/
+            cp \$S/runtimedb.db /pvcroot/
+            cp \$S/userdb.db /pvcroot/
+            mkdir -p /pvcroot/consent
+            C=/opt/thunder/consent/repository/database
+            cp \$C/consentdb.db /pvcroot/consent/
+            touch /pvcroot/.initialized
+            echo seeded PVC
+          else
+            echo PVC already seeded
+          fi
+        volumeMounts:
+        - name: database-storage
+          mountPath: /pvcroot
+PATCHEOF
+    if ! kubectl patch deployment "$deploy" -n "$ns" \
+            --context "${CLUSTER_CONTEXT}" \
+            --type strategic --patch-file "$patch_tmp"; then
+        rm -f "$patch_tmp"
+        echo "❌ Failed to patch Thunder initContainer"
+        return 1
+    fi
+    rm -f "$patch_tmp"
+    echo "✅ Thunder initContainer patched"
+
+    # ── 2. Wait for Thunder rollout ──────────────────────────────────────────
+    echo "⏳ Waiting for Thunder rollout (up to 3 min)..."
+    if ! kubectl rollout status "deployment/$deploy" -n "$ns" \
+            --context "${CLUSTER_CONTEXT}" --timeout=180s; then
+        echo "❌ Thunder rollout timed out"
+        kubectl describe pod -n "$ns" --context "${CLUSTER_CONTEXT}" | tail -30
+        return 1
+    fi
+    echo "✅ Thunder is running"
+
+    # ── 3. Apply bootstrap ConfigMaps + Job ───────────────────────────────────
+    echo "🔧 Applying Thunder bootstrap ConfigMaps and Job..."
+    local py_job
+    py_job=$(mktemp /tmp/amp-job-XXXXXX.py)
+    cat > "$py_job" << 'PYEOF'
+import sys, re
+content = sys.stdin.read()
+docs = re.split(r'(?m)^---[ \t]*$', content)
+for doc in docs:
+    if not doc.strip():
+        continue
+    if 'helm.sh/hook' not in doc:
+        continue
+    # Only ConfigMap and Job hook resources
+    if not re.search(r'^kind: (Job|ConfigMap)', doc, re.M):
+        continue
+    doc = re.sub(r'(?m)^[ \t]+"?helm\.sh/hook[^\n]*\n', '', doc)
+    print('---')
+    print(doc.strip())
+PYEOF
+
+    kubectl delete job "$job_name" -n "$ns" \
+        --context "${CLUSTER_CONTEXT}" --ignore-not-found --wait=false 2>/dev/null || true
+
+    helm template amp-thunder-extension "$chart" --namespace "$ns" 2>/dev/null \
+        | python3 "$py_job" \
+        | sed "s/^  name: amp-thunder-extension-setup$/  name: ${job_name}/" \
+        | kubectl apply -n "$ns" --context "${CLUSTER_CONTEXT}" -f -
+    rm -f "$py_job"
+
+    # ── 4. Wait for bootstrap Job ────────────────────────────────────────────
+    echo "⏳ Waiting for bootstrap Job (up to 5 min)..."
+    if ! kubectl wait "job/$job_name" -n "$ns" \
+            --context "${CLUSTER_CONTEXT}" \
+            --for=condition=complete --timeout=300s; then
+        echo "❌ Bootstrap job failed or timed out"
+        kubectl logs "job/$job_name" -n "$ns" --context "${CLUSTER_CONTEXT}" 2>/dev/null | tail -30
+        return 1
+    fi
+    echo "✅ Thunder bootstrap completed"
+
+    # ── 5. Restart Thunder (picks up bootstrapped configdb.db) ───────────────
+    echo "🔄 Restarting Thunder (picks up bootstrap data)..."
+    kubectl rollout restart "deployment/$deploy" -n "$ns" --context "${CLUSTER_CONTEXT}"
+    if ! kubectl rollout status "deployment/$deploy" -n "$ns" \
+            --context "${CLUSTER_CONTEXT}" --timeout=120s; then
+        echo "❌ Thunder restart timed out"
+        return 1
+    fi
+    echo "✅ Thunder ready"
 }

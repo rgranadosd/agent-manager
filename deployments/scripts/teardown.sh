@@ -39,25 +39,13 @@ else
 fi
 
 # ============================================================================
-# Step 3: Delete Colima dev profile
+# Step 3: Podman machine (optional)
 # ============================================================================
 echo ""
-echo "3️⃣  Delete Colima dev profile"
-if command -v colima &> /dev/null; then
-    if colima list 2>/dev/null | grep -q "dev"; then
-        echo "🛑 Deleting Colima dev profile..."
-        colima stop dev 2>/dev/null || true
-        colima delete dev --force 2>/dev/null || true
-        echo "✅ Colima dev profile deleted"
-    else
-        echo "⏭️  Colima dev profile not found, skipping"
-    fi
-else
-    echo "⏭️  Colima not installed, skipping"
-fi
+echo "3️⃣  Podman machine"
+echo "ℹ️  The podman machine is shared across projects — not stopped automatically."
+echo "   To stop it:   podman machine stop"
+echo "   To delete it: podman machine rm"
 
-echo ""
-echo "ℹ️  Note: Colima default profile may still be running."
-echo "   To completely remove Colima: colima delete"
 echo ""
 echo "✅ Teardown complete!"

@@ -7,6 +7,9 @@ CLUSTER_CONTEXT="k3d-${CLUSTER_NAME}"
 GATEWAY_OPERATOR_VERSION="0.7.0"
 GATEWAY_CHART_VERSION="1.1.0"
 
+# Thunder IdP image (must match wso2-amp-thunder-extension/values.yaml)
+THUNDER_IMAGE="ghcr.io/asgardeo/thunder:0.34.0"
+
 # OpenChoreo community module versions compatible with OpenChoreo 1.1.1
 OBSERVABILITY_LOGS_OPENSEARCH_VERSION="0.4.1"
 OBSERVABILITY_TRACING_OPENSEARCH_VERSION="0.4.1"

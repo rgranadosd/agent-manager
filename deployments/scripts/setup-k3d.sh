@@ -37,6 +37,18 @@ else
     echo ""
     echo "✅ k3d cluster created successfully!"
 
+    # Fix static IP on server-0 so k3s always starts with the same node-ip.
+    # Without this, podman assigns a random DHCP IP on each VM restart; k3s
+    # records the first IP as --node-ip and crashes when it changes (crash loop).
+    echo "📌 Assigning static IP 10.89.0.3 to server-0..."
+    SERVER_NODE="k3d-${CLUSTER_NAME}-server-0"
+    NETWORK="k3d-${CLUSTER_NAME}"
+    podman stop "$SERVER_NODE" 2>/dev/null || true
+    podman network disconnect "$NETWORK" "$SERVER_NODE" 2>/dev/null || true
+    podman network connect --ip 10.89.0.3 "$NETWORK" "$SERVER_NODE"
+    podman start "$SERVER_NODE"
+    echo "✅ Static IP 10.89.0.3 assigned to $SERVER_NODE"
+
     refresh_kubeconfig
 
     if ! wait_for_cluster; then

@@ -65,7 +65,7 @@ services:
       - KEY_MANAGER_ISSUER=Agent Management Platform Local,http://thunder.amp.localhost:8080
       - KEY_MANAGER_AUDIENCE=localhost,amp-publisher-*,amp-api-client,amp-console-client,amctl,am-mcp,http://localhost:9000/
       - AMP_VERSION=v0.8.0
-      - OPEN_CHOREO_BASE_URL=http://api.openchoreo.localhost:8195
+      - OPEN_CHOREO_BASE_URL=http://api.openchoreo.localhost:8080
       # OpenBao/Vault Secret Management Configuration
       # NOTE: Run ./deployments/scripts/port-forward.sh to forward OpenBao from k3d cluster
       # Uses the default OpenBao that comes with OpenChoreo for both user and system secrets
@@ -98,18 +98,23 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - agent-manager
-      - k3d-openchoreo-local-setup # Connect to k3d cluster network for hostname resolution
+      agent-manager:
+      k3d-openchoreo-local-setup:
+        # Static IP so that the agent-manager-host Endpoints (k8s/agent-manager-host.yaml)
+        # never need updating after docker compose up --force-recreate.
+        ipv4_address: 10.89.0.20
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      # OpenChoreo API uses Host-based routing via Kgateway on port 8080.
-      # The gateway routes requests based on the Host header, so we need the
-      # hostname to resolve to the host machine for proper routing.
-      - "api.openchoreo.localhost:host-gateway"
+      # NOTE (podman/k3d): the kgateway LoadBalancers are exposed on the k3d node
+      # IP (10.89.0.3) via klipper-lb. The service is attached to the k3d network,
+      # so it reaches the gateway directly at the node IP. Using host-gateway here
+      # fails under podman because the host-published 8080 isn't reachable from
+      # inside the container (rootless hairpin NAT).
+      - "api.openchoreo.localhost:10.89.0.3"
       # Thunder IDP for OAuth2 token exchange (must match OpenChoreo's security.oidc config)
-      - "thunder.amp.localhost:host-gateway"
+      - "thunder.amp.localhost:10.89.0.3"
       # API Platform Gateway runtime for agent endpoint access
-      - "api-platform-gateway.amp.localhost:host-gateway"
+      - "api-platform-gateway.amp.localhost:10.89.0.3"
 
   # Agent Manager Console (React Frontend)
   agent-manager-console:

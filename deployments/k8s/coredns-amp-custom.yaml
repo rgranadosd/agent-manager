@@ -49,12 +49,8 @@ data:
       name regex (.+\.)?gateway\.localhost host.k3d.internal
       answer auto
     }
-  # The dev gateway chart + setup-gateway.sh reach agent-manager via
-  # host.docker.internal (Docker Desktop / Colima inject it into k3d pods).
-  # A plain Linux k3d runner (CI) has no such injection, so fold it onto
-  # host.k3d.internal, which k3d guarantees on every platform.
-  hostdocker.override: |
-    rewrite stop {
-      name regex host\.docker\.internal host.k3d.internal
-      answer auto
-    }
+  # NOTE: host.docker.internal is NOT rewritten here.
+  # On local dev (podman/k3d), it resolves via CoreDNS NodeHosts to the
+  # agent-manager-host Service ClusterIP, which routes to the docker-compose
+  # agent-manager-service container. See deployments/k8s/agent-manager-host.yaml
+  # and ensure_agent_manager_host_service() in utils.sh.
