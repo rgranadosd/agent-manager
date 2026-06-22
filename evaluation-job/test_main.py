@@ -36,6 +36,7 @@ from main import (
     validate_time_format,
     publish_scores,
     OAuth2TokenManager,
+    TRACE_FETCH_PAGE_SIZE,
     _eval_template,
     _load_custom_code_evaluator,
 )
@@ -834,7 +835,7 @@ class TestMainIntegration:
                     "IDP_CLIENT_SECRET": "test-secret",
                 },
             ),
-            patch("main.TraceFetcher"),
+            patch("main.TraceFetcher") as mock_trace_fetcher,
             patch("main.Monitor", return_value=mock_monitor_instance),
             pytest.raises(SystemExit) as exc_info,
         ):
@@ -861,6 +862,9 @@ class TestMainIntegration:
             end_time="2026-01-15T11:00:00Z",
             sample_rate=1.0,
         )
+
+        # page_size is set on the TraceFetcher via the in-code constant, not a CLI flag
+        assert mock_trace_fetcher.call_args.kwargs["page_size"] == TRACE_FETCH_PAGE_SIZE
 
     @patch("main.publish_scores", return_value=True)
     @patch("main.builtin")

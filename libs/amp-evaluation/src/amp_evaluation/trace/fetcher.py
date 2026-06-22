@@ -386,6 +386,7 @@ class TraceFetcher:
         environment: str,
         token_provider: Optional[Callable[[], str]] = None,
         timeout: int = 30,
+        page_size: int = 10,
     ):
         """
         Initialize trace fetcher.
@@ -398,6 +399,8 @@ class TraceFetcher:
             environment: Environment name (required)
             token_provider: Callable that returns a JWT token for authentication (required)
             timeout: Request timeout in seconds
+            page_size: Default max traces per /traces/export page (memory-bound; API
+                allows up to 1000). Override per-call via fetch_traces(page_size=...).
         """
         if not base_url:
             raise ValueError("base_url is required")
@@ -419,6 +422,7 @@ class TraceFetcher:
         self.environment = environment
         self.token_provider = token_provider
         self.timeout = timeout
+        self.page_size = page_size
 
     def _get_auth_headers(self) -> Dict[str, str]:
         """Get authorization headers with a fresh JWT token."""
@@ -466,26 +470,30 @@ class TraceFetcher:
         self,
         start_time: str,
         end_time: str,
-        page_size: int = 1000,
+        page_size: Optional[int] = None,
         max_traces: Optional[int] = None,
     ) -> Iterator[OTELTrace]:
         """
         Fetch traces from the trace service using /traces/export endpoint.
 
-        /traces/export caps each response at `page_size` traces (max 1000) and has no
-        cursor, so this walks the time window in ascending order, re-querying from the
-        last seen trace's startTime until the range is exhausted. Traces are yielded
-        lazily as each page comes in.
+        /traces/export caps each response at `page_size` traces (API allows up to 1000)
+        and has no cursor, so this walks the time window in ascending order, re-querying
+        from the last seen trace's startTime until the range is exhausted. Traces are
+        yielded lazily as each page comes in, so at most `page_size` parsed trace objects
+        (each with nested spans/payloads) are held in memory at once — keep this small
+        rather than maxing it out at 1000.
 
         Args:
             start_time: Start time in ISO 8601 format (e.g., "2025-12-16T06:58:02.433Z")
             end_time: End time in ISO 8601 format
-            page_size: Max traces to request per page (API max is 1000)
+            page_size: Max traces to request per page (memory-bound; API allows up to
+                1000). Defaults to the page_size set on this fetcher instance.
             max_traces: Optional cap on the total number of traces to yield
 
         Yields:
             Trace objects with OTEL/AMP attributes, in ascending startTime order
         """
+        page_size = page_size if page_size is not None else self.page_size
         seen_ids: set = set()
         cursor_start = start_time
         yielded = 0

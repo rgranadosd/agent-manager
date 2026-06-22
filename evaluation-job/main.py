@@ -55,6 +55,11 @@ logger = logging.getLogger(__name__)
 PUBLISH_MAX_RETRIES = 3
 PUBLISH_INITIAL_BACKOFF = 2  # seconds
 
+# Max traces per /traces/export page. Kept small and deliberate -- each page is fully
+# parsed into memory at once, so this bounds peak memory regardless of how many traces
+# match the monitor's time window. Not exposed as a CLI flag; tune this constant directly.
+TRACE_FETCH_PAGE_SIZE = 10
+
 
 class OAuth2TokenManager:
     """Manages OAuth2 client_credentials tokens with caching."""
@@ -529,7 +534,7 @@ def main() -> None:
         logger.info("Configured LLM client to route through OpenAI-compatible gateway at %s", llm_api_base)
 
     logger.info(
-        "Starting monitor evaluation monitor=%s organization=%s project=%s agent=%s env=%s time_range=%s..%s sampling=%.1f",
+        "Starting monitor evaluation monitor=%s organization=%s project=%s agent=%s env=%s time_range=%s..%s sampling=%.2f",
         args.monitor_name,
         args.organization,
         args.project,
@@ -653,6 +658,7 @@ def main() -> None:
             agent=args.agent,
             environment=args.environment,
             token_provider=token_manager.get_token,
+            page_size=TRACE_FETCH_PAGE_SIZE,
         )
 
         monitor = Monitor(

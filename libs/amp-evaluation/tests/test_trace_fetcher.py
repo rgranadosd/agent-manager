@@ -125,6 +125,45 @@ class TestFetchTracesPagination:
         assert result == []
         assert mock_get.call_count == 1
 
+    def test_constructor_page_size_used_when_not_overridden(self):
+        fetcher = TraceFetcher(
+            base_url="http://localhost:8001",
+            organization="org",
+            project="proj",
+            agent="agent",
+            environment="dev",
+            token_provider=lambda: "test-token",
+            page_size=25,
+        )
+        page = [_raw_trace("t0", "2026-01-01T00:00:00Z")]
+
+        with patch("requests.get", return_value=_mock_response(page, total_count=1)) as mock_get:
+            list(fetcher.fetch_traces(start_time="s", end_time="e"))
+
+        assert mock_get.call_args.kwargs["params"]["limit"] == "25"
+
+    def test_per_call_page_size_overrides_constructor_default(self):
+        fetcher = TraceFetcher(
+            base_url="http://localhost:8001",
+            organization="org",
+            project="proj",
+            agent="agent",
+            environment="dev",
+            token_provider=lambda: "test-token",
+            page_size=25,
+        )
+        page = [_raw_trace("t0", "2026-01-01T00:00:00Z")]
+
+        with patch("requests.get", return_value=_mock_response(page, total_count=1)) as mock_get:
+            list(fetcher.fetch_traces(start_time="s", end_time="e", page_size=5))
+
+        assert mock_get.call_args.kwargs["params"]["limit"] == "5"
+
+    def test_default_page_size_is_small(self):
+        """The constructor default must stay memory-bound, not the API's 1000 max."""
+        fetcher = _make_fetcher()
+        assert fetcher.page_size == 10
+
 
 class TestSampleTraces:
     def test_deterministic_across_runs(self):
