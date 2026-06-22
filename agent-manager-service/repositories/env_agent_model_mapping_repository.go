@@ -110,7 +110,8 @@ func (r *envAgentModelMappingRepository) ListAgentConsumersByProxyUUIDs(ctx cont
 	err := r.db.WithContext(ctx).
 		Table("env_agent_model_mapping eam").
 		Select("DISTINCT a.handle AS proxy_handle, a.name AS proxy_name, ac.project_name, ac.agent_id").
-		Joins("JOIN artifacts a ON a.uuid = eam.llm_proxy_uuid").
+		Joins("JOIN llm_proxies lp ON lp.uuid = eam.llm_proxy_uuid").
+		Joins("JOIN artifacts a ON a.uuid = lp.uuid").
 		Joins("JOIN agent_configurations ac ON ac.uuid = eam.config_uuid").
 		Where("eam.llm_proxy_uuid IN ?", proxyUUIDs).
 		Scan(&results).Error

@@ -135,7 +135,7 @@ export const LLMProviderConsumersTab: React.FC<
                   hover
                   sx={{
                     "& .row-action": { visibility: "hidden" },
-                    "&:hover .row-action": { visibility: "visible" },
+                    "&:hover .row-action, &:focus-within .row-action": { visibility: "visible" },
                   }}
                 >
                   <TableCell>
