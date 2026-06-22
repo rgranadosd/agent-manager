@@ -26,7 +26,10 @@ import { metaData as agentSecurityMetadata } from "@agent-management-platform/ag
 import { metaData as configureAgentMetadata, AddLLMProviderComponent, ViewLLMProviderComponent, AddMCPServerComponent, ViewMCPServerComponent } from "@agent-management-platform/configure-agent";
 import { metaData as deploymentMetadata } from "@agent-management-platform/deploy";
 import { metaData as evalMetadata } from "@agent-management-platform/eval";
-import { metaData as gatewaysMetadata } from "@agent-management-platform/gateways";
+import {
+  metaData as gatewaysMetadata,
+  identityProvidersMetaData,
+} from "@agent-management-platform/gateways";
 import { metaData as identitiesMetadata } from "@agent-management-platform/identities";
 import { metaData as llmProvidersMetadata } from "@agent-management-platform/llm-providers";
 import { metaData as mcpProxiesMetadata } from "@agent-management-platform/mcp-proxies";
@@ -69,22 +72,22 @@ export const LazyLogsComponent = logsMetadata.levels!.component as FC;
 export const LazyMetricsComponent = metricsMetadata.levels!.component as FC;
 
 // Evaluation
-export const LazyEvalEvaluatorsComponent =
-  evalMetadata.pages.component.evalEvaluators.component as FC;
-export const LazyCreateEvaluatorComponent =
-  evalMetadata.pages.component.createEvaluator.component as FC;
-export const LazyViewEvaluatorComponent =
-  evalMetadata.pages.component.viewEvaluator.component as FC;
-export const LazyEditEvaluatorComponent =
-  evalMetadata.pages.component.editEvaluator.component as FC;
+export const LazyEvalEvaluatorsOrg =
+  evalMetadata.pages.organization.evalEvaluators.component as FC;
+export const LazyCreateEvaluatorOrg =
+  evalMetadata.pages.organization.createEvaluator.component as FC;
+export const LazyViewEvaluatorOrg =
+  evalMetadata.pages.organization.viewEvaluator.component as FC;
+export const LazyEditEvaluatorOrg =
+  evalMetadata.pages.organization.editEvaluator.component as FC;
 export const LazyEvalMonitorsComponent =
-  evalMetadata.pages.component.evalMonitors.component as FC;
+  evalMetadata.pages.organization.evalMonitors.component as FC;
 export const LazyCreateMonitorComponent =
-  evalMetadata.pages.component.createMonitor.component as FC;
+  evalMetadata.pages.organization.createMonitor.component as FC;
 export const LazyEditMonitorComponent =
-  evalMetadata.pages.component.editMonitor.component as FC;
+  evalMetadata.pages.organization.editMonitor.component as FC;
 export const LazyViewMonitorComponent =
-  evalMetadata.pages.component.viewMonitor.component as FC;
+  evalMetadata.pages.organization.viewMonitor.component as FC;
 
 // LLM Providers
 export const LazyLLMProvidersOrg = llmProvidersMetadata.levels!.organization as FC;
@@ -97,6 +100,10 @@ export const LazyMCPProxiesOrg = mcpProxiesMetadata.levels!.organization as FC;
 
 // Gateways
 export const LazyGatewaysOrg = gatewaysMetadata.levels!.organization as FC;
+
+// Security → Identity Providers
+export const LazyIdentityProvidersOrg = identityProvidersMetaData.levels!
+  .organization as FC;
 
 // Identities
 export const LazyIdentitiesOrg = identitiesMetadata.levels!.organization as FC;

@@ -27,14 +27,16 @@ import (
 	"github.com/onsi/ginkgo/v2"
 
 	"github.com/wso2/agent-manager/test/e2e/framework"
+	envops "github.com/wso2/agent-manager/test/e2e/operations/environment"
 )
 
 // CleanupStaleE2EResources finds and deletes e2e projects (with the
 // E2EProjectPrefix) that were created more than 1 hour ago. It deletes all
 // agents within those projects first, then deletes the projects themselves.
 // This is intended to be called from BeforeSuite before any tests execute.
+const cutoff = 1 * time.Hour
+
 func CleanupStaleE2EResources(client *framework.AMPClient, orgName string) {
-	cutoff := time.Now().Add(-1 * time.Hour)
 
 	path := fmt.Sprintf("/api/v1/orgs/%s/projects", orgName)
 	resp, err := client.Get(path)
@@ -65,11 +67,7 @@ func CleanupStaleE2EResources(client *framework.AMPClient, orgName string) {
 		if !strings.HasPrefix(proj.Name, framework.E2EProjectPrefix) {
 			continue
 		}
-		// Never clean up the shared agent project — it is reused across runs
-		if proj.Name == framework.E2ESharedProjectName {
-			continue
-		}
-		if proj.CreatedAt.After(cutoff) {
+		if time.Since(proj.CreatedAt) < cutoff {
 			continue
 		}
 
@@ -104,6 +102,236 @@ func CleanupStaleE2EResources(client *framework.AMPClient, orgName string) {
 				proj.Name, delResp.StatusCode)
 			break
 		}
+	}
+
+	// Order matters and mirrors the platform's referential deletion guards:
+	// projects (done above) → deployment pipelines (a pipeline refuses deletion while a
+	// project references it) → LLM providers → environments (an environment refuses
+	// deletion while a pipeline references it).
+	cleanupStaleDeploymentPipelines(client, orgName)
+	cleanupStaleLLMProviders(client, orgName)
+	cleanupStaleCustomEvaluators(client, orgName)
+	cleanupStaleEnvironments(client, orgName)
+}
+
+// cleanupStaleCustomEvaluators deletes e2e-created custom evaluators (identifier
+// prefixed with "e2e-"). Built-in evaluators are never touched. There is no creation
+// timestamp on evaluators, but this runs in BeforeSuite before the current run creates
+// its own (uniquely-suffixed) evaluator, so anything present is from a prior run.
+// A 409 means an active monitor still references it (ErrCustomEvaluatorInUse); since
+// monitors are not cleaned here, that evaluator is logged and left in place.
+func cleanupStaleCustomEvaluators(client *framework.AMPClient, orgName string) {
+	path := fmt.Sprintf("/api/v1/orgs/%s/evaluators", orgName)
+	resp, err := client.Get(path)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to list evaluators: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: list evaluators returned %d, skipping\n", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to read evaluators response: %v\n", err)
+		return
+	}
+
+	var evaluators framework.EvaluatorListResponse
+	if err := json.Unmarshal(body, &evaluators); err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to decode evaluators: %v\n", err)
+		return
+	}
+
+	for _, e := range evaluators.Evaluators {
+		if e.IsBuiltin || !strings.HasPrefix(e.Identifier, "e2e-") {
+			continue
+		}
+
+		evalPath := fmt.Sprintf("/api/v1/orgs/%s/evaluators/custom/%s", orgName, e.Identifier)
+		delResp, err := client.Delete(evalPath)
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("stale cleanup: failed to delete custom evaluator %s: %v\n", e.Identifier, err)
+			continue
+		}
+		delResp.Body.Close()
+		logDeleteResult("custom evaluator", e.Identifier, delResp.StatusCode)
+	}
+}
+
+// logDeleteResult reports a stale-cleanup DELETE outcome without misreporting a
+// non-2xx response as a successful deletion: 204/404 are success, 409 means the
+// resource is still referenced (guard) and is skipped, anything else is a failure.
+func logDeleteResult(kind, name string, status int) {
+	switch status {
+	case http.StatusNoContent, http.StatusNotFound:
+		ginkgo.GinkgoWriter.Printf("stale cleanup: deleted %s %s (status %d)\n", kind, name, status)
+	case http.StatusConflict:
+		ginkgo.GinkgoWriter.Printf("stale cleanup: %s %s still in use (status %d), skipping\n", kind, name, status)
+	default:
+		ginkgo.GinkgoWriter.Printf("stale cleanup: delete %s %s returned status %d (not removed)\n", kind, name, status)
+	}
+}
+
+// cleanupStaleDeploymentPipelines deletes e2e-created deployment pipelines (name
+// prefixed with "e2e-") that were created more than the cutoff ago. The "default"
+// pipeline is never touched. These are org-scoped and are not cascaded by project
+// deletion, so they orphan unless removed explicitly. Runs after project cleanup so
+// the platform's "pipeline referenced by a project" guard does not block deletion.
+func cleanupStaleDeploymentPipelines(client *framework.AMPClient, orgName string) {
+
+	path := fmt.Sprintf("/api/v1/orgs/%s/deployment-pipelines", orgName)
+	resp, err := client.Get(path)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to list deployment pipelines: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: list deployment pipelines returned %d, skipping\n", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to read deployment pipelines response: %v\n", err)
+		return
+	}
+
+	var pipelines framework.DeploymentPipelineListResponse
+	if err := json.Unmarshal(body, &pipelines); err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to decode deployment pipelines: %v\n", err)
+		return
+	}
+
+	for _, p := range pipelines.DeploymentPipelines {
+		if p.Name == "default" || !strings.HasPrefix(p.Name, "e2e-") {
+			continue
+		}
+		if time.Since(p.CreatedAt) < cutoff {
+			continue
+		}
+
+		pipelinePath := fmt.Sprintf("/api/v1/orgs/%s/deployment-pipelines/%s", orgName, p.Name)
+		delResp, err := client.Delete(pipelinePath)
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("stale cleanup: failed to delete deployment pipeline %s: %v\n", p.Name, err)
+			continue
+		}
+		delResp.Body.Close()
+		logDeleteResult("deployment pipeline", p.Name, delResp.StatusCode)
+	}
+}
+
+// cleanupStaleLLMProviders deletes e2e-created LLM providers (name prefixed with
+// "e2e", case-insensitive) created more than the cutoff ago. These are org-scoped and
+// are not cascaded by project or environment deletion.
+func cleanupStaleLLMProviders(client *framework.AMPClient, orgName string) {
+
+	path := fmt.Sprintf("/api/v1/orgs/%s/llm-providers", orgName)
+	resp, err := client.Get(path)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to list LLM providers: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: list LLM providers returned %d, skipping\n", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to read LLM providers response: %v\n", err)
+		return
+	}
+
+	var providers framework.LLMProviderListResponse
+	if err := json.Unmarshal(body, &providers); err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to decode LLM providers: %v\n", err)
+		return
+	}
+
+	for _, p := range providers.Providers {
+		// e2e providers are named/identified "E2E ..." / "e2e-..."; match either ID or Name.
+		if !strings.HasPrefix(strings.ToLower(p.Name), "e2e") && !strings.HasPrefix(strings.ToLower(p.ID), "e2e") {
+			continue
+		}
+		if p.CreatedAt != nil && time.Since(*p.CreatedAt) < cutoff {
+			continue
+		}
+
+		providerPath := fmt.Sprintf("/api/v1/orgs/%s/llm-providers/%s", orgName, p.ID)
+		delResp, err := client.Delete(providerPath)
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("stale cleanup: failed to delete LLM provider %s: %v\n", p.ID, err)
+			continue
+		}
+		delResp.Body.Close()
+		logDeleteResult("LLM provider", p.ID, delResp.StatusCode)
+	}
+}
+
+// cleanupStaleEnvironments finds environments with the E2EEnvPrefix that were
+// created more than 1 hour ago and tears them down via remove-environment.sh
+// (which uninstalls the gateway helm release and deletes the environment).
+// The default environment is never touched. Failures are logged, not fatal,
+// so a single bad teardown doesn't abort the suite.
+func cleanupStaleEnvironments(client *framework.AMPClient, orgName string) {
+	defaultEnv := client.Cfg().DefaultEnv
+
+	path := fmt.Sprintf("/api/v1/orgs/%s/environments", orgName)
+	resp, err := client.Get(path)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to list environments: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: list environments returned %d, skipping\n", resp.StatusCode)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to read environments response: %v\n", err)
+		return
+	}
+
+	var environments framework.EnvironmentListResponse
+	if err := json.Unmarshal(body, &environments); err != nil {
+		ginkgo.GinkgoWriter.Printf("stale cleanup: failed to decode environments: %v\n", err)
+		return
+	}
+
+	for _, env := range environments {
+		if !strings.HasPrefix(env.Name, framework.E2EEnvPrefix) {
+			continue
+		}
+		// Never remove the default environment, even if it somehow matches.
+		if env.Name == defaultEnv {
+			continue
+		}
+		if time.Since(env.CreatedAt) < cutoff {
+			continue
+		}
+
+		ginkgo.GinkgoWriter.Printf("stale cleanup: removing stale environment %q (created %s)\n",
+			env.Name, env.CreatedAt.Format(time.RFC3339))
+
+		params := envops.FromClient(client)
+		params.EnvName = env.Name
+		if err := envops.RemoveEnvironment(params); err != nil {
+			ginkgo.GinkgoWriter.Printf("stale cleanup: remove-environment.sh failed for %q: %v\n", env.Name, err)
+			continue
+		}
+		ginkgo.GinkgoWriter.Printf("stale cleanup: removed environment %q\n", env.Name)
 	}
 }
 

@@ -114,6 +114,9 @@ func handleCommonErrors(w http.ResponseWriter, err error, fallbackMsg string) {
 	case errors.Is(err, utils.ErrProjectHasAssociatedAgents):
 		utils.WriteErrorResponseWithReason(w, http.StatusConflict,
 			"Project has associated agents", err.Error(), utils.ErrCodeConflict)
+	case errors.Is(err, utils.ErrDeploymentPipelineInUse):
+		utils.WriteErrorResponseWithReason(w, http.StatusConflict,
+			"Deployment pipeline is referenced by one or more projects", err.Error(), utils.ErrCodeConflict)
 	case errors.Is(err, utils.ErrSecretPathConflict):
 		utils.WriteErrorResponseWithReason(w, http.StatusConflict,
 			"Secret path conflict", err.Error(), utils.ErrCodeConflict)
@@ -132,6 +135,12 @@ func handleCommonErrors(w http.ResponseWriter, err error, fallbackMsg string) {
 	case errors.Is(err, utils.ErrAgentKindHasInstances):
 		utils.WriteErrorResponseWithReason(w, http.StatusConflict,
 			"Agent kind has active instances", err.Error(), utils.ErrCodeConflict)
+	// Generic conflict catch-all: any unclassified conflict (e.g. a raw "already exists"
+	// from OpenChoreo) is a 409, never a 500. Keep this after the specific conflict cases
+	// above so they win; err.Error() carries the detail in the response reason.
+	case errors.Is(err, utils.ErrConflict):
+		utils.WriteErrorResponseWithReason(w, http.StatusConflict,
+			"Conflict", err.Error(), utils.ErrCodeConflict)
 
 	// Bad request errors
 	case errors.Is(err, utils.ErrInvalidInput):

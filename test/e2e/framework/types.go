@@ -64,9 +64,15 @@ type Repository struct {
 	AppPath string `json:"appPath,omitempty"`
 }
 
+type AgentKindRef struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 type Provisioning struct {
-	Type       string      `json:"type"`
-	Repository *Repository `json:"repository,omitempty"`
+	Type       string        `json:"type"`
+	Repository *Repository   `json:"repository,omitempty"`
+	AgentKind  *AgentKindRef `json:"agentKind,omitempty"`
 }
 
 type AgentType struct {
@@ -82,8 +88,8 @@ type EnvironmentVariable struct {
 }
 
 type Configurations struct {
-	Env                        []EnvironmentVariable `json:"env,omitempty"`
-	EnableAutoInstrumentation  *bool                 `json:"enableAutoInstrumentation,omitempty"`
+	Env                       []EnvironmentVariable `json:"env,omitempty"`
+	EnableAutoInstrumentation *bool                 `json:"enableAutoInstrumentation,omitempty"`
 }
 
 type InputInterfaceSchema struct {
@@ -91,9 +97,9 @@ type InputInterfaceSchema struct {
 }
 
 type InputInterface struct {
-	Type     string               `json:"type"`
-	Port     int                  `json:"port,omitempty"`
-	BasePath string               `json:"basePath,omitempty"`
+	Type     string                `json:"type"`
+	Port     int                   `json:"port,omitempty"`
+	BasePath string                `json:"basePath,omitempty"`
 	Schema   *InputInterfaceSchema `json:"schema,omitempty"`
 }
 
@@ -108,7 +114,7 @@ type DockerConfig struct {
 }
 
 type BuildConfig struct {
-	Type      string          `json:"type"`
+	Type      string           `json:"type"`
 	Buildpack *BuildpackConfig `json:"buildpack,omitempty"`
 	Docker    *DockerConfig    `json:"docker,omitempty"`
 }
@@ -167,7 +173,7 @@ type CreateAgentRequest struct {
 	Configurations *Configurations      `json:"configurations,omitempty"`
 	RuntimeConfigs *RuntimeConfigs      `json:"runtimeConfigs,omitempty"`
 	InputInterface *InputInterface      `json:"inputInterface,omitempty"`
-	ModelConfig    []ModelConfigRequest  `json:"modelConfig,omitempty"`
+	ModelConfig    []ModelConfigRequest `json:"modelConfig,omitempty"`
 }
 
 type UpdateAgentRequest struct {
@@ -192,6 +198,34 @@ type AgentListResponse struct {
 	Total  int             `json:"total"`
 	Limit  int             `json:"limit"`
 	Offset int             `json:"offset"`
+}
+
+// ---------------------------------------------------------------------------
+// Agent Catalog / Kinds
+// ---------------------------------------------------------------------------
+
+// KindConfigSchemaEntry defines a single runtime configuration parameter
+// exposed by a published agent kind.
+type KindConfigSchemaEntry struct {
+	Name         string  `json:"name"`
+	IsSecret     bool    `json:"isSecret"`
+	IsMandatory  bool    `json:"isMandatory"`
+	DefaultValue *string `json:"defaultValue"`
+}
+
+type PublishKindRequest struct {
+	KindName        string                  `json:"kindName"`
+	KindDisplayName string                  `json:"kindDisplayName"`
+	KindDescription string                  `json:"kindDescription,omitempty"`
+	Version         string                  `json:"version"`
+	BuildName       string                  `json:"buildName"`
+	ConfigSchema    []KindConfigSchemaEntry `json:"configSchema,omitempty"`
+}
+
+type PublishKindResponse struct {
+	KindName    string `json:"kindName"`
+	Version     string `json:"version"`
+	Description string `json:"description,omitempty"`
 }
 
 type TokenRequest struct {
@@ -299,17 +333,25 @@ type UpdateGatewayRequest struct {
 }
 
 type GatewayResponse struct {
-	UUID             string    `json:"uuid"`
-	OrganizationName string    `json:"organizationName"`
-	Name             string    `json:"name"`
-	DisplayName      string    `json:"displayName"`
-	GatewayType      string    `json:"gatewayType"`
-	Vhost            string    `json:"vhost"`
-	Region           string    `json:"region,omitempty"`
-	IsCritical       bool      `json:"isCritical"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	UUID             string          `json:"uuid"`
+	OrganizationName string          `json:"organizationName"`
+	Name             string          `json:"name"`
+	DisplayName      string          `json:"displayName"`
+	GatewayType      string          `json:"gatewayType"`
+	Vhost            string          `json:"vhost"`
+	Region           string          `json:"region,omitempty"`
+	IsCritical       bool            `json:"isCritical"`
+	Status           string          `json:"status"`
+	Environments     []GatewayEnvRef `json:"environments,omitempty"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
+}
+
+// GatewayEnvRef is an environment associated with a gateway, as returned in the
+// gateways list response.
+type GatewayEnvRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type GatewayListResponse struct {
@@ -381,20 +423,19 @@ type DeploymentPipelineListResponse struct {
 }
 
 // ---------------------------------------------------------------------------
-// Catalog
+// Catalog / Agent Kinds
 // ---------------------------------------------------------------------------
 
-type CatalogResource struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Kind        string `json:"kind"`
+// AgentKindListItem is one entry in the /agent-kinds list response. The /agent-kinds
+// endpoint is the source of truth for published kinds, so kind-existence checks query this.
+type AgentKindListItem struct {
+	Name          string `json:"name"`
+	LatestVersion string `json:"latestVersion"`
 }
 
-type CatalogListResponse struct {
-	Resources []CatalogResource `json:"resources"`
-	Total     int               `json:"total"`
-	Limit     int               `json:"limit"`
-	Offset    int               `json:"offset"`
+type AgentKindListResponse struct {
+	Kinds []AgentKindListItem `json:"kinds"`
+	Total int                 `json:"total"`
 }
 
 // ---------------------------------------------------------------------------
@@ -447,7 +488,7 @@ type LLMProviderTemplateMetadataAuth struct {
 }
 
 type LLMProviderTemplateMetadata struct {
-	EndpointURL string                          `json:"endpointUrl,omitempty"`
+	EndpointURL string                           `json:"endpointUrl,omitempty"`
 	Auth        *LLMProviderTemplateMetadataAuth `json:"auth,omitempty"`
 }
 
@@ -478,7 +519,7 @@ type SecurityAPIKey struct {
 }
 
 type SecurityConfig struct {
-	Enabled bool           `json:"enabled"`
+	Enabled bool            `json:"enabled"`
 	APIKey  *SecurityAPIKey `json:"apiKey,omitempty"`
 }
 
@@ -611,25 +652,25 @@ type MonitorLLMProviderRef struct {
 }
 
 type CreateMonitorRequest struct {
-	Name            string                  `json:"name"`
-	DisplayName     string                  `json:"displayName"`
-	Description     string                  `json:"description,omitempty"`
-	EnvironmentName string                  `json:"environmentName"`
-	Evaluators      []MonitorEvaluator      `json:"evaluators"`
-	Type            string                  `json:"type"`
-	LLMProvider     *MonitorLLMProviderRef  `json:"llmProvider,omitempty"`
-	IntervalMinutes int                     `json:"intervalMinutes,omitempty"`
-	SamplingRate    *float64                `json:"samplingRate,omitempty"`
-	TraceStart      *time.Time              `json:"traceStart,omitempty"`
-	TraceEnd        *time.Time              `json:"traceEnd,omitempty"`
+	Name            string                 `json:"name"`
+	DisplayName     string                 `json:"displayName"`
+	Description     string                 `json:"description,omitempty"`
+	EnvironmentName string                 `json:"environmentName"`
+	Evaluators      []MonitorEvaluator     `json:"evaluators"`
+	Type            string                 `json:"type"`
+	LLMProvider     *MonitorLLMProviderRef `json:"llmProvider,omitempty"`
+	IntervalMinutes int                    `json:"intervalMinutes,omitempty"`
+	SamplingRate    *float64               `json:"samplingRate,omitempty"`
+	TraceStart      *time.Time             `json:"traceStart,omitempty"`
+	TraceEnd        *time.Time             `json:"traceEnd,omitempty"`
 }
 
 type UpdateMonitorRequest struct {
-	DisplayName     string                  `json:"displayName,omitempty"`
-	Evaluators      []MonitorEvaluator      `json:"evaluators,omitempty"`
-	LLMProvider     *MonitorLLMProviderRef  `json:"llmProvider,omitempty"`
-	IntervalMinutes int                     `json:"intervalMinutes,omitempty"`
-	SamplingRate    *float64                `json:"samplingRate,omitempty"`
+	DisplayName     string                 `json:"displayName,omitempty"`
+	Evaluators      []MonitorEvaluator     `json:"evaluators,omitempty"`
+	LLMProvider     *MonitorLLMProviderRef `json:"llmProvider,omitempty"`
+	IntervalMinutes int                    `json:"intervalMinutes,omitempty"`
+	SamplingRate    *float64               `json:"samplingRate,omitempty"`
 }
 
 type MonitorResponse struct {
@@ -697,14 +738,29 @@ type ConfigurationItem struct {
 	Key         string `json:"key"`
 	Value       string `json:"value,omitempty"`
 	IsSensitive bool   `json:"isSensitive"`
+	IsSystem    bool   `json:"isSystem"`
 	SecretRef   string `json:"secretRef,omitempty"`
+}
+
+type ConfigurationFile struct {
+	Key         string `json:"key,omitempty"`
+	MountPath   string `json:"mountPath,omitempty"`
+	IsSensitive bool   `json:"isSensitive,omitempty"`
+	SecretRef   string `json:"secretRef,omitempty"`
+}
+
+// AgentConfigurations mirrors the API's "configurations" object, which groups
+// environment variables and file mounts separately (not a flat list).
+type AgentConfigurations struct {
+	Env   []ConfigurationItem `json:"env"`
+	Files []ConfigurationFile `json:"files"`
 }
 
 type ConfigurationResponse struct {
 	ProjectName    string              `json:"projectName"`
 	AgentName      string              `json:"agentName"`
 	Environment    string              `json:"environment"`
-	Configurations []ConfigurationItem `json:"configurations"`
+	Configurations AgentConfigurations `json:"configurations"`
 }
 
 type ResourceRequests struct {
@@ -810,11 +866,11 @@ type SpanSummaryListResponse struct {
 // ---------------------------------------------------------------------------
 
 type BuildOverview struct {
-	BuildName  string     `json:"buildName"`
-	Status     *string    `json:"status,omitempty"`
-	ImageID    *string    `json:"imageId,omitempty"`
-	StartedAt  time.Time  `json:"startedAt"`
-	EndedAt    *time.Time `json:"endedAt,omitempty"`
+	BuildName string     `json:"buildName"`
+	Status    *string    `json:"status,omitempty"`
+	ImageID   *string    `json:"imageId,omitempty"`
+	StartedAt time.Time  `json:"startedAt"`
+	EndedAt   *time.Time `json:"endedAt,omitempty"`
 }
 
 type BuildsListResponse struct {
@@ -858,9 +914,9 @@ type BuildDetailsResponse struct {
 // ---------------------------------------------------------------------------
 
 type DeployAgentRequest struct {
-	ImageID                  string              `json:"imageId"`
-	Env                      []EnvironmentVariable `json:"env,omitempty"`
-	EnableAutoInstrumentation *bool               `json:"enableAutoInstrumentation,omitempty"`
+	ImageID                   string                `json:"imageId"`
+	Env                       []EnvironmentVariable `json:"env,omitempty"`
+	EnableAutoInstrumentation *bool                 `json:"enableAutoInstrumentation,omitempty"`
 }
 
 type DeployAgentResponse struct {
@@ -948,4 +1004,42 @@ type MetricsResponse struct {
 	Memory         []MetricDataPoint `json:"memory"`
 	MemoryRequests []MetricDataPoint `json:"memoryRequests"`
 	MemoryLimits   []MetricDataPoint `json:"memoryLimits"`
+}
+
+// --- Deployment pipeline & promotion ---
+
+// TargetEnvironmentRef references a target environment within a promotion path.
+type TargetEnvironmentRef struct {
+	Name string `json:"name"`
+}
+
+// PromotionPath defines a source environment and the environments it can promote to.
+type PromotionPath struct {
+	SourceEnvironmentRef  string                 `json:"sourceEnvironmentRef"`
+	TargetEnvironmentRefs []TargetEnvironmentRef `json:"targetEnvironmentRefs"`
+}
+
+// CreateDeploymentPipelineRequest is the body for creating an org deployment pipeline.
+type CreateDeploymentPipelineRequest struct {
+	DisplayName    string          `json:"displayName"`
+	Description    *string         `json:"description,omitempty"`
+	ProjectName    *string         `json:"projectName,omitempty"`
+	PromotionPaths []PromotionPath `json:"promotionPaths"`
+}
+
+// PromoteAgentRequest is the body for promoting an agent from one environment to another.
+type PromoteAgentRequest struct {
+	SourceEnvironment         string                `json:"sourceEnvironment"`
+	TargetEnvironment         string                `json:"targetEnvironment"`
+	UseConfigFromSourceEnv    *bool                 `json:"useConfigFromSourceEnv,omitempty"`
+	Env                       []EnvironmentVariable `json:"env,omitempty"`
+	EnableAutoInstrumentation *bool                 `json:"enableAutoInstrumentation,omitempty"`
+}
+
+// PromoteAgentResponse is the 202 body returned by the promote endpoint.
+type PromoteAgentResponse struct {
+	AgentName         string `json:"agentName"`
+	ProjectName       string `json:"projectName"`
+	SourceEnvironment string `json:"sourceEnvironment"`
+	TargetEnvironment string `json:"targetEnvironment"`
 }
