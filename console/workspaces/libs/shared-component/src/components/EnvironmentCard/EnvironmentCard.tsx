@@ -49,7 +49,6 @@ import {
   PauseCircle,
   Play,
   Tag,
-  Wrench,
 } from "@wso2/oxygen-ui-icons-react";
 import { NoDataFound, TextInput } from "@agent-management-platform/views";
 import { formatDistanceToNow } from "date-fns";

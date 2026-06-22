@@ -35,7 +35,10 @@ import {
 } from "@agent-management-platform/api-client";
 import { useConfirmationDialog } from "@agent-management-platform/shared-component";
 import { FadeIn, PageLayout } from "@agent-management-platform/views";
-import { absoluteRouteMap, type ThunderGroup } from "@agent-management-platform/types";
+import {
+  absoluteRouteMap,
+  type ThunderGroup,
+} from "@agent-management-platform/types";
 import { ListingSkeletonRows } from "./components/ListingSkeletonRows";
 
 export const GroupsPage: React.FC = () => {
@@ -65,9 +68,11 @@ export const GroupsPage: React.FC = () => {
     }
   }, [groups.length, total, page, rowsPerPage]);
 
-  const identitiesRoute = (absoluteRouteMap.children.org.children as unknown as {
-    identities: { children: { groups: { path: string } } };
-  }).identities;
+  const identitiesRoute = (
+    absoluteRouteMap.children.org.children as unknown as {
+      identities: { children: { groups: { path: string } } };
+    }
+  ).identities;
 
   const createPath = orgId
     ? generatePath(identitiesRoute.children.groups.path + "/create", { orgId })
@@ -75,7 +80,10 @@ export const GroupsPage: React.FC = () => {
 
   const editGroupPath = (groupId: string) =>
     orgId
-      ? generatePath(identitiesRoute.children.groups.path + "/:groupId/edit", { orgId, groupId })
+      ? generatePath(identitiesRoute.children.groups.path + "/:groupId/edit", {
+          orgId,
+          groupId,
+        })
       : "#";
 
   const handleDelete = (group: ThunderGroup) => {
@@ -125,60 +133,82 @@ export const GroupsPage: React.FC = () => {
             </ListingTable.Head>
             <ListingTable.Body>
               {isLoading && <ListingSkeletonRows rows={rowsPerPage} />}
-              {!isLoading && groups.map((group: ThunderGroup) => (
-                <ListingTable.Row
-                  key={group.id}
-                  variant="card"
-                  hover
-                  onMouseEnter={() => setHoveredId(group.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(group.id)}
-                  onBlur={() => setHoveredId(null)}
-                >
-                  <ListingTable.Cell>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <Avatar
-                        sx={{
-                          bgcolor: "primary.main",
-                          color: "primary.contrastText",
-                          fontSize: 16,
-                          height: 36,
-                          width: 36,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {group.name.charAt(0).toUpperCase() || "G"}
-                      </Avatar>
-                      <Typography variant="body2" fontWeight={500} noWrap>
-                        {group.name}
+              {!isLoading &&
+                groups.map((group: ThunderGroup) => (
+                  <ListingTable.Row
+                    key={group.id}
+                    variant="card"
+                    hover
+                    onMouseEnter={() => setHoveredId(group.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onFocus={() => setHoveredId(group.id)}
+                    onBlur={(e) => {
+                      if (
+                        !e.currentTarget.contains(
+                          e.relatedTarget as Node | null,
+                        )
+                      ) {
+                        setHoveredId(null);
+                      }
+                    }}
+                  >
+                    <ListingTable.Cell>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar
+                          sx={{
+                            bgcolor: "primary.main",
+                            color: "primary.contrastText",
+                            fontSize: 16,
+                            height: 36,
+                            width: 36,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {group.name.charAt(0).toUpperCase() || "G"}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {group.name}
+                        </Typography>
+                      </Stack>
+                    </ListingTable.Cell>
+                    <ListingTable.Cell>
+                      <Typography variant="body2" color="text.secondary">
+                        {group.description ?? "—"}
                       </Typography>
-                    </Stack>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell>
-                    <Typography variant="body2" color="text.secondary">
-                      {group.description ?? "—"}
-                    </Typography>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell align="right">
-                    {hoveredId === group.id && (
-                      <FadeIn>
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Tooltip title="Edit group">
-                            <IconButton size="small" onClick={() => navigate(editGroupPath(group.id))}>
-                              <Edit size={16} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete group">
-                            <IconButton size="small" color="error" onClick={() => handleDelete(group)}>
-                              <Trash size={16} />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </FadeIn>
-                    )}
-                  </ListingTable.Cell>
-                </ListingTable.Row>
-              ))}
+                    </ListingTable.Cell>
+                    <ListingTable.Cell align="right">
+                      {hoveredId === group.id && (
+                        <FadeIn>
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            justifyContent="flex-end"
+                          >
+                            <Tooltip title="Edit group">
+                              <IconButton
+                                size="small"
+                                onClick={() =>
+                                  navigate(editGroupPath(group.id))
+                                }
+                              >
+                                <Edit size={16} />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete group">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDelete(group)}
+                              >
+                                <Trash size={16} />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
+                        </FadeIn>
+                      )}
+                    </ListingTable.Cell>
+                  </ListingTable.Row>
+                ))}
             </ListingTable.Body>
           </ListingTable>
         )}

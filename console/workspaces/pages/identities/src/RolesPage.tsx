@@ -35,7 +35,10 @@ import {
 } from "@agent-management-platform/api-client";
 import { useConfirmationDialog } from "@agent-management-platform/shared-component";
 import { FadeIn, PageLayout } from "@agent-management-platform/views";
-import { absoluteRouteMap, type ThunderRole } from "@agent-management-platform/types";
+import {
+  absoluteRouteMap,
+  type ThunderRole,
+} from "@agent-management-platform/types";
 import { ListingSkeletonRows } from "./components/ListingSkeletonRows";
 
 export const RolesPage: React.FC = () => {
@@ -65,14 +68,20 @@ export const RolesPage: React.FC = () => {
     }
   }, [roles.length, total, page, rowsPerPage]);
 
-  const rolesBasePath = (absoluteRouteMap.children.org.children as unknown as {
-    identities: { children: { roles: { path: string } } };
-  }).identities.children.roles.path;
+  const rolesBasePath = (
+    absoluteRouteMap.children.org.children as unknown as {
+      identities: { children: { roles: { path: string } } };
+    }
+  ).identities.children.roles.path;
 
-  const createPath = orgId ? generatePath(rolesBasePath + "/create", { orgId }) : "#";
+  const createPath = orgId
+    ? generatePath(rolesBasePath + "/create", { orgId })
+    : "#";
 
   const editRolePath = (roleId: string) =>
-    orgId ? generatePath(rolesBasePath + "/:roleId/edit", { orgId, roleId }) : "#";
+    orgId
+      ? generatePath(rolesBasePath + "/:roleId/edit", { orgId, roleId })
+      : "#";
 
   const handleDelete = (role: ThunderRole) => {
     addConfirmation({
@@ -121,62 +130,82 @@ export const RolesPage: React.FC = () => {
             </ListingTable.Head>
             <ListingTable.Body>
               {isLoading && <ListingSkeletonRows rows={rowsPerPage} />}
-              {!isLoading && roles.map((role: ThunderRole) => (
-                <ListingTable.Row
-                  key={role.id}
-                  variant="card"
-                  hover
-                  onMouseEnter={() => setHoveredId(role.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(role.id)}
-                  onBlur={() => setHoveredId(null)}
-                >
-                  <ListingTable.Cell>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <Avatar
-                        sx={{
-                          bgcolor: "primary.main",
-                          color: "primary.contrastText",
-                          fontSize: 16,
-                          height: 36,
-                          width: 36,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {role.name.charAt(0).toUpperCase() || "R"}
-                      </Avatar>
-                      <Typography variant="body2" fontWeight={500} noWrap>
-                        {role.name}
+              {!isLoading &&
+                roles.map((role: ThunderRole) => (
+                  <ListingTable.Row
+                    key={role.id}
+                    variant="card"
+                    hover
+                    onMouseEnter={() => setHoveredId(role.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    onFocus={() => setHoveredId(role.id)}
+                    onBlur={(e) => {
+                      if (
+                        !e.currentTarget.contains(
+                          e.relatedTarget as Node | null,
+                        )
+                      ) {
+                        setHoveredId(null);
+                      }
+                    }}
+                  >
+                    <ListingTable.Cell>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar
+                          sx={{
+                            bgcolor: "primary.main",
+                            color: "primary.contrastText",
+                            fontSize: 16,
+                            height: 36,
+                            width: 36,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {role.name.charAt(0).toUpperCase() || "R"}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {role.name}
+                        </Typography>
+                      </Stack>
+                    </ListingTable.Cell>
+                    <ListingTable.Cell>
+                      <Typography variant="body2" color="text.secondary">
+                        {role.description ?? "—"}
                       </Typography>
-                    </Stack>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell>
-                    <Typography variant="body2" color="text.secondary">
-                      {role.description ?? "—"}
-                    </Typography>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell align="right">
-                    {hoveredId === role.id && (
-                      <FadeIn>
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Tooltip title="Edit role">
-                            <IconButton size="small" onClick={() => navigate(editRolePath(role.id))}>
-                              <Edit size={16} />
-                            </IconButton>
-                          </Tooltip>
-                          {!role.isReadOnly && (
-                            <Tooltip title="Delete role">
-                              <IconButton size="small" color="error" onClick={() => handleDelete(role)}>
-                                <Trash size={16} />
+                    </ListingTable.Cell>
+                    <ListingTable.Cell align="right">
+                      {hoveredId === role.id && (
+                        <FadeIn>
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            justifyContent="flex-end"
+                          >
+                            <Tooltip title="Edit role">
+                              <IconButton
+                                size="small"
+                                onClick={() => navigate(editRolePath(role.id))}
+                              >
+                                <Edit size={16} />
                               </IconButton>
                             </Tooltip>
-                          )}
-                        </Stack>
-                      </FadeIn>
-                    )}
-                  </ListingTable.Cell>
-                </ListingTable.Row>
-              ))}
+                            {!role.isReadOnly && (
+                              <Tooltip title="Delete role">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDelete(role)}
+                                >
+                                  <Trash size={16} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </FadeIn>
+                      )}
+                    </ListingTable.Cell>
+                  </ListingTable.Row>
+                ))}
             </ListingTable.Body>
           </ListingTable>
         )}

@@ -35,7 +35,10 @@ import {
 } from "@agent-management-platform/api-client";
 import { useConfirmationDialog } from "@agent-management-platform/shared-component";
 import { FadeIn, PageLayout } from "@agent-management-platform/views";
-import { absoluteRouteMap, type ThunderUser } from "@agent-management-platform/types";
+import {
+  absoluteRouteMap,
+  type ThunderUser,
+} from "@agent-management-platform/types";
 import { ListingSkeletonRows } from "./components/ListingSkeletonRows";
 
 export const UsersPage: React.FC = () => {
@@ -65,9 +68,11 @@ export const UsersPage: React.FC = () => {
     }
   }, [users.length, total, page, rowsPerPage]);
 
-  const identitiesRoute = (absoluteRouteMap.children.org.children as unknown as {
-    identities: { children: { users: { path: string } } };
-  }).identities;
+  const identitiesRoute = (
+    absoluteRouteMap.children.org.children as unknown as {
+      identities: { children: { users: { path: string } } };
+    }
+  ).identities;
 
   const invitePath = orgId
     ? generatePath(identitiesRoute.children.users.path + "/invite", { orgId })
@@ -79,7 +84,10 @@ export const UsersPage: React.FC = () => {
 
   const editUserPath = (userId: string) =>
     orgId
-      ? generatePath(identitiesRoute.children.users.path + "/:userId/edit", { orgId, userId })
+      ? generatePath(identitiesRoute.children.users.path + "/:userId/edit", {
+          orgId,
+          userId,
+        })
       : "#";
 
   const getAttr = (user: ThunderUser, key: string) =>
@@ -141,63 +149,89 @@ export const UsersPage: React.FC = () => {
             </ListingTable.Head>
             <ListingTable.Body>
               {isLoading && <ListingSkeletonRows rows={rowsPerPage} />}
-              {!isLoading && users.map((user: ThunderUser) => {
-                const username = getAttr(user, "username");
-                return (
-                <ListingTable.Row
-                  key={user.id}
-                  variant="card"
-                  hover
-                  onMouseEnter={() => setHoveredId(user.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(user.id)}
-                  onBlur={() => setHoveredId(null)}
-                >
-                  <ListingTable.Cell>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                      <Avatar
-                        sx={{
-                          bgcolor: "primary.main",
-                          color: "primary.contrastText",
-                          fontSize: 16,
-                          height: 36,
-                          width: 36,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {username.charAt(0).toUpperCase() || "U"}
-                      </Avatar>
-                      <Typography variant="body2" fontWeight={500} noWrap>
-                        {username}
-                      </Typography>
-                    </Stack>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell>
-                    <Typography variant="body2" color="text.secondary" noWrap>
-                      {user.id}
-                    </Typography>
-                  </ListingTable.Cell>
-                  <ListingTable.Cell align="right">
-                    {hoveredId === user.id && (
-                      <FadeIn>
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Tooltip title="Edit user">
-                            <IconButton size="small" onClick={() => navigate(editUserPath(user.id))}>
-                              <Edit size={16} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete user">
-                            <IconButton size="small" color="error" onClick={() => handleDelete(user)}>
-                              <Trash size={16} />
-                            </IconButton>
-                          </Tooltip>
+              {!isLoading &&
+                users.map((user: ThunderUser) => {
+                  const username = getAttr(user, "username");
+                  return (
+                    <ListingTable.Row
+                      key={user.id}
+                      variant="card"
+                      hover
+                      onMouseEnter={() => setHoveredId(user.id)}
+                      onMouseLeave={() => setHoveredId(null)}
+                      onFocus={() => setHoveredId(user.id)}
+                      onBlur={(e) => {
+                        if (
+                          !e.currentTarget.contains(
+                            e.relatedTarget as Node | null,
+                          )
+                        ) {
+                          setHoveredId(null);
+                        }
+                      }}
+                    >
+                      <ListingTable.Cell>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar
+                            sx={{
+                              bgcolor: "primary.main",
+                              color: "primary.contrastText",
+                              fontSize: 16,
+                              height: 36,
+                              width: 36,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {username.charAt(0).toUpperCase() || "U"}
+                          </Avatar>
+                          <Typography variant="body2" fontWeight={500} noWrap>
+                            {username}
+                          </Typography>
                         </Stack>
-                      </FadeIn>
-                    )}
-                  </ListingTable.Cell>
-                </ListingTable.Row>
-                );
-              })}
+                      </ListingTable.Cell>
+                      <ListingTable.Cell>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          noWrap
+                        >
+                          {user.id}
+                        </Typography>
+                      </ListingTable.Cell>
+                      <ListingTable.Cell align="right">
+                        {hoveredId === user.id && (
+                          <FadeIn>
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              justifyContent="flex-end"
+                            >
+                              <Tooltip title="Edit user">
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    navigate(editUserPath(user.id))
+                                  }
+                                >
+                                  <Edit size={16} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete user">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDelete(user)}
+                                >
+                                  <Trash size={16} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </FadeIn>
+                        )}
+                      </ListingTable.Cell>
+                    </ListingTable.Row>
+                  );
+                })}
             </ListingTable.Body>
           </ListingTable>
         )}
