@@ -28,16 +28,11 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  ListingTable,
   Typography,
 } from "@wso2/oxygen-ui";
 import { generatePath, useNavigate } from "react-router-dom";
-import { ArrowRight } from "@wso2/oxygen-ui-icons-react";
+import { ArrowRight, Users } from "@wso2/oxygen-ui-icons-react";
 
 interface LLMProviderConsumersTabProps {
   orgName: string | undefined;
@@ -93,99 +88,88 @@ export const LLMProviderConsumersTab: React.FC<
 
   if (consumers.length === 0) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          py: 8,
-          gap: 1,
-          color: "text.secondary",
-        }}
-      >
-        <Typography variant="body1">No consumers yet</Typography>
-        <Typography variant="body2">
-          Agents and monitors that use an LLM proxy pointing to this provider
-          will appear here.
-        </Typography>
-      </Box>
+      <ListingTable.Container>
+        <ListingTable.EmptyState
+          illustration={<Users size={64} />}
+          title="No consumers yet"
+          description="Agents and monitors that use an LLM proxy pointing to this provider will appear here."
+        />
+      </ListingTable.Container>
     );
   }
 
   return (
     <Box sx={{ pt: 2 }}>
-      <TableContainer>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Project</TableCell>
-              <TableCell sx={{ width: 140 }} />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {consumers.map((consumer, idx) => {
-              const href = orgName
-                ? consumerLink(orgName, consumer)
-                : undefined;
-              return (
-                <TableRow
-                  key={idx}
-                  hover
-                  sx={{
-                    "& .row-action": { visibility: "hidden" },
-                    "&:hover .row-action, &:focus-within .row-action": { visibility: "visible" },
-                  }}
-                >
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {consumer.consumerName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {consumer.consumerType === "agent" ? (
-                      <Chip
-                        label="Agent"
-                        size="small"
-                        variant="outlined"
-                        color="primary"
-                      />
-                    ) : (
-                      <Chip
-                        label="Monitor"
-                        size="small"
-                        variant="outlined"
-                        color="default"
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {consumer.projectName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" padding="none" sx={{ pr: 1.5 }}>
-                    {href && (
-                      <Button
-                        className="row-action"
-                        variant="outlined"
-                        size="small"
-                        endIcon={<ArrowRight size={14} />}
-                        onClick={() => navigate(href)}
-                        aria-label={`Go to ${consumer.consumerType} ${consumer.consumerName}`}
-                        sx={{ minWidth: 120 }}
-                      >
-                        {`Go to ${consumer.consumerType}`}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <ListingTable>
+        <ListingTable.Head>
+          <ListingTable.Row>
+            <ListingTable.Cell>Name</ListingTable.Cell>
+            <ListingTable.Cell>Type</ListingTable.Cell>
+            <ListingTable.Cell>Project</ListingTable.Cell>
+            <ListingTable.Cell width="140px" />
+          </ListingTable.Row>
+        </ListingTable.Head>
+        <ListingTable.Body>
+          {consumers.map((consumer, idx) => {
+            const href = orgName
+              ? consumerLink(orgName, consumer)
+              : undefined;
+            return (
+              <ListingTable.Row
+                key={idx}
+                hover
+                sx={{
+                  "& .row-action": { visibility: "hidden" },
+                  "&:hover .row-action, &:focus-within .row-action": { visibility: "visible" },
+                }}
+              >
+                <ListingTable.Cell>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {consumer.consumerName}
+                  </Typography>
+                </ListingTable.Cell>
+                <ListingTable.Cell>
+                  {consumer.consumerType === "agent" ? (
+                    <Chip
+                      label="Agent"
+                      size="small"
+                      variant="outlined"
+                      color="primary"
+                    />
+                  ) : (
+                    <Chip
+                      label="Monitor"
+                      size="small"
+                      variant="outlined"
+                      color="default"
+                    />
+                  )}
+                </ListingTable.Cell>
+                <ListingTable.Cell>
+                  <Typography variant="body2" color="text.secondary">
+                    {consumer.projectName}
+                  </Typography>
+                </ListingTable.Cell>
+                <ListingTable.Cell align="right" padding="none" sx={{ pr: 1.5 }}>
+                  {href && (
+                    <Button
+                      className="row-action"
+                      variant="outlined"
+                      size="small"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => navigate(href)}
+                      aria-label={`Go to ${consumer.consumerType} ${consumer.consumerName}`}
+                      sx={{ minWidth: 120 }}
+                    >
+                      {`Go to ${consumer.consumerType}`}
+                    </Button>
+                  )}
+                </ListingTable.Cell>
+              </ListingTable.Row>
+            );
+          })}
+        </ListingTable.Body>
+      </ListingTable>
     </Box>
   );
 };
