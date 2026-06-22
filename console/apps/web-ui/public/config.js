@@ -35,7 +35,7 @@ window.__RUNTIME_CONFIG__ = {
     storage: 'localStorage',
   },
   disableAuth: 'false' === 'true',
-  rbacEnabled: 'true' === 'true',
+  rbacEnabled: 'false' === 'true',
   apiBaseUrl: 'http://localhost:9000',
   obsApiBaseUrl: 'http://localhost:9098',
   gatewayControlPlaneUrl: 'http://localhost:9243',

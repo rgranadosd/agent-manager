@@ -52,6 +52,7 @@ var PredefinedRolePermissions = map[string][]Permission{
 		RoleCreate, RoleRead, RoleUpdate, RoleDelete,
 		GroupCreate, GroupRead, GroupUpdate, GroupDelete,
 		CatalogRead, RepositoryRead,
+		ProfileUpdateAttributes,
 	},
 
 	RoleDeveloper: {
@@ -73,6 +74,7 @@ var PredefinedRolePermissions = map[string][]Permission{
 		MonitorScoreRead,
 		ObservabilityProjectDashboard, ObservabilityInfraMetric,
 		CatalogRead, RepositoryRead,
+		ProfileUpdateAttributes,
 	},
 
 	RoleAILead: {
@@ -91,6 +93,7 @@ var PredefinedRolePermissions = map[string][]Permission{
 		MonitorRead, MonitorScoreRead,
 		ObservabilityOrgDashboard, ObservabilityProjectDashboard, ObservabilityGuardrailMetric,
 		CatalogRead,
+		ProfileUpdateAttributes,
 	},
 
 	RolePlatformEngineer: {
@@ -107,5 +110,6 @@ var PredefinedRolePermissions = map[string][]Permission{
 		MonitorRead, MonitorScoreRead,
 		ObservabilityOrgDashboard, ObservabilityProjectDashboard, ObservabilityInfraMetric,
 		CatalogRead,
+		ProfileUpdateAttributes,
 	},
 }

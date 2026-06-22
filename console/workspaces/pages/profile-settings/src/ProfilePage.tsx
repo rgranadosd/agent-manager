@@ -17,6 +17,7 @@
  */
 
 import React, { useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -29,7 +30,7 @@ import {
 } from "@wso2/oxygen-ui";
 import { PageLayout, TextInput } from "@agent-management-platform/views";
 import { useAuthHooks } from "@agent-management-platform/auth";
-import { useUpdateUserProfile, useUpdateUserCredentials } from "@agent-management-platform/api-client";
+import { useUpdateUserProfile } from "@agent-management-platform/api-client";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -49,6 +50,7 @@ function TabPanel(props: TabPanelProps) {
 
 export const ProfilePage: React.FC = () => {
   const { userInfo } = useAuthHooks();
+  const { orgId } = useParams<{ orgId: string }>();
   const [activeTab, setActiveTab] = useState(0);
 
   // Profile update state
@@ -59,7 +61,11 @@ export const ProfilePage: React.FC = () => {
     email: userInfo?.email || "",
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
-  const { mutateAsync: updateProfile, isPending: isUpdatingProfile, error: profileError } = useUpdateUserProfile();
+  const {
+    mutateAsync: updateProfile,
+    isPending: isUpdatingProfile,
+    error: profileError,
+  } = useUpdateUserProfile();
 
   // Credential update state
   const [credentialData, setCredentialData] = useState({
@@ -68,7 +74,6 @@ export const ProfilePage: React.FC = () => {
     confirmPassword: "",
   });
   const [credentialErrors, setCredentialErrors] = useState<Record<string, string>>({});
-  const { mutateAsync: updateCredentials, isPending: isUpdatingCredentials, error: credentialError } = useUpdateUserCredentials();
 
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -106,10 +111,11 @@ export const ProfilePage: React.FC = () => {
   };
 
   const handleProfileSubmit = async () => {
-    if (!validateProfile()) return;
+    if (!validateProfile() || !orgId || !userInfo?.sub) return;
 
     try {
       await updateProfile({
+        params: { orgName: orgId, userId: userInfo.sub },
         body: {
           attributes: {
             username: profileData.username.trim(),
@@ -127,16 +133,21 @@ export const ProfilePage: React.FC = () => {
   };
 
   const handleCredentialSubmit = async () => {
-    if (!validateCredentials()) return;
+    if (!validateCredentials() || !orgId || !userInfo?.sub) return;
 
     try {
-      await updateCredentials(
-        {
+      await updateProfile({
+        params: { orgName: orgId, userId: userInfo.sub },
+        body: {
           attributes: {
+            username: profileData.username.trim(),
+            firstname: profileData.firstname.trim(),
+            lastname: profileData.lastname.trim(),
+            email: profileData.email.trim(),
             password: credentialData.newPassword,
           },
-        }
-      );
+        },
+      });
       setSuccessMessage("Password updated successfully");
       setCredentialData({
         currentPassword: "",
@@ -145,7 +156,7 @@ export const ProfilePage: React.FC = () => {
       });
       setCredentialErrors({});
     } catch {
-      // Error is shown via credentialError state
+      // Error is shown via profileError state
     }
   };
 
@@ -161,9 +172,9 @@ export const ProfilePage: React.FC = () => {
           </Alert>
         ) : null}
 
-        {profileError || credentialError ? (
+        {profileError ? (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {(profileError as Error)?.message || (credentialError as Error)?.message || "An error occurred"}
+            {(profileError as Error)?.message || "An error occurred"}
           </Alert>
         ) : null}
 
@@ -290,9 +301,9 @@ export const ProfilePage: React.FC = () => {
               <Button
                 variant="contained"
                 onClick={handleCredentialSubmit}
-                disabled={isUpdatingCredentials || !credentialData.newPassword}
+                disabled={isUpdatingProfile || !credentialData.newPassword}
               >
-                {isUpdatingCredentials ? <CircularProgress size={24} /> : "Update Password"}
+                {isUpdatingProfile ? <CircularProgress size={24} /> : "Update Password"}
               </Button>
             </Stack>
           </Form.Stack>

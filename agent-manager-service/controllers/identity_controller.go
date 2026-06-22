@@ -43,6 +43,7 @@ type IdentityController interface {
 	GetUserGroups(w http.ResponseWriter, r *http.Request)
 	GetUserRoles(w http.ResponseWriter, r *http.Request)
 	InviteUser(w http.ResponseWriter, r *http.Request)
+	UpdateCurrentUserProfile(w http.ResponseWriter, r *http.Request)
 
 	// Groups
 	ListGroups(w http.ResponseWriter, r *http.Request)
@@ -1296,6 +1297,39 @@ func (c *identityController) ListAMPPermissions(w http.ResponseWriter, r *http.R
 		return
 	}
 	utils.WriteSuccessResponse(w, http.StatusOK, map[string]any{"permissions": perms, "resourceServerId": rsID})
+}
+
+// UpdateCurrentUserProfile updates the current user's profile information
+func (c *identityController) UpdateCurrentUserProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := logger.GetLogger(ctx)
+
+	userID := r.PathValue(utils.PathParamUserID)
+	if userID == "" {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "User ID is required")
+		return
+	}
+
+	var body spec.UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		utils.WriteErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	updatedUser, err := c.client.UpdateUser(ctx, userID, thundersvc.UpdateUserRequest{
+		Attributes: *body.Attributes,
+	})
+	if err != nil {
+		if thundersvc.IsNotFound(err) {
+			utils.WriteErrorResponse(w, http.StatusNotFound, "User not found")
+			return
+		}
+		log.Error("UpdateCurrentUserProfile failed", "userID", userID, "error", err)
+		utils.WriteErrorResponse(w, http.StatusInternalServerError, "Failed to update user profile")
+		return
+	}
+
+	utils.WriteSuccessResponse(w, http.StatusOK, updatedUser)
 }
 
 // validateUserOwnership checks if a user belongs to the caller's OU

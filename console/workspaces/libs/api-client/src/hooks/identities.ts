@@ -25,7 +25,7 @@ import {
   getRoleAssignments, addRolePermissions, removeRolePermissions,
   addRoleAssignees, removeRoleAssignees,
   listAMPPermissions,
-  updateUserProfile, updateUserCredentials,
+  updateUserProfile,
 } from "../apis";
 import type {
   ThunderUserListResponse, ThunderUser,
@@ -137,17 +137,9 @@ export function useDeleteUser() {
 
 export function useUpdateUserProfile() {
   const { getToken } = useAuthHooks();
-  return useApiMutation<ThunderUser, unknown, { body: UpdateUserRequest }>({
+  return useApiMutation<ThunderUser, unknown, { params: UserPathParams; body: UpdateUserRequest }>({
     action: { verb: 'update', target: 'profile' },
-    mutationFn: ({ body }) => updateUserProfile(body, getToken),
-  });
-}
-
-export function useUpdateUserCredentials() {
-  const { getToken } = useAuthHooks();
-  return useApiMutation<void, unknown, { attributes: { password: string } }>({
-    action: { verb: 'update', target: 'password' },
-    mutationFn: (body) => updateUserCredentials(body, getToken),
+    mutationFn: ({ params, body }) => updateUserProfile(params, body, getToken),
   });
 }
 

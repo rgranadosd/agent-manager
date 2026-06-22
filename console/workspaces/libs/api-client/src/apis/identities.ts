@@ -406,26 +406,17 @@ export async function removeRoleAssignees(
 // --- User Profile & Credentials (Self) ---
 
 export async function updateUserProfile(
+  params: UserPathParams,
   body: UpdateUserRequest,
   getToken?: () => Promise<string>,
 ): Promise<ThunderUser> {
+  const { orgName = "default", userId } = params;
   const token = getToken ? await getToken() : undefined;
   const res = await httpPUT(
-    `${orgBase("default")}/users/me`, body, { token },
+    `${orgBase(orgName)}/users/${encodeURIComponent(userId)}/profile`, body, { token },
   );
   if (!res.ok) throw await res.json();
   return res.json();
-}
-
-export async function updateUserCredentials(
-  body: { attributes: { password: string } },
-  getToken?: () => Promise<string>,
-): Promise<void> {
-  const token = getToken ? await getToken() : undefined;
-  const res = await httpPOST(
-    `${orgBase("default")}/users/me/update-credentials`, body, { token },
-  );
-  if (!res.ok) throw await res.json();
 }
 
 // --- Permissions catalog ---

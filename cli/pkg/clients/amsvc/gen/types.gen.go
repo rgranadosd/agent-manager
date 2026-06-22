@@ -4781,14 +4781,6 @@ type ListUsersParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// UpdateUserCredentialsJSONBody defines parameters for UpdateUserCredentials.
-type UpdateUserCredentialsJSONBody struct {
-	Attributes struct {
-		// Password New password
-		Password string `json:"password"`
-	} `json:"attributes"`
-}
-
 // DiscoverOidcConfigurationParams defines parameters for DiscoverOidcConfiguration.
 type DiscoverOidcConfigurationParams struct {
 	// Url Issuer base URL or full .well-known/openid-configuration URL.
@@ -5097,14 +5089,11 @@ type UpdateRoleJSONRequestBody = UpdateRoleRequest
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequest
 
-// UpdateUserProfileJSONRequestBody defines body for UpdateUserProfile for application/json ContentType.
-type UpdateUserProfileJSONRequestBody = UpdateUserRequest
-
-// UpdateUserCredentialsJSONRequestBody defines body for UpdateUserCredentials for application/json ContentType.
-type UpdateUserCredentialsJSONRequestBody UpdateUserCredentialsJSONBody
-
 // UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
 type UpdateUserJSONRequestBody = UpdateUserRequest
+
+// UpdateCurrentUserProfileJSONRequestBody defines body for UpdateCurrentUserProfile for application/json ContentType.
+type UpdateCurrentUserProfileJSONRequestBody = UpdateUserRequest
 
 // CreateLLMProviderTemplateJSONRequestBody defines body for CreateLLMProviderTemplate for application/json ContentType.
 type CreateLLMProviderTemplateJSONRequestBody = CreateLLMProviderTemplateRequest

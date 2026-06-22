@@ -196,16 +196,16 @@ export function RootRouter() {
             </Protected>
           }
         >
-          <Route
-            path={relativeRouteMap.children.profile.path}
-            element={
-              <Suspense fallback={<LoadingFallback />}>
-                <LazyProfilePage />
-              </Suspense>
-            }
-          />
           <Route path={relativeRouteMap.children.org.path} element={<OrgGuard />}>
             <Route index element={<LazyOverviewOrg />} />
+            <Route
+              path={relativeRouteMap.children.org.children.profile.path}
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <LazyProfilePage />
+                </Suspense>
+              }
+            />
             {
               orgPageModules.map((module) => (
                 <Route
