@@ -61,9 +61,9 @@ help:
 # Complete setup
 setup: setup-colima setup-k3d setup-openchoreo setup-platform setup-console-local
 	@$(MAKE) dev-migrate
-	@cd deployments/scripts && ./port-forward.sh --platform --background
+	@cd deployments/setup && ./port-forward.sh --platform --background
 	@$(MAKE) setup-gateway
-	@cd deployments/scripts && ./port-forward.sh --background
+	@cd deployments/setup && ./port-forward.sh --background
 	@echo ""
 	@echo "✅ Setup complete!"
 	@echo ""
@@ -76,13 +76,13 @@ setup: setup-colima setup-k3d setup-openchoreo setup-platform setup-console-loca
 
 # Setup individual components
 setup-colima:
-	@cd deployments/scripts && ./setup-colima.sh
+	@cd deployments/setup && ./setup-colima.sh
 
 setup-k3d:
-	@cd deployments/scripts && ./setup-k3d.sh && ./setup-prerequisites.sh
+	@cd deployments/setup && ./setup-k3d.sh && ./setup-prerequisites.sh
 
 setup-openchoreo:
-	@cd deployments/scripts && ./setup-openchoreo.sh $(CURDIR)
+	@cd deployments/setup && ./setup-openchoreo.sh $(CURDIR)
 
 gen-keys:
 	@echo "🔑 Generating JWT signing keys..."
@@ -90,10 +90,10 @@ gen-keys:
 	@echo "✅ JWT signing keys generated in agent-manager-service/keys/"
 
 setup-platform: gen-keys
-	@cd deployments/scripts && ./setup-platform.sh
+	@cd deployments/setup && ./setup-platform.sh
 
 setup-gateway:
-	@cd deployments/scripts && ./setup-gateway.sh
+	@cd deployments/setup && ./setup-gateway.sh
 
 # Console local setup with dependency tracking
 # This will only rebuild when rush.json or pnpm-lock.yaml changes
@@ -207,13 +207,13 @@ GATEWAY    ?=
 BACKGROUND ?=
 
 port-forward:
-	@cd deployments/scripts && ./port-forward.sh \
+	@cd deployments/setup && ./port-forward.sh \
 		$(if $(filter true,$(PLATFORM)),--platform) \
 		$(if $(filter true,$(GATEWAY)),--gateway) \
 		$(if $(filter true,$(BACKGROUND)),--background)
 
 stop-port-forward:
-	@cd deployments/scripts && ./stop-port-forward.sh
+	@cd deployments/setup && ./stop-port-forward.sh
 
 # Database commands
 db-connect:
@@ -305,4 +305,4 @@ e2e-test:
 
 # Cleanup
 teardown:
-	@cd deployments/scripts && ./teardown.sh
+	@cd deployments/setup && ./teardown.sh
