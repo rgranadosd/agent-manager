@@ -253,7 +253,11 @@ export function ManageIdentityProviderDialog({
                 value={envName}
                 displayEmpty
                 onChange={(e) => setEnvName(e.target.value as string)}
-                renderValue={(v) => (v ? (v as string) : "Select an environment")}
+                renderValue={(v) => {
+                  if (!v) return "Select an environment";
+                  const env = (environments ?? []).find((en) => en.name === v);
+                  return env?.displayName || env?.name || (v as string);
+                }}
               >
                 {(environments ?? []).map((env) => (
                   <MenuItem key={env.name} value={env.name}>
