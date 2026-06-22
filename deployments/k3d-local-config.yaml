@@ -81,6 +81,17 @@ options:
       - arg: "--disable=traefik"
         nodeFilters:
           - server:*
+      # Disable k3s NetworkPolicy enforcement (kube-router). On this local
+      # dev cluster the per-component NetworkPolicies that OpenChoreo generates
+      # don't need to be enforced, and kube-router mis-programs them after a
+      # pod is recreated several times (e.g. CrashLoop during build iteration):
+      # it then rejects even allowed ingress to the agent pod's port, so the
+      # API Platform Gateway gets "connection refused" → 503 UpstreamConnectionFailure
+      # on "Try It". Disabling enforcement makes the policies inert and avoids
+      # the whack-a-mole of deleting them on every redeploy.
+      - arg: "--disable-network-policy"
+        nodeFilters:
+          - server:*
 # Configure insecure registries for HTTP access
 # Allows kubelet to pull images from Workflow Plane registry via HTTP
 registries:
