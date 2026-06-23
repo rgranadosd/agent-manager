@@ -294,15 +294,17 @@ setup-ai-gateway: dev-migrate
 # E2E tests
 # Run all (parallel):    make e2e-test
 # Run one suite:         make e2e-test SUITE=monitors
+# Run a suite group:     make e2e-test SUITE=cli            (recursive: all suites under tests/cli/)
 # Run with focus filter to run a specific test case: make e2e-test FOCUS="Project Deletion Conflict"
 # A focused run (FOCUS) runs serially (--procs=1); everything else uses -p.
 GINKGO_PROCS := $(if $(FOCUS),--procs=1,-p)
 e2e-test:
 	@echo "Running E2E tests..."
 	@cd test/e2e && set -a && [ -f .env ] && . ./.env; set +a && \
-		go run github.com/onsi/ginkgo/v2/ginkgo -v $(GINKGO_PROCS) --timeout 45m --poll-progress-after=600s \
-		--keep-going --junit-report=e2e-report.xml --output-dir=. \
-		$(if $(FOCUS),--focus="$(FOCUS)") $(if $(SUITE),./tests/$(SUITE)/,./tests/...)
+
+		go run github.com/onsi/ginkgo/v2/ginkgo -v --procs=1 --timeout 45m --poll-progress-after=600s \
+		--junit-report=e2e-report.xml --output-dir=. \
+		$(if $(FOCUS),--focus="$(FOCUS)") $(if $(SUITE),./tests/$(SUITE)/...,./tests/...)
 
 
 # Cleanup
