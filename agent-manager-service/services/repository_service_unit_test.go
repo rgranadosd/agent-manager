@@ -138,6 +138,8 @@ func TestRepositoryService_ListBranches(t *testing.T) {
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, boom)
+		// A real fetch error must not be masked as "not found".
+		assert.NotErrorIs(t, err, gitprovider.ErrNotFound)
 	})
 
 	t.Run("propagates invalid-credentials error before any provider work", func(t *testing.T) {
@@ -152,6 +154,7 @@ func TestRepositoryService_ListBranches(t *testing.T) {
 		_, err := svc.ListBranches(context.Background(), branchReq("git-secret", "acme"), gitprovider.ProviderGitHub, 10, 0)
 
 		assert.ErrorIs(t, err, utils.ErrGitSecretInvalidType)
+		assert.NotErrorIs(t, err, gitprovider.ErrNotFound)
 	})
 
 	t.Run("unsupported provider type fails locally without network", func(t *testing.T) {
@@ -188,6 +191,8 @@ func TestRepositoryService_ListCommits(t *testing.T) {
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, boom)
+		// A real fetch error must not be masked as "not found".
+		assert.NotErrorIs(t, err, gitprovider.ErrNotFound)
 	})
 
 	t.Run("propagates invalid-credentials error before any provider work", func(t *testing.T) {
@@ -201,6 +206,7 @@ func TestRepositoryService_ListCommits(t *testing.T) {
 		_, err := svc.ListCommits(context.Background(), commitReq("git-secret", "acme"), gitprovider.ProviderGitHub, 10, 0)
 
 		assert.ErrorIs(t, err, utils.ErrGitSecretInvalidType)
+		assert.NotErrorIs(t, err, gitprovider.ErrNotFound)
 	})
 
 	t.Run("unsupported provider type fails locally without network", func(t *testing.T) {

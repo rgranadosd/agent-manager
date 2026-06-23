@@ -159,5 +159,15 @@ go test -run 'TestAgentKindService' ./services/
 
 - [ ] `make test-unit` passes.
 - [ ] `go build -tags=integration ./...` compiles (catches helper-name collisions across tiers).
-- [ ] `gofmt -l` clean on changed files; `make lint` reports nothing new.
+- [ ] **CI lint passes** — run the exact CI command (NOT just `make lint`/`gofmt`, which use a different config):
+      `golangci-lint run --config .github/linters/.golangci.yaml ./...`
+- [ ] `gofmt -l` clean on changed files.
 - [ ] Regenerated `spec/`/mocks committed if the YAML or an interface changed.
+
+CI lints **test files too**, with a strict config (`.github/linters/.golangci.yaml`). Trip-ups that bite test authors:
+
+- **`nilnil`** — never `return nil, nil`. Use an empty typed value (`return []*models.Foo{}, nil`). When `(nil, nil)` is the actual input under test, suppress with a reason: `//nolint:nilnil // exercising the (nil, nil) input the service must handle`.
+- **`goheader`** — every `.go` file (tests included) needs the Apache license header; copy it from an existing file.
+- **`errorlint` / `nilerr`** — compare errors with `errors.Is`, not `==`; don't `return nil` after a non-nil error check.
+- **`nolintlint`** — a bare `//nolint` is itself an error: always `//nolint:<linter> // <reason>`.
+- **`exhaustruct`** (every struct field must be set) is enabled, but an exclusion rule turns it off for `_test.go` files — so test fixtures can use partial struct literals freely. It still applies to production code you touch.

@@ -26,9 +26,9 @@ wire: ## Run wire code gen.
 codegen: ## Run code gen.
 	@echo "Running go generate"
 	@# Requires the `moq` binary on PATH (mock generation for client + repository
-	@# interfaces, see //go:generate directives). Install with:
-	@#   go install github.com/matryer/moq@latest
-	@command -v moq >/dev/null 2>&1 || echo "WARNING: 'moq' not found on PATH; mock (re)generation will be skipped. Install: go install github.com/matryer/moq@latest"
+	@# interfaces, see //go:generate directives). Install with (version pinned in README):
+	@#   go install github.com/matryer/moq@v0.5.3
+	@command -v moq >/dev/null 2>&1 || echo "WARNING: 'moq' not found on PATH; go generate will still run but mock (re)generation will fail. Install: go install github.com/matryer/moq@v0.5.3"
 	@go generate -tags=wireinject ./...
 	@echo "Go generate done"
 

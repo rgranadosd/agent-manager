@@ -37,9 +37,27 @@ PG_CONTAINER="${PG_CONTAINER:-}"
 detect_pg_container() {
     [ -n "$PG_CONTAINER" ] && { echo "$PG_CONTAINER"; return; }
     command -v docker >/dev/null 2>&1 || return
-    # Prefer a container publishing the test port, then any postgres image.
-    docker ps --filter "publish=${TEST_DB_PORT}" --format '{{.Names}} {{.Image}}' 2>/dev/null \
-        | awk 'tolower($2) ~ /postgres/ {print $1; exit}'
+    # Find every Postgres container publishing the test port. We refuse to guess
+    # when more than one matches: psql_exec drives destructive DROP/CREATE DATABASE
+    # commands, so picking the wrong instance could wipe the wrong database.
+    local matches
+    matches="$(docker ps --filter "publish=${TEST_DB_PORT}" --format '{{.Names}} {{.Image}}' 2>/dev/null \
+        | awk 'tolower($2) ~ /postgres/ {print $1}')"
+
+    local count
+    count="$(printf '%s\n' "$matches" | grep -c .)"
+    if [ "$count" -gt 1 ]; then
+        echo "✗ FAILED - Multiple Postgres containers publish port ${TEST_DB_PORT}; refusing to guess which to use." >&2
+        echo "  Matching containers:" >&2
+        printf '%s\n' "$matches" | sed 's/^/    /' >&2
+        echo "  Set PG_CONTAINER=<name> to disambiguate." >&2
+        return 1
+    fi
+    if [ "$count" -eq 0 ]; then
+        # No match: let the caller (psql_exec) emit its install/PG_CONTAINER hint.
+        return
+    fi
+    printf '%s\n' "$matches"
 }
 
 psql_exec() {
@@ -48,8 +66,14 @@ psql_exec() {
             -h "$TEST_DB_HOST" -p "$TEST_DB_PORT" -U "$TEST_DB_USER" "$@"
         return $?
     fi
-    local container
+    local container detect_rc
     container="$(detect_pg_container)"
+    detect_rc=$?
+    # detect_pg_container returns non-zero only when the match is ambiguous; it has
+    # already printed the matching containers and the PG_CONTAINER hint to stderr.
+    if [ "$detect_rc" -ne 0 ]; then
+        return "$detect_rc"
+    fi
     if [ -z "$container" ]; then
         echo "✗ FAILED - psql not found on host and no Postgres container detected." >&2
         echo "  Install psql (brew install libpq) or set PG_CONTAINER=<name>." >&2
