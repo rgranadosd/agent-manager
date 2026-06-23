@@ -120,6 +120,7 @@ run_install() {
 
 log "Phase 1/2: bootstrap (Docker + tools + firewall)"
 ensure_prerequisites
+ensure_inotify_limits
 ensure_firewall 443
 ensure_disk
 

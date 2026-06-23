@@ -73,6 +73,48 @@ ensure_disk() {
   fi
 }
 
+# inotify_bump_target <current> <floor> — echo <floor> when the current sysctl value is
+# below it (or empty/non-numeric, i.e. unreadable), else echo nothing. Pure: lets the
+# caller decide whether a bump is needed without touching sysctl, and keeps the
+# never-lower-an-existing-higher-value rule unit-testable.
+inotify_bump_target() {
+  local current="$1" floor="$2"
+  if [[ "$current" =~ ^[0-9]+$ ]] && (( current >= floor )); then return 0; fi
+  printf '%s' "$floor"
+}
+
+# ensure_inotify_limits — raise fs.inotify.max_user_{instances,watches} to the floors k3d
+# needs (kubelet + many containers each open watches) and persist them. A fresh
+# single-user install can otherwise exhaust the default instance ceiling: systemd logs
+# "Failed to allocate directory watch: Too many open files" and k3d configmap/secret
+# watches silently go stale. Only keys actually below their floor are touched/persisted,
+# so a host already tuned higher is never lowered.
+ensure_inotify_limits() {
+  local inst_floor=512 watch_floor=524288 cur tgt conf=/etc/sysctl.d/99-amp-inotify.conf
+  local -a lines=()
+
+  cur="$(sysctl -n fs.inotify.max_user_instances 2>/dev/null || true)"
+  tgt="$(inotify_bump_target "$cur" "$inst_floor")"
+  if [[ -n "$tgt" ]]; then
+    sysctl -w "fs.inotify.max_user_instances=$tgt" >/dev/null 2>&1 || true
+    lines+=("fs.inotify.max_user_instances=$tgt")
+  fi
+
+  cur="$(sysctl -n fs.inotify.max_user_watches 2>/dev/null || true)"
+  tgt="$(inotify_bump_target "$cur" "$watch_floor")"
+  if [[ -n "$tgt" ]]; then
+    sysctl -w "fs.inotify.max_user_watches=$tgt" >/dev/null 2>&1 || true
+    lines+=("fs.inotify.max_user_watches=$tgt")
+  fi
+
+  if (( ${#lines[@]} )); then
+    printf '%s\n' "${lines[@]}" > "$conf" 2>/dev/null || true
+    log "Raised inotify limits for k3d (${lines[*]})"
+  else
+    log "inotify limits already sufficient for k3d"
+  fi
+}
+
 # verify_caddy_up — fail loudly if the amp-caddy container isn't healthy shortly after
 # start. Caddy runs on the host network, so a port collision (e.g. an UPSTREAM_LISTEN_PORT
 # already bound by k3d) makes it crash-loop; without this check the installer would
