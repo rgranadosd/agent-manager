@@ -260,6 +260,62 @@ export function ManageIdentityProviderDialog({
     [scriptInputs, showToken, resolvedToken],
   );
 
+  const environmentField = (
+    <FormControl fullWidth disabled={isDelete}>
+      <FormLabel required>Environment</FormLabel>
+      <Select
+        size="small"
+        value={envName}
+        displayEmpty
+        onChange={(e) => setEnvName(e.target.value as string)}
+        renderValue={(v) => {
+          if (!v) return "Select an environment";
+          const env = envOptions.find((en) => en.name === v);
+          return env?.displayName || env?.name || (v as string);
+        }}
+      >
+        {envOptions.map((env) => (
+          <MenuItem key={env.name} value={env.name}>
+            {env.displayName || env.name}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+
+  const gatewayField = (
+    <FormControl fullWidth disabled={isDelete || (!isGatewayLocked && !envName)}>
+      <FormLabel required>Gateway</FormLabel>
+      {isGatewayLocked ? (
+        <TextField
+          size="small"
+          fullWidth
+          value={lockedGateway?.name ?? ""}
+          slotProps={{ input: { readOnly: true } }}
+          disabled
+        />
+      ) : (
+        <Select
+          size="small"
+          value={gatewayId}
+          displayEmpty
+          onChange={(e) => setGatewayId(e.target.value as string)}
+          renderValue={(v) => {
+            if (!v) return "Select a gateway";
+            const gw = gateways.find((g) => g.uuid === v);
+            return gw?.displayName || gw?.name || (v as string);
+          }}
+        >
+          {gateways.map((gw) => (
+            <MenuItem key={gw.uuid} value={gw.uuid}>
+              {gw.displayName || gw.name}
+            </MenuItem>
+          ))}
+        </Select>
+      )}
+    </FormControl>
+  );
+
   return (
     <DrawerWrapper open={open} onClose={onClose}>
       <DrawerHeader
@@ -277,57 +333,20 @@ export function ManageIdentityProviderDialog({
           </Typography>
 
           <Stack spacing={2}>
-            <FormControl fullWidth disabled={isDelete}>
-              <FormLabel required>Environment</FormLabel>
-              <Select
-                size="small"
-                value={envName}
-                displayEmpty
-                onChange={(e) => setEnvName(e.target.value as string)}
-                renderValue={(v) => {
-                  if (!v) return "Select an environment";
-                  const env = envOptions.find((en) => en.name === v);
-                  return env?.displayName || env?.name || (v as string);
-                }}
-              >
-                {envOptions.map((env) => (
-                  <MenuItem key={env.name} value={env.name}>
-                    {env.displayName || env.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth disabled={isDelete || !envName}>
-              <FormLabel required>Gateway</FormLabel>
-              {isGatewayLocked ? (
-                <TextField
-                  size="small"
-                  fullWidth
-                  value={lockedGateway?.name ?? ""}
-                  slotProps={{ input: { readOnly: true } }}
-                  disabled
-                />
-              ) : (
-                <Select
-                  size="small"
-                  value={gatewayId}
-                  displayEmpty
-                  onChange={(e) => setGatewayId(e.target.value as string)}
-                  renderValue={(v) => {
-                    if (!v) return "Select a gateway";
-                    const gw = gateways.find((g) => g.uuid === v);
-                    return gw?.displayName || gw?.name || (v as string);
-                  }}
-                >
-                  {gateways.map((gw) => (
-                    <MenuItem key={gw.uuid} value={gw.uuid}>
-                      {gw.displayName || gw.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              )}
-            </FormControl>
+            {/* Gateway comes first when it is locked in (added from a gateway);
+                otherwise Environment leads, because the gateway picker is
+                filtered by the selected environment. */}
+            {isGatewayLocked ? (
+              <>
+                {gatewayField}
+                {environmentField}
+              </>
+            ) : (
+              <>
+                {environmentField}
+                {gatewayField}
+              </>
+            )}
 
             <FormControl fullWidth disabled={isDelete}>
               <FormLabel required>Name</FormLabel>
