@@ -794,12 +794,20 @@ func (s *PlatformGatewayService) UpsertIdentityProvider(ctx context.Context, gat
 	}
 	// Patch the gateway runtime config first so a failed apply never leaves a mirror
 	// row the gateway does not honor.
+	applied := false
 	if s.gatewayApplier != nil && providerType == models.IdentityProviderTypeCustom {
 		if err := s.gatewayApplier.ApplyIdentityProvider(ctx, gatewayID, orgName, *provider); err != nil {
 			return nil, err
 		}
+		applied = true
 	}
 	if err := s.gatewayRepo.UpsertIdentityProvider(provider); err != nil {
+		if applied {
+			// Gateway was patched but the mirror write failed: the two are diverged
+			// until the client retries (both operations are idempotent).
+			slog.Warn("gateway identity provider applied but mirror upsert failed; retry to reconcile",
+				"gatewayID", gatewayID, "provider", name, "error", err)
+		}
 		return nil, err
 	}
 	return provider, nil
@@ -817,12 +825,23 @@ func (s *PlatformGatewayService) DeleteIdentityProvider(ctx context.Context, gat
 	if err != nil {
 		return err
 	}
+	removed := false
 	if s.gatewayApplier != nil && !models.IsSystemIdentityProvider(name) {
 		if err := s.gatewayApplier.DeleteIdentityProvider(ctx, gatewayID, orgName, name); err != nil {
 			return err
 		}
+		removed = true
 	}
-	return s.gatewayRepo.DeleteIdentityProvider(gwUUIDStr, name)
+	if err := s.gatewayRepo.DeleteIdentityProvider(gwUUIDStr, name); err != nil {
+		if removed {
+			// Gateway entry was removed but the mirror delete failed: the two are
+			// diverged until the client retries (both operations are idempotent).
+			slog.Warn("gateway identity provider removed but mirror delete failed; retry to reconcile",
+				"gatewayID", gatewayID, "provider", name, "error", err)
+		}
+		return err
+	}
+	return nil
 }
 
 // ListIdentityProvidersByGateway lists the identity providers mirrored for a gateway.
