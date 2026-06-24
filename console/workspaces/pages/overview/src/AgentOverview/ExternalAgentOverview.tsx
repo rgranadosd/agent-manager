@@ -20,7 +20,7 @@ import { globalConfig, type Environment } from '@agent-management-platform/types
 import { Box, Button, Skeleton, Stack } from "@wso2/oxygen-ui";
 import { Settings } from "@wso2/oxygen-ui-icons-react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useGetAgent,
   useListEnvironments,
@@ -66,6 +66,12 @@ export const ExternalAgentOverview = () => {
     setSelectedEnvironmentId(environmentId);
     setSearchParams({ setup: "true" });
   };
+
+  useEffect(() => {
+    if (!isEnvironmentsLoading && !selectedEnvironmentId) {
+      setSelectedEnvironmentId(sortedEnvironmentList.length > 0 ? sortedEnvironmentList[0].id! : "");
+    }
+  }, [sortedEnvironmentList, isEnvironmentsLoading, selectedEnvironmentId]);
 
   return (
     <>
@@ -126,7 +132,7 @@ export const ExternalAgentOverview = () => {
         )}
       </Box>
       <InstrumentationDrawer
-        open={searchParams.get("setup") === "true"}
+        open={searchParams.get("setup") === "true" && selectedEnvironmentId !== ""}
         onClose={() => setSearchParams({})}
         agentId={agentId ?? ""}
         orgName={orgId ?? "default"}
