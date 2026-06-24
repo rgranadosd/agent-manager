@@ -245,17 +245,9 @@ func runDeploy(ctx context.Context, o *DeployOptions) error {
 		return render.Error(o.IO, o.Scope, err)
 	}
 
-	pipeResp, err := client.GetDeploymentPipelineWithResponse(ctx, o.Org, o.Proj)
+	targetEnv, err := cmdutil.ResolveEntryEnvironment(ctx, client, o.Org, o.Proj)
 	if err != nil {
-		return render.Error(o.IO, o.Scope, clierr.Newf(clierr.Transport, "%v", err))
-	}
-	if pipeResp.JSON200 == nil {
-		return render.Error(o.IO, o.Scope, cmdutil.ErrorFromServer(pipeResp.HTTPResponse, cmdutil.FirstNonNil(pipeResp.JSON404, pipeResp.JSON500)))
-	}
-	targetEnv := cmdutil.LowestEnvironment(pipeResp.JSON200.PromotionPaths)
-	if targetEnv == "" {
-		return render.Error(o.IO, o.Scope, clierr.Newf(clierr.Internal,
-			"deployment pipeline has no entry environment for project %q", o.Proj))
+		return render.Error(o.IO, o.Scope, err)
 	}
 
 	cfgResp, err := client.GetAgentConfigurationsWithResponse(ctx, o.Org, o.Proj, o.AgentName,

@@ -17,7 +17,10 @@
 package cmdutil
 
 import (
+	"context"
+
 	amsvc "github.com/wso2/agent-manager/cli/pkg/clients/amsvc/gen"
+	"github.com/wso2/agent-manager/cli/pkg/clierr"
 )
 
 // LowestEnvironment returns the entry environment of the deployment pipeline —
@@ -38,4 +41,24 @@ func LowestEnvironment(paths []amsvc.PromotionPath) string {
 		}
 	}
 	return ""
+}
+
+// ResolveEntryEnvironment fetches the project's deployment pipeline and returns
+// its entry (lowest) environment — the one internal-agent deploys target first.
+// Returns a clierr on transport failure, a non-2xx response, or a pipeline with
+// no entry environment. Both `agent deploy` and external-agent token minting
+// resolve the same environment, so the logic lives here to keep them in sync.
+func ResolveEntryEnvironment(ctx context.Context, client *amsvc.ClientWithResponses, org, proj string) (string, error) {
+	pipeResp, err := client.GetDeploymentPipelineWithResponse(ctx, org, proj)
+	if err != nil {
+		return "", clierr.Newf(clierr.Transport, "get deployment pipeline: %v", err)
+	}
+	if pipeResp.JSON200 == nil {
+		return "", ErrorFromServer(pipeResp.HTTPResponse, FirstNonNil(pipeResp.JSON404, pipeResp.JSON500))
+	}
+	env := LowestEnvironment(pipeResp.JSON200.PromotionPaths)
+	if env == "" {
+		return "", clierr.Newf(clierr.Internal, "deployment pipeline has no entry environment for project %q", proj)
+	}
+	return env, nil
 }
