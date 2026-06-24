@@ -89,6 +89,7 @@ const sidebars: SidebarsConfig = {
             'reference/cli/llm-provider',
             'reference/cli/skills',
             'reference/cli/version',
+            'reference/cli/api',
           ],
         },
       ],

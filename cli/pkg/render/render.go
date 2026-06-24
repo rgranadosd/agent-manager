@@ -91,6 +91,17 @@ func textError(ios *iostreams.IOStreams, err error) error {
 	return &renderedError{err: err}
 }
 
+// Rendered marks err as already presented to the user without writing
+// anything itself. Commands that emit their own raw output (e.g. `amctl api`)
+// return Rendered(err) so the top-level runner exits non-zero but does not
+// re-print the error or append usage.
+func Rendered(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &renderedError{err: err}
+}
+
 // IsRendered reports whether err is (or wraps) a value returned by Error.
 func IsRendered(err error) bool {
 	var r *renderedError

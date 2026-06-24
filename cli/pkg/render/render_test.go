@@ -56,6 +56,30 @@ func TestJSONError_WritesEnvelope(t *testing.T) {
 	}
 }
 
+func TestRendered_MarksWithoutWriting(t *testing.T) {
+	inner := clierr.New(clierr.Transport, "boom")
+	err := Rendered(inner)
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	if !IsRendered(err) {
+		t.Fatal("expected IsRendered to be true for Rendered(err)")
+	}
+	if err.Error() != inner.Error() {
+		t.Errorf("Error() = %q, want %q", err.Error(), inner.Error())
+	}
+	var cliErr clierr.CLIError
+	if !errors.As(err, &cliErr) {
+		t.Fatal("expected errors.As to reach the wrapped clierr through Rendered")
+	}
+}
+
+func TestRendered_NilReturnsNil(t *testing.T) {
+	if err := Rendered(nil); err != nil {
+		t.Errorf("Rendered(nil) = %v, want nil", err)
+	}
+}
+
 func TestError_DispatchesJSON(t *testing.T) {
 	ios, _, out, _ := iostreams.Test()
 	ios.JSON = true
