@@ -23,10 +23,9 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   useGetAgent,
-  useListEnvironments,
   useListGateways,
 } from "@agent-management-platform/api-client";
-import { EnvironmentCard, usePipelineEnvironments } from "@agent-management-platform/shared-component";
+import { EnvironmentCard, usePipelineEnvironmentsState } from "@agent-management-platform/shared-component";
 import { InstrumentationDrawer } from "./InstrumentationDrawer";
 import { NoDataFound } from "@agent-management-platform/views";
 import { EnvMonitorsSection } from "./EnvMonitorsSection";
@@ -43,11 +42,10 @@ export const ExternalAgentOverview = () => {
     agentName: agentId,
   });
 
-  const { isLoading: isEnvironmentsLoading } = useListEnvironments({ orgName: orgId });
-
   // Show only the environments in the current project's deployment pipeline,
-  // ordered by the promotion chain.
-  const sortedEnvironmentList = usePipelineEnvironments(orgId, projectId);
+  // ordered by the promotion chain. isLoading covers environments + project + pipelines.
+  const { environments: sortedEnvironmentList, isLoading: isEnvironmentsLoading } =
+    usePipelineEnvironmentsState(orgId, projectId);
 
   // Per-env OTEL endpoint. The gateway mapped to the selected environment carries
   // the externally-reachable vhost; the OTEL RestApi is published at `<vhost>/otel`.
@@ -69,7 +67,7 @@ export const ExternalAgentOverview = () => {
 
   useEffect(() => {
     if (!isEnvironmentsLoading && !selectedEnvironmentId) {
-      setSelectedEnvironmentId(sortedEnvironmentList.length > 0 ? sortedEnvironmentList[0].id! : "");
+      setSelectedEnvironmentId(sortedEnvironmentList.length > 0 ? (sortedEnvironmentList[0].id ?? "") : "");
     }
   }, [sortedEnvironmentList, isEnvironmentsLoading, selectedEnvironmentId]);
 
