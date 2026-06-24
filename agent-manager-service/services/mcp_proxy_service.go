@@ -54,13 +54,6 @@ const (
 	maxMCPResponseBody     = 10 << 20
 )
 
-var excludedMCPProxyPolicyListNames = map[string]struct{}{
-	"mcp-acl-list": {},
-	"mcp-auth":     {},
-	"mcp-authz":    {},
-	"mcp-rewrite":  {},
-}
-
 // MCPProxyService handles MCP proxy operations.
 type MCPProxyService struct {
 	db                   *gorm.DB
@@ -486,9 +479,6 @@ func extractGatewayPolicyManifestItems(value interface{}) []models.MCPPolicyAvai
 		name = strings.TrimSpace(name)
 		version = strings.TrimSpace(version)
 		if name == "" || version == "" {
-			return
-		}
-		if _, ok := excludedMCPProxyPolicyListNames[strings.ToLower(name)]; ok {
 			return
 		}
 		key := name + "\x00" + version
