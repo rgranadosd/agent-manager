@@ -10,8 +10,9 @@ against the identity providers configured on it. Each agent then chooses which o
 providers it accepts.
 
 Identity providers are **owned by the gateway**, not by Agent Manager. You manage them from the
-**Identity Providers** page in the console, which renders a command you run against your cluster.
-The command updates the gateway's runtime configuration and then syncs Agent Manager's records.
+**Identity Providers** card on a gateway's detail page in the console, which renders a command you
+run against your cluster. The command updates the gateway's runtime configuration and then syncs
+Agent Manager's records.
 
 There are two types of identity provider:
 
@@ -25,18 +26,21 @@ There are two types of identity provider:
 - Terminal access to your cluster with `kubectl`, `helm`, and `jq` configured. For the
   quickstart, run the command inside the dev container shell.
 
-## Step 1: Open Identity Providers
+## Step 1: Open the Gateway's Identity Providers
 
 1. Open the AMP Console.
-2. In the left sidebar, under **SECURITY**, click **Identity Providers**.
+2. In the left sidebar, under **INFRASTRUCTURE**, click **Gateways**, then open the gateway you
+   want to secure.
+3. On the gateway's detail page, find the **Identity Providers** card.
 
-The list shows every identity provider configured across your gateways, with its type, issuer,
-environment, and gateway.
+The card shows the identity providers configured on this gateway, with its type, issuer, and
+environment.
 
 ## Step 2: Add an Identity Provider
 
-1. Click **Add Identity Provider**.
-2. Select the **Environment** and **Gateway** the provider belongs to.
+1. In the **Identity Providers** card, click **Add Identity Provider**.
+2. The **Gateway** is already selected. Choose the **Environment** the provider belongs to (it is
+   selected automatically when the gateway maps to a single environment).
 3. Enter a **Name**. Agents reference the provider by this name, so choose something stable and
    descriptive, such as `Auth0` or `EntraID`.
 4. Provide the issuer details, either way:
@@ -66,11 +70,12 @@ Behind the scenes the command:
 4. Waits for the gateway to finish reprogramming.
 
 The command is idempotent — it is safe to re-run. Once it completes, the new provider appears in
-the **Identity Providers** list and becomes selectable when securing an agent with OAuth.
+the gateway's **Identity Providers** card and becomes selectable when securing an agent with OAuth.
 
 ## Step 4: Remove an Identity Provider
 
-1. Open the **Remove Identity Provider** dialog for the provider you want to delete.
+1. In the **Identity Providers** card, hover the provider you want to delete and click the remove
+   icon to open the **Remove Identity Provider** dialog.
 2. Copy the rendered command (it includes `ACTION=delete`) and run it the same way as in Step 3.
 
 System providers such as `ThunderKeyManager` cannot be removed.
