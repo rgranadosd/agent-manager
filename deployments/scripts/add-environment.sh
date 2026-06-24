@@ -32,6 +32,14 @@ set -euo pipefail
 #   - IS_PRODUCTION (default: false)
 #   - ORG_NAME (default: default), DATAPLANE_REF (default: default)
 #   - AGENT_MANAGER_URL (default: http://localhost:9000)
+#   - ENV_INGRESS_HOST (default: am-gateway.localhost): agent-facing gateway host.
+#   - ENV_INGRESS_HTTPS_HOST (default: unset): set on TLS deployments to advertise
+#     an https listener variant. The console reads the https endpoint variant when
+#     the platform runs with tlsEnabled=true, and an Environment's external gateway
+#     wholly replaces the dataplane's, so without this the deployed-agent invoke URL
+#     is empty and try-out 405s. Defaults to ENV_INGRESS_HOST on :443 when only the
+#     TLS toggle is wanted (set ENV_INGRESS_HTTPS_HOST=$ENV_INGRESS_HOST).
+#   - ENV_INGRESS_HTTPS_PORT (default: 443): port for the https listener variant.
 
 # --- Required inputs ---
 : "${ENV_NAME:?ENV_NAME is required (e.g. ENV_NAME=staging)}"
@@ -150,6 +158,19 @@ echo ""
 echo "🌍 Creating environment '${ENV_NAME}'..."
 
 ENV_INGRESS_HOST="${ENV_INGRESS_HOST:-am-gateway.localhost}"
+ENV_INGRESS_HTTPS_HOST="${ENV_INGRESS_HTTPS_HOST:-}"
+ENV_INGRESS_HTTPS_PORT="${ENV_INGRESS_HTTPS_PORT:-443}"
+
+# Build the external listener set. Always advertise http; add an https variant when
+# ENV_INGRESS_HTTPS_HOST is set (TLS deployments). The console reads the https
+# endpoint variant when tlsEnabled=true, and an Environment's external gateway
+# wholly replaces the dataplane's, so an http-only override on a TLS platform leaves
+# the deployed-agent invoke URL empty (try-out then 405s against the console host).
+EXTERNAL_LISTENERS="\"http\": {\"host\": \"${ENV_INGRESS_HOST}\", \"port\": ${GATEWAY_VHOST_PORT}}"
+if [ -n "${ENV_INGRESS_HTTPS_HOST}" ]; then
+    EXTERNAL_LISTENERS="${EXTERNAL_LISTENERS}, \"https\": {\"host\": \"${ENV_INGRESS_HTTPS_HOST}\", \"port\": ${ENV_INGRESS_HTTPS_PORT}}"
+fi
+
 ENV_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${AGENT_MANAGER_API_URL}/orgs/${ORG_NAME}/environments" \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/json" \
@@ -162,10 +183,7 @@ ENV_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${AGENT_MANAGER_API_URL}/org
         \"gateway\": {
             \"ingress\": {
                 \"external\": {
-                    \"http\": {
-                        \"host\": \"${ENV_INGRESS_HOST}\",
-                        \"port\": ${GATEWAY_VHOST_PORT}
-                    }
+                    ${EXTERNAL_LISTENERS}
                 }
             }
         }
