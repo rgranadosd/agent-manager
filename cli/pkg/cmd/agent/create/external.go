@@ -37,10 +37,19 @@ func runExternalPostCreate(ctx context.Context, opts *CreateOptions, agent *amsv
 	}
 	traceObsURL := tc.URL()
 
+	// The token's environment claim must name a real environment. Resolve the
+	// lowest (entry) environment of the project's deployment pipeline — the same
+	// environment internal agent deploys target first — and send it explicitly.
+	env, err := lowestEnvironment(ctx, opts, client)
+	if err != nil {
+		return err
+	}
+
 	expires := externalTokenExpiresIn
 	body := amsvc.TokenRequest{ExpiresIn: &expires}
+	params := &amsvc.GenerateAgentTokenParams{Environment: &env}
 
-	tokenResp, err := client.GenerateAgentTokenWithResponse(ctx, opts.Org, opts.Proj, agent.Name, nil, body)
+	tokenResp, err := client.GenerateAgentTokenWithResponse(ctx, opts.Org, opts.Proj, agent.Name, params, body)
 	if err != nil {
 		return clierr.Newf(clierr.Transport, "generate agent token: %v", err)
 	}
@@ -64,6 +73,23 @@ func runExternalPostCreate(ctx context.Context, opts *CreateOptions, agent *amsv
 	fmt.Fprintln(opts.IO.ErrOut)
 	fmt.Fprintln(opts.IO.ErrOut, instructions)
 	return nil
+}
+
+// lowestEnvironment fetches the project's deployment pipeline and returns its
+// entry environment, which the token request needs for the environment claim.
+func lowestEnvironment(ctx context.Context, opts *CreateOptions, client *amsvc.ClientWithResponses) (string, error) {
+	pipeResp, err := client.GetDeploymentPipelineWithResponse(ctx, opts.Org, opts.Proj)
+	if err != nil {
+		return "", clierr.Newf(clierr.Transport, "get deployment pipeline: %v", err)
+	}
+	if pipeResp.JSON200 == nil {
+		return "", cmdutil.ErrorFromServer(pipeResp.HTTPResponse, cmdutil.FirstNonNil(pipeResp.JSON404, pipeResp.JSON500))
+	}
+	env := cmdutil.LowestEnvironment(pipeResp.JSON200.PromotionPaths)
+	if env == "" {
+		return "", clierr.Newf(clierr.Internal, "deployment pipeline has no entry environment for project %q", opts.Proj)
+	}
+	return env, nil
 }
 
 func otelIngestEndpoint(base string) string {
