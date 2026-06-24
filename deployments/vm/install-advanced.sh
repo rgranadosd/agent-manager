@@ -22,6 +22,8 @@ source "${VM_DIR}/lib-vm.sh"
 source "${VM_DIR}/lib-advanced.sh"
 # shellcheck source=lib-bootstrap.sh
 source "${VM_DIR}/lib-bootstrap.sh"
+# shellcheck source=lib-tls.sh
+source "${VM_DIR}/lib-tls.sh"
 
 print_template() {
   cat <<'TEMPLATE'
@@ -31,10 +33,29 @@ print_template() {
 # --- Required ---
 AMP_VERSION=0.15.0                 # amp/v* release tag (see github.com/wso2/agent-manager/tags)
 DOMAIN_BASE=amp.mycompany.com      # service hosts derived as <svc>.<DOMAIN_BASE>
-TLS_MODE=letsencrypt               # letsencrypt | byoc | upstream
+TLS_MODE=letsencrypt               # letsencrypt | letsencrypt-dns | byoc | selfsigned | upstream
 
 # --- letsencrypt mode ---
 ACME_EMAIL=ops@mycompany.com       # ACME contact (recommended)
+
+# --- letsencrypt-dns mode (DNS-01: public-trusted certs on a PRIVATE VM) ---
+# The ACME CA never connects to the VM; it reads a DNS TXT record, so no public
+# ingress is needed (egress only). Requires a public DNS zone you control — A records
+# may point at the VM's private IP (split-horizon is fine). ACME_EMAIL (above) is
+# required in this mode. Set DNS_PROVIDER to a lego provider and supply that provider's
+# credentials as env vars in this file (lego reads them natively). Documented
+# providers: route53 (AWS) | cloudflare | gcloud (Google Cloud DNS) | azuredns.
+# DNS_PROVIDER=route53
+#   AWS:        AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_REGION=us-east-1
+#   Cloudflare: CF_DNS_API_TOKEN=...
+#   Google:     GCE_PROJECT=... GCE_SERVICE_ACCOUNT_FILE=/opt/amp/gcp-sa.json
+#   Azure:      AZURE_TENANT_ID=... AZURE_CLIENT_ID=... AZURE_CLIENT_SECRET=... AZURE_SUBSCRIPTION_ID=...
+# ACME_SERVER=https://acme-staging-v02.api.letsencrypt.org/directory  # optional: LE staging for testing
+
+# --- selfsigned mode (fully offline: no public zone, no internal CA) ---
+# Generates a local CA + leaf covering every service host + the *.<AGENTS_BASE>
+# wildcard. The CA is written to /opt/amp/certs/ca.crt — import it into client trust
+# stores (MDM/GPO) so browsers trust the console/API without warnings. No extra keys.
 
 # --- byoc mode (operator-supplied cert/key) ---
 # The cert MUST carry SANs covering *.<DOMAIN_BASE> AND *.<AGENTS_BASE>.
@@ -89,6 +110,13 @@ AMP_HOST_CONSOLE="" AMP_HOST_API="" AMP_HOST_THUNDER="" AMP_HOST_OBSERVER=""
 AMP_HOST_GATEWAY="" AMP_HOST_CP="" AMP_AGENTS_BASE=""
 derive_hosts
 
+# letsencrypt-dns and selfsigned both produce a cert/key and reuse the byoc serving
+# path, so default the served paths to the canonical cert dir when unset.
+if [[ "$TLS_MODE" == letsencrypt-dns || "$TLS_MODE" == selfsigned ]]; then
+  TLS_CERT_FILE="${TLS_CERT_FILE:-/opt/amp/certs/fullchain.pem}"
+  TLS_KEY_FILE="${TLS_KEY_FILE:-/opt/amp/certs/privkey.pem}"
+fi
+
 # BYOC cert validation happens before any cluster work.
 if [[ "$TLS_MODE" == byoc ]]; then
   if ! validate_cert "$TLS_CERT_FILE" "$TLS_KEY_FILE"; then
@@ -100,13 +128,14 @@ fi
 render_active_caddyfile() {   # echoes the Caddyfile for the active TLS_MODE
   case "$TLS_MODE" in
     letsencrypt) caddyfile letsencrypt "${ACME_EMAIL:-}" "" "" "" ;;
-    byoc)        caddyfile byoc "" "$TLS_CERT_FILE" "$TLS_KEY_FILE" "" ;;
+    byoc|letsencrypt-dns|selfsigned) caddyfile byoc "" "$TLS_CERT_FILE" "$TLS_KEY_FILE" "" ;;
     upstream)    caddyfile upstream "" "" "" "${UPSTREAM_LISTEN_PORT:-80}" "${UPSTREAM_TRUSTED_PROXIES:-0.0.0.0/0}" ;;
   esac
 }
 
 # start_caddy_advanced — render the active Caddyfile and (re)start the Caddy container.
-# byoc mode bind-mounts the operator cert/key read-only into the container.
+# The cert-file modes (byoc, letsencrypt-dns, selfsigned) bind-mount the cert/key
+# read-only into the container.
 start_caddy_advanced() {
   mkdir -p /opt/amp
   render_active_caddyfile >/opt/amp/Caddyfile
@@ -114,7 +143,7 @@ start_caddy_advanced() {
 
   local mounts=(-v amp-caddy-data:/data -v amp-caddy-config:/config
                 -v /opt/amp/Caddyfile:/etc/caddy/Caddyfile:ro)
-  if [[ "$TLS_MODE" == byoc ]]; then
+  if [[ "$TLS_MODE" == byoc || "$TLS_MODE" == letsencrypt-dns || "$TLS_MODE" == selfsigned ]]; then
     mounts+=(-v "${TLS_CERT_FILE}:${TLS_CERT_FILE}:ro" -v "${TLS_KEY_FILE}:${TLS_KEY_FILE}:ro")
   fi
 
@@ -140,7 +169,16 @@ preflight_dns() {
     return 0
   fi
   if validate_dns "${cand[@]}"; then
-    [[ "$mode" == advisory ]] && log "DNS check: all hostnames resolve to this VM."
+    # validate_dns returns 0 in advisory modes even when some hosts did not resolve,
+    # so only claim success when it actually recorded no errors; otherwise tell the
+    # operator to point their private DNS / client hosts at this VM.
+    if [[ "$mode" == advisory ]]; then
+      if (( ${#DNS_ERRORS[@]} == 0 )); then
+        log "DNS check: all hostnames resolve to this VM."
+      else
+        log "DNS check: some hostnames do not resolve to this VM yet (advisory; see above). Point your private DNS, or client /etc/hosts entries, at this VM before connecting."
+      fi
+    fi
     return 0
   fi
   # validate_dns already printed the per-host details + (letsencrypt) remediation.
@@ -158,8 +196,25 @@ run_advanced_install() {
 
   log "Phase 1/2: bootstrap (Docker + tools + firewall)"
   ensure_prerequisites
+  ensure_inotify_limits
   if [[ "$TLS_MODE" == upstream ]]; then ensure_firewall "${UPSTREAM_LISTEN_PORT:-80}"; else ensure_firewall 443; fi
   ensure_disk
+
+  # Produce the cert before the cluster work for the cert-file modes; both then reuse
+  # the byoc serving path in start_caddy_advanced below.
+  case "$TLS_MODE" in
+    selfsigned)
+      log "Generating local CA + leaf (offline TLS)"
+      generate_selfsigned_ca "$(dirname "$TLS_CERT_FILE")"
+      validate_cert "$TLS_CERT_FILE" "$TLS_KEY_FILE" \
+        || { printf '%s\n' "${CERT_ERRORS[@]}" >&2; die "generated self-signed cert failed validation"; }
+      ;;
+    letsencrypt-dns)
+      mkdir -p /opt/amp
+      install -m 600 "$CONFIG_FILE" /opt/amp/amp-config.env
+      issue_dns01_cert "$(dirname "$TLS_CERT_FILE")"
+      ;;
+  esac
 
   log "Phase 2/2: install Agent Manager + start Caddy (this takes 8-15 min)"
   # Build the override arrays install.sh honors, from the hostname-driven cores.
@@ -192,6 +247,12 @@ run_advanced_install() {
 
   start_caddy_advanced
 
+  # DNS-01 certs are short-lived; install a daily renewal timer (lego renew + Caddy
+  # reload). The timer reads provider creds from the saved config copy.
+  if [[ "$TLS_MODE" == letsencrypt-dns ]]; then
+    install_renewal_timer "$(dirname "$TLS_CERT_FILE")" /opt/amp/amp-config.env
+  fi
+
   log "Done. Access URLs:"
   cat <<EOF
 
@@ -203,6 +264,12 @@ run_advanced_install() {
   Deployed agents: https://<org>-<project>.${AMP_AGENTS_BASE}/...
 EOF
   [[ -n "$AMP_HOST_CP" ]] && echo "  Gateway control plane: https://${AMP_HOST_CP}  (connect external gateways here; registration token is secret-bearing)"
+  [[ "$TLS_MODE" == selfsigned ]] && cat <<EOF
+
+  Self-signed mode: import the CA into client trust stores so browsers trust these
+  hosts without warnings:
+    CA cert: $(dirname "$TLS_CERT_FILE")/ca.crt
+EOF
 }
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -212,6 +279,16 @@ if [[ "$DRY_RUN" == "true" ]]; then
     "$AMP_HOST_GATEWAY" "${AMP_HOST_CP:-<none>}" "$AMP_AGENTS_BASE"
   log "DRY RUN — amp helm args:"; amp_helm_args
   log "DRY RUN — Caddyfile (${TLS_MODE}):"; render_active_caddyfile
+  case "$TLS_MODE" in
+    letsencrypt-dns)
+      log "DRY RUN — DNS-01 issuance plan (lego):"
+      build_lego_args "${ACME_EMAIL:-}" "$DNS_PROVIDER" "$(dirname "$TLS_CERT_FILE")" "${ACME_SERVER:-}" run
+      ;;
+    selfsigned)
+      log "DRY RUN — self-signed cert SANs:"
+      tls_san_list
+      ;;
+  esac
   log "DRY RUN — DNS pre-flight (advisory):"; preflight_dns advisory
   exit 0
 fi

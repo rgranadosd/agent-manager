@@ -9,6 +9,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib-advanced.sh disable=SC1091
 source "${SCRIPT_DIR}/../lib-advanced.sh"
+# shellcheck source=../lib-vm.sh disable=SC1091
+source "${SCRIPT_DIR}/../lib-vm.sh"
+# shellcheck source=../lib-tls.sh disable=SC1091
+source "${SCRIPT_DIR}/../lib-tls.sh"
 
 FAILLOG="$(mktemp)"
 TMP="$(mktemp -d)"
@@ -112,6 +116,17 @@ _resolve_host() { echo ""; }
 validate_dns 203.0.113.10; rc=$?
 assert_eq "LE unresolved rc=1" "1" "$rc"
 unset -f _resolve_host
+
+# --- generate_selfsigned_ca: produces a CA + leaf whose SANs cover every host ---
+generate_selfsigned_ca "$TMP/ssg" 365
+assert_eq "selfsigned writes ca.crt"      "yes" "$([[ -f "$TMP/ssg/ca.crt" ]] && echo yes || echo no)"
+assert_eq "selfsigned writes fullchain"   "yes" "$([[ -f "$TMP/ssg/fullchain.pem" ]] && echo yes || echo no)"
+# validate_cert reads AMP_HOST_* (set at top of this file) + checks SAN coverage incl.
+# the *.agents wildcard, so a passing rc proves the generated SANs are complete.
+validate_cert "$TMP/ssg/fullchain.pem" "$TMP/ssg/privkey.pem"; rc=$?
+assert_eq "selfsigned cert validates rc=0" "0" "$rc"
+ssg_sans="$(openssl x509 -noout -ext subjectAltName -in "$TMP/ssg/fullchain.pem" 2>/dev/null)"
+assert_eq "selfsigned covers agents wildcard" "yes" "$(grep -qF '*.agents.amp.mycompany.com' <<<"$ssg_sans" && echo yes || echo no)"
 
 if [[ -s "$FAILLOG" ]]; then echo "PREFLIGHT TESTS FAILED"; exit 1; fi
 echo "ALL PREFLIGHT TESTS PASSED"

@@ -25,8 +25,12 @@ derive_hosts() {
 load_config() {
   local file="${1:?load_config requires a config file path}"
   [[ -f "$file" ]] || { printf 'config file not found: %s\n' "$file" >&2; return 1; }
+  # Export every assignment so DNS-provider credentials (CF_*, AWS_*, GCE_*, ...) reach
+  # the dockerized lego: _lego_cred_env_args lists them via `compgen -e` (exported only)
+  # and forwards them with `docker run -e`. A plain `source` leaves them unexported, so
+  # token-based providers (Cloudflare/route53/azuredns) would silently get no credentials.
   # shellcheck disable=SC1090
-  source "$file"
+  set -a; source "$file"; set +a
 }
 
 # validate_config — check required keys and mode-specific requirements. Populates the
@@ -61,11 +65,22 @@ validate_config() {
         fi
       fi
       ;;
+    letsencrypt-dns)
+      # DNS-01: the ACME CA never connects to the VM (reads a TXT record from public
+      # DNS), so this works on a private VM. lego needs a provider to write the TXT
+      # record and an account email to register.
+      [[ -n "${DNS_PROVIDER:-}" ]] || CONFIG_ERRORS+=("DNS_PROVIDER is required for letsencrypt-dns mode (a lego DNS provider, e.g. route53 | cloudflare | gcloud | azuredns)")
+      [[ -n "${ACME_EMAIL:-}" ]]   || CONFIG_ERRORS+=("ACME_EMAIL is required for letsencrypt-dns mode (lego registers an ACME account with it)")
+      ;;
+    selfsigned)
+      # Offline: a local CA + leaf is generated; no public zone, CA, or email needed.
+      :
+      ;;
     "")
-      CONFIG_ERRORS+=("TLS_MODE is required (letsencrypt | byoc | upstream)")
+      CONFIG_ERRORS+=("TLS_MODE is required (letsencrypt | letsencrypt-dns | byoc | selfsigned | upstream)")
       ;;
     *)
-      CONFIG_ERRORS+=("TLS_MODE must be one of: letsencrypt | byoc | upstream (got '${TLS_MODE}')")
+      CONFIG_ERRORS+=("TLS_MODE must be one of: letsencrypt | letsencrypt-dns | byoc | selfsigned | upstream (got '${TLS_MODE}')")
       ;;
   esac
   (( ${#CONFIG_ERRORS[@]} == 0 ))
@@ -191,7 +206,7 @@ validate_dns() {
       printf '[preflight] In letsencrypt mode every hostname (incl. *.%s) must A-record to this VM before ACME can issue. Create those records and re-run.\n' "$AMP_AGENTS_BASE" >&2
       return 1
     fi
-    printf '[preflight] (advisory in %s mode — a load balancer / proxy may front DNS)\n' "${TLS_MODE:-?}" >&2
+    printf '[preflight] (advisory in %s mode; ensure your DNS or client hosts entries point at this VM)\n' "${TLS_MODE:-?}" >&2
   fi
   return 0
 }
