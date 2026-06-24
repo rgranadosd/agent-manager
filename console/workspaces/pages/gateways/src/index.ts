@@ -15,10 +15,9 @@
  * under the License.
  */
 
-import { DoorClosedLocked, KeyRound, ShieldCheck } from "@wso2/oxygen-ui-icons-react";
+import { DoorClosedLocked } from "@wso2/oxygen-ui-icons-react";
 import type { PageMetadata } from "@agent-management-platform/types";
 import { GatewaysOrganization } from "./Gateways.Organization";
-import { IdentityProvidersOrganization } from "./IdentityProviders.Organization";
 
 export const metaData: PageMetadata = {
   title: "Gateways",
@@ -36,28 +35,6 @@ export const gatewaysMetadata = {
   icon: metaData.icon,
 };
 
-export const identityProvidersMetaData: PageMetadata = {
-  title: "Identity Providers",
-  description: "Manage gateway identity providers (token issuers)",
-  icon: KeyRound,
-  path: "/security/identity-providers",
-  component: IdentityProvidersOrganization,
-  levels: {
-    organization: IdentityProvidersOrganization,
-  },
-};
-
-// Nav metadata for the org-level "Security" section and its "Identity Providers" child.
-export const securityMetadata = {
-  title: "Security",
-  icon: ShieldCheck,
-};
-
-export const identityProvidersMetadata = {
-  title: identityProvidersMetaData.title,
-  icon: identityProvidersMetaData.icon,
-};
-
-export { GatewaysOrganization, IdentityProvidersOrganization };
+export { GatewaysOrganization };
 
 export default GatewaysOrganization;

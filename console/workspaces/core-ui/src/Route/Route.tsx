@@ -34,7 +34,6 @@ import {
   LazyAddMCPServerComponent,
   LazyViewMCPServerComponent,
   LazyGatewaysOrg,
-  LazyIdentityProvidersOrg,
   LazyIdentitiesOrg,
   LazyDeploymentPipelinesOrg,
   LazyEnvironmentsOrg,
@@ -222,12 +221,6 @@ export function RootRouter() {
                 relativeRouteMap.children.org.children.identities.path + "/*"
               }
               element={<LazyIdentitiesOrg />}
-            />
-            <Route
-              path={
-                relativeRouteMap.children.org.children.security.path + "/*"
-              }
-              element={<LazyIdentityProvidersOrg />}
             />
             <Route
               path={

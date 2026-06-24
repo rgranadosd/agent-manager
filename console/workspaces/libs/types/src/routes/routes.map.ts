@@ -51,17 +51,6 @@ export const rootRouteMap: AppRoute = {
                         },
                     },
                 },
-                security: {
-                    path: 'security',
-                    index: true,
-                    children: {
-                        identityProviders: {
-                            path: 'identity-providers',
-                            index: true,
-                            children: {},
-                        },
-                    },
-                },
                 llmProviders: {
                     path: 'llm-providers',
                     index: true,
