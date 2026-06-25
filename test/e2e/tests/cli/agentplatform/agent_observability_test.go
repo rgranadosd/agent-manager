@@ -14,10 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package cliagentobstests
+package cliagentplatformtests
 
 import (
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,16 +29,13 @@ import (
 	"github.com/wso2/agent-manager/test/e2e/testsetup"
 )
 
-var _ = Describe("amctl agent (CLI-owned lifecycle)", Label("cli", "agent", "slow"), Ordered, func() {
+var _ = Describe("amctl agent (CLI-owned lifecycle)", Label("cli", "agent"), Ordered, func() {
 	var (
 		cfg   *framework.Config
 		owned *framework.CLILifecycleAgent
 	)
 
 	BeforeAll(func() {
-		if os.Getenv("OPENAI_API_KEY") == "" {
-			Skip("OPENAI_API_KEY not set; skipping slow CLI lifecycle suite")
-		}
 		cfg = framework.LoadConfig()
 		client, err := framework.NewAMPClient(cfg)
 		Expect(err).NotTo(HaveOccurred())

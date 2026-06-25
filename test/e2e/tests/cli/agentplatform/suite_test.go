@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package cliagentobstests
+package cliagentplatformtests
 
 import (
 	"testing"
@@ -28,7 +28,7 @@ import (
 // H is the shared CLI harness: binary built once, logged in per parallel process.
 var H = amctl.RegisterSuite()
 
-func TestCLIAgentObs(t *testing.T) {
+func TestCLIAgentPlatform(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "CLI Agent Observability Suite")
+	RunSpecs(t, "CLI Platform Agent Suite")
 }
