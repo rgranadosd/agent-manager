@@ -667,7 +667,7 @@ export const ViewLLMProviderComponent: React.FC = () => {
             const headerName = authEntry?.name || "Authorization";
             const headerValue = authEntry?.value || (apiKeyEnvVar ? `$${apiKeyEnvVar.name}` : "<api-key>");
             const curlCode = [
-              `curl -X POST ${providerConfig.url || "<endpoint-url>"}`,
+              `curl -X POST ${providerConfig.url || "<endpoint-url>"}/chat/completions`,
               `  --header "${headerName}: ${headerValue}"`,
               `  -d '{"model": "", "messages": [{"role": "user", "content": "Hi..."}]}'`,
             ].join(" \\\n");
