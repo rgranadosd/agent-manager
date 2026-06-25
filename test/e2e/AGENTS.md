@@ -190,7 +190,7 @@ picked up automatically with no CI change.
   `operations/cli/<resource>/`. The `agentplatform` suite owns a dedicated
   running platform agent and hosts its mutating/observability/llm commands; the
   keyless `agent` suite covers build-free agent CRUD. Every e2e run executes all
-  suites together — there is no fast/slow or opt-in tier.
+  suites together.
 - Keep `framework/amctl` resource-agnostic. Never add project/agent/etc.
   knowledge to the harness.
 - CLI specs assert exit codes and JSON envelopes, not human-readable text.
