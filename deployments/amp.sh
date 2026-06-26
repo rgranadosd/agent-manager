@@ -25,6 +25,20 @@ CMD="${1:-}"
 
 case "$CMD" in
 
+--help|-h|help)
+    echo "Uso: bash deployments/amp.sh <comando>"
+    echo ""
+    echo "  Cluster:"
+    echo "    start    Arranca el cluster pausado (auto-fix Podman si falla)"
+    echo "    stop     Pausa el cluster (conserva todos los datos)"
+    echo "    init     Borra y reinstala desde cero (VERSION=0.16.0)"
+    echo "    status   Muestra estado de pods, gateway y agentes"
+    echo ""
+    echo "  WSO2 upstream:"
+    echo "    check    Ve si WSO2 tiene cambios nuevos (sin tocar nada)"
+    echo "    update   Descarga y aplica los cambios de WSO2"
+    ;;
+
 stop)
     echo -e "${B}Parando cluster $CLUSTER...${N}"
     k3d cluster stop "$CLUSTER" && ok "Cluster pausado (datos conservados)" || fail "Error al parar el cluster"
@@ -112,13 +126,16 @@ update)
     ;;
 
 *)
-    echo "Uso: bash deployments/amp.sh {start|stop|init|status|check|update}"
+    echo "Uso: bash deployments/amp.sh <comando>"
     echo ""
-    echo "  start    Arranca el cluster pausado"
-    echo "  stop     Pausa el cluster (conserva datos)"
-    echo "  init     Borra y reinstala desde cero (VERSION=0.16.0)"
-    echo "  status   Muestra el estado actual"
-    echo "  check    Ve si WSO2 tiene cambios (sin tocar nada)"
-    echo "  update   Descarga y aplica los cambios de WSO2"
+    echo "  Cluster:"
+    echo "    start    Arranca el cluster pausado (auto-fix Podman si falla)"
+    echo "    stop     Pausa el cluster (conserva todos los datos)"
+    echo "    init     Borra y reinstala desde cero (VERSION=0.16.0)"
+    echo "    status   Muestra estado de pods, gateway y agentes"
+    echo ""
+    echo "  WSO2 upstream:"
+    echo "    check    Ve si WSO2 tiene cambios nuevos (sin tocar nada)"
+    echo "    update   Descarga y aplica los cambios de WSO2"
     ;;
 esac
