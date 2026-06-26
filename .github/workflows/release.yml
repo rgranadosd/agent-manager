@@ -540,6 +540,8 @@ jobs:
 
   create-release:
     name: Create Release
+    # E2E is intentionally NOT a dependency here: it runs in parallel and reports
+    # red/green for the same run, but it does not gate the release.
     needs:
       [
         prepare-release,
@@ -547,7 +549,6 @@ jobs:
         build-python-instrumentation-provider-images,
         package-charts,
         build-amctl,
-        e2e,
       ]
     if: ${{ !contains(inputs.target_version, '-rc') }}
     runs-on:
