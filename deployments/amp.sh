@@ -71,12 +71,54 @@ status)
     bash "$SCRIPT_DIR/amp-status.sh"
     ;;
 
-*)
-    echo "Uso: bash deployments/amp.sh {start|stop|init|status}"
+check)
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
+    echo -e "${B}Comprobando cambios en WSO2 upstream...${N}"
+    git -C "$REPO_DIR" fetch origin -q
+    NEW=$(git -C "$REPO_DIR" log main..origin/main --oneline)
+    if [ -z "$NEW" ]; then
+        ok "Sin cambios — estás al día con WSO2"
+    else
+        COUNT=$(echo "$NEW" | wc -l | tr -d ' ')
+        warn "$COUNT commits nuevos en WSO2:"
+        echo "$NEW" | sed 's/^/    /'
+        echo ""
+        echo "  Para actualizar: bash deployments/amp.sh update"
+    fi
+    ;;
+
+update)
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
+    CURRENT=$(git -C "$REPO_DIR" branch --show-current)
+    echo -e "${B}Actualizando desde WSO2 upstream...${N}"
+    git -C "$REPO_DIR" fetch origin -q
+    NEW=$(git -C "$REPO_DIR" log main..origin/main --oneline)
+    if [ -z "$NEW" ]; then
+        ok "Ya estás al día, nada que actualizar"
+        exit 0
+    fi
+    COUNT=$(echo "$NEW" | wc -l | tr -d ' ')
+    echo "  $COUNT commits nuevos:"
+    echo "$NEW" | sed 's/^/    /'
     echo ""
-    echo "  start   Arranca el cluster pausado"
-    echo "  stop    Pausa el cluster (conserva datos)"
-    echo "  init    Borra y reinstala desde cero (VERSION=0.16.0)"
-    echo "  status  Muestra el estado actual"
+    # Avanzar main hasta origin/main
+    git -C "$REPO_DIR" branch -f main origin/main
+    ok "main actualizado a origin/main"
+    # Rerebasar la rama de trabajo encima del nuevo main
+    git -C "$REPO_DIR" rebase main "$CURRENT" 2>&1 | sed 's/^/    /'
+    ok "Rama $CURRENT rebasada encima del nuevo main"
+    echo ""
+    warn "Si cambia algo en install.sh, haz: bash deployments/amp.sh init"
+    ;;
+
+*)
+    echo "Uso: bash deployments/amp.sh {start|stop|init|status|check|update}"
+    echo ""
+    echo "  start    Arranca el cluster pausado"
+    echo "  stop     Pausa el cluster (conserva datos)"
+    echo "  init     Borra y reinstala desde cero (VERSION=0.16.0)"
+    echo "  status   Muestra el estado actual"
+    echo "  check    Ve si WSO2 tiene cambios (sin tocar nada)"
+    echo "  update   Descarga y aplica los cambios de WSO2"
     ;;
 esac
