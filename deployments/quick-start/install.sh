@@ -276,7 +276,7 @@ helm_install_idempotent() {
         --namespace "${namespace}" \
         --create-namespace \
         --timeout "${timeout}s" \
-        "${extra_args[@]}"; then
+        ${extra_args[@]+"${extra_args[@]}"}; then
         log_success "${release_name} installed successfully"
         return 0
     else
@@ -890,7 +890,7 @@ else
         --timeout "${TIMEOUT_CONTROL_PLANE}s" \
         --version "${OPENCHOREO_VERSION}" \
         --values "${DEPLOYMENTS_DIR}/single-cluster/values-cp.yaml" \
-        "${CP_HELM_ARGS[@]}" 2>&1); then
+        ${CP_HELM_ARGS[@]+"${CP_HELM_ARGS[@]}"} 2>&1); then
         echo "$CP_INSTALL_OUTPUT"
         if echo "$CP_INSTALL_OUTPUT" | grep -q "no endpoints available for service \"controller-manager-webhook-service\""; then
             log_warning "Control Plane webhook was not ready. Waiting for deployments and retrying once..."
@@ -902,7 +902,7 @@ else
                 --timeout "${TIMEOUT_CONTROL_PLANE}s" \
                 --version "${OPENCHOREO_VERSION}" \
                 --values "${DEPLOYMENTS_DIR}/single-cluster/values-cp.yaml" \
-                "${CP_HELM_ARGS[@]}" || { log_error "Failed to install openchoreo-control-plane after retry"; exit 1; }
+                ${CP_HELM_ARGS[@]+"${CP_HELM_ARGS[@]}"} || { log_error "Failed to install openchoreo-control-plane after retry"; exit 1; }
         else
             log_error "Failed to install openchoreo-control-plane"
             exit 1

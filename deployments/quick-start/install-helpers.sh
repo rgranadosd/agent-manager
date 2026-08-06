@@ -136,7 +136,7 @@ install_amp_helm_chart() {
         --namespace "${namespace}" \
         --create-namespace \
         --timeout "${timeout}s" \
-        "${extra_args[@]}"; then
+        ${extra_args[@]+"${extra_args[@]}"}; then
         return 0
     else
         return 1
@@ -159,7 +159,7 @@ install_agent_management_platform() {
         --version "${chart_version}" \
         --set console.config.instrumentationUrl="http://default-default.gateway.localhost:19080/otel" \
         --set agentManagerService.config.amObserverPublicURL="http://traces.amp.localhost:11080" \
-        "${AMP_HELM_ARGS[@]}" >"${helm_log}" 2>&1; then
+        ${AMP_HELM_ARGS[@]+"${AMP_HELM_ARGS[@]}"} >"${helm_log}" 2>&1; then
         echo "Helm installation log (last 50 lines):"
         tail -50 "${helm_log}" 2>/dev/null || cat "${helm_log}" 2>/dev/null || echo "Log file not available"
         echo ""
@@ -225,7 +225,7 @@ install_observability_extension() {
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${OBSERVABILITY_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${OBSERVABILITY_HELM_ARGS[@]}"; then
+        ${OBSERVABILITY_HELM_ARGS[@]+"${OBSERVABILITY_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -297,7 +297,7 @@ install_amp_thunder_extension() {
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${THUNDER_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${THUNDER_HELM_ARGS[@]}"; then
+        ${THUNDER_HELM_ARGS[@]+"${THUNDER_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -313,7 +313,7 @@ install_evaluation_extension() {
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${EVALUATION_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${EVALUATION_HELM_ARGS[@]}"; then
+        ${EVALUATION_HELM_ARGS[@]+"${EVALUATION_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -356,7 +356,7 @@ install_platform_resources_extension() {
     # Install Helm chart
     if ! install_amp_helm_chart "${release_name}" "${chart_ref}" "${DEFAULT_NS}" "${TIMEOUT_AMP_INSTALL}" \
         --version "${chart_version}" \
-        "${PLATFORM_RESOURCES_HELM_ARGS[@]}"; then
+        ${PLATFORM_RESOURCES_HELM_ARGS[@]+"${PLATFORM_RESOURCES_HELM_ARGS[@]}"}; then
         return 1
     fi
 
@@ -460,8 +460,8 @@ install_gateway_extension() {
         --set agentManager.orgName=default \
         --set gateway.environment=default \
         --set gateway.vhost="${gateway_vhost}" \
-        "${thunder_args[@]}" \
-        "${GATEWAY_HELM_ARGS[@]}"; then
+        ${thunder_args[@]+"${thunder_args[@]}"} \
+        ${GATEWAY_HELM_ARGS[@]+"${GATEWAY_HELM_ARGS[@]}"}; then
         return 1
     fi
 
