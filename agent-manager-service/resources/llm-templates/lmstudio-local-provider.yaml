@@ -1,0 +1,39 @@
+# LlmProvider que consume la template lmstudio-local.
+# Registrar DESPUES de la template:
+#   POST http://<gw-controller>:9090/api/management/v0.9/llm-providers
+#
+# Se usa la IP y no host.lima.internal a proposito: ese nombre no esta fijado en
+# el NodeHosts de CoreDNS, asi que su resolucion depende de una cadena de reenvio
+# DNS. 192.168.5.2 es `gatewayAddress` en ~/.colima/<perfil>/colima.yaml: valor de
+# configuracion, no de DHCP. Sobrevive a cambios de red y a colima stop/start.
+# NO usar host.k3d.internal: resuelve a 172.18.0.1, el bridge Docker de la VM.
+#
+# Verificado desde el pod gateway-runtime: alcanza el Mac en 192.168.5.2
+# incluso para servicios atados solo a 127.0.0.1, asi que LM Studio puede
+# quedarse en su 127.0.0.1:1234 por defecto.
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: LlmProvider
+metadata:
+  name: lmstudio-local-provider
+spec:
+  displayName: LM Studio Local
+  version: v1.0
+  template: lmstudio-local
+  upstream:
+    url: http://192.168.5.2:1234/v1
+    auth:
+      type: api-key
+      header: Authorization
+      # LM Studio no valida la key, pero acepta el bearer y lo ignora.
+      value: Bearer lm-studio
+  # Con deny_all + estas excepciones se ajusta al ejemplo de la doc. Los otros
+  # providers de esta instancia usan allow_all; si algo da 403, ese es el motivo.
+  accessControl:
+    mode: deny_all
+    exceptions:
+      - path: /chat/completions
+        methods: [POST]
+      - path: /models
+        methods: [GET]
+      - path: /models/{modelId}
+        methods: [GET]

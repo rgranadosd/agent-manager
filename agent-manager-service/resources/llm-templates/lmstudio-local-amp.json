@@ -1,0 +1,33 @@
+{
+  "id": "lmstudio-local",
+  "name": "LM Studio (local)",
+  "description": "LM Studio en el Mac anfitrion, alcanzable desde k3s via host.lima.internal",
+  "metadata": {
+    "endpointUrl": "http://192.168.5.2:1234/v1",
+    "auth": {
+      "type": "api-key",
+      "header": "Authorization",
+      "valuePrefix": "Bearer "
+    }
+  },
+  "promptTokens": {
+    "location": "payload",
+    "identifier": "$.usage.prompt_tokens"
+  },
+  "completionTokens": {
+    "location": "payload",
+    "identifier": "$.usage.completion_tokens"
+  },
+  "totalTokens": {
+    "location": "payload",
+    "identifier": "$.usage.total_tokens"
+  },
+  "requestModel": {
+    "location": "payload",
+    "identifier": "$.model"
+  },
+  "responseModel": {
+    "location": "payload",
+    "identifier": "$.model"
+  }
+}

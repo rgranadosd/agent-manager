@@ -1,0 +1,34 @@
+# LlmProviderTemplate para LM Studio corriendo en el Mac anfitrion, fuera del k3s.
+#
+# Conforme a AI Gateway 1.1.0 / LLM Proxy / LLM Provider Templates.
+# Se registra en la API de gestion del gateway:
+#   POST http://<gw-controller>:9090/api/management/v0.9/llm-provider-templates
+#
+# LM Studio expone un servidor compatible con OpenAI, asi que las rutas de
+# extraccion son las mismas que la template openai de fabrica.
+#
+# El endpoint y la auth NO van aqui: la doc los coloca en el LlmProvider
+# (spec.upstream). Ver lmstudio-local-provider.yaml.
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: LlmProviderTemplate
+metadata:
+  name: lmstudio-local
+spec:
+  displayName: LM Studio (local)
+  promptTokens:
+    location: payload
+    identifier: $.usage.prompt_tokens
+  completionTokens:
+    location: payload
+    identifier: $.usage.completion_tokens
+  totalTokens:
+    location: payload
+    identifier: $.usage.total_tokens
+  # remainingTokens se omite a proposito (opcional segun el field reference):
+  # LM Studio no emite cabeceras x-ratelimit-*.
+  requestModel:
+    location: payload
+    identifier: $.model
+  responseModel:
+    location: payload
+    identifier: $.model
